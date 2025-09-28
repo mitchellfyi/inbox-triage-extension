@@ -43,7 +43,7 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 ### AI Integration
 - `[done]` Summarizer API integration testing - Validate across different thread lengths
 - `[done]` Prompt API JSON schema enforcement - Ensure reliable structured output
-- `[todo]` Tone parameter validation - Test all tone options (neutral, friendly, assertive, formal)
+- `[done]` Tone parameter validation - Test all tone options (neutral, friendly, assertive, formal)
 - `[done]` Fallback draft generation - Handle AI failures gracefully
 
 ## Gmail Extraction
