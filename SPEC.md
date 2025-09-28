@@ -129,6 +129,17 @@ This project builds a Chrome extension for inbox triage that summarises email th
 **And** provide clear instructions on how to enable Chrome AI features  
 **And** gracefully disable AI-dependent UI elements until models are ready
 
+### Processing Mode Configuration
+**Given** the user opens the side panel  
+**When** they view the Processing Settings section  
+**Then** they should see radio buttons for "On-device only" and "Hybrid (Allow cloud fallback)" modes  
+**And** "On-device only" should be selected by default  
+**When** the user selects "Hybrid (Allow cloud fallback)"  
+**Then** a privacy notice should appear explaining data transmission implications  
+**And** the notice should clarify that cloud fallback is not currently implemented  
+**And** their selection should be persisted across browser sessions  
+**And** all AI operations should continue using on-device processing only
+
 ## Technical Requirements
 
 - Manifest V3 Chrome extension using the Side Panel API.
@@ -153,6 +164,7 @@ A submission must include a public repository with install instructions, a short
 
 - **Privacy**: All processing must happen locally; do not collect or transmit user data. Email content and attachments never leave the user's device.
 - **Attachment Privacy**: File processing (PDF, DOCX, XLSX, images) must occur entirely on-device using local parsing libraries. No attachment content should be sent to external services.
+- **Processing Mode Configuration**: Users can select between "On-device only" (default) and "Hybrid (Allow cloud fallback)" modes. The hybrid mode displays privacy notices but currently maintains on-device processing only to preserve privacy guarantees.
 - **Maintainability**: Organise code for readability and future enhancements.
 - **Accessibility**: Ensure UI controls are keyboard accessible and labelled.
 - **Performance**: Attachment processing should not block the UI and should handle large files gracefully with appropriate size limits.

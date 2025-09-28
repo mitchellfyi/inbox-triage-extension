@@ -225,11 +225,11 @@ class InboxTriageServiceWorker {
         try {
             switch (message.action) {
                 case 'generateSummary':
-                    await this.generateSummary(message.thread, sendResponse);
+                    await this.generateSummary(message.thread, sendResponse, message.userSettings);
                     break;
                     
                 case 'generateDrafts':
-                    await this.generateReplyDrafts(message.thread, message.tone, message.guidance, sendResponse);
+                    await this.generateReplyDrafts(message.thread, message.tone, message.guidance, sendResponse, message.userSettings);
                     break;
                     
                 case 'processAttachment':
@@ -263,19 +263,36 @@ class InboxTriageServiceWorker {
         }
     }
     
-    async generateSummary(thread, sendResponse) {
+    async generateSummary(thread, sendResponse, userSettings = null) {
         try {
+            const processingMode = userSettings?.processingMode || 'device-only';
+            let usedFallback = false;
+            
             // Check AI capabilities first
             if (!this.aiCapabilities.summarizer) {
-                throw new Error('AI summarization is not available in this browser. Please use Chrome 120+ with AI features enabled.');
+                if (processingMode === 'hybrid') {
+                    // In a real implementation, this would trigger cloud fallback
+                    // For now, we show a message about privacy constraints
+                    throw new Error('AI summarization is not available in this browser. Cloud fallback is not implemented to maintain privacy guarantees. Please use Chrome 120+ with AI features enabled.');
+                } else {
+                    throw new Error('AI summarization is not available in this browser. Please use Chrome 120+ with AI features enabled.');
+                }
             }
             
             // Check if model is ready
             const capabilities = this.aiCapabilities.summarizer;
             if (capabilities.available === 'after-download') {
-                throw new Error('AI model is downloading. This may take a few minutes. Please try again later.');
+                if (processingMode === 'hybrid') {
+                    throw new Error('AI model is downloading. Cloud fallback is not implemented to maintain privacy guarantees. Please wait for download to complete.');
+                } else {
+                    throw new Error('AI model is downloading. This may take a few minutes. Please try again later.');
+                }
             } else if (capabilities.available === 'no') {
-                throw new Error('AI summarization is not available. Please enable Chrome AI features in Settings > Privacy and security > Experimental AI.');
+                if (processingMode === 'hybrid') {
+                    throw new Error('AI summarization is not available. Cloud fallback is not implemented to maintain privacy guarantees. Please enable Chrome AI features in Settings > Privacy and security > Experimental AI.');
+                } else {
+                    throw new Error('AI summarization is not available. Please enable Chrome AI features in Settings > Privacy and security > Experimental AI.');
+                }
             }
             
             // Combine all message content
@@ -330,7 +347,8 @@ class InboxTriageServiceWorker {
             sendResponse({
                 success: true,
                 summary: summary,
-                keyPoints: keyPoints
+                keyPoints: keyPoints,
+                usedFallback: usedFallback
             });
             
         } catch (error) {
@@ -351,18 +369,33 @@ class InboxTriageServiceWorker {
         }
     }
     
-    async generateReplyDrafts(thread, tone, guidance, sendResponse) {
+    async generateReplyDrafts(thread, tone, guidance, sendResponse, userSettings = null) {
         try {
+            const processingMode = userSettings?.processingMode || 'device-only';
+            let usedFallback = false;
+            
             if (!this.aiCapabilities.promptApi) {
-                throw new Error('Language Model API not available. Please enable AI features in Chrome.');
+                if (processingMode === 'hybrid') {
+                    throw new Error('Language Model API not available. Cloud fallback is not implemented to maintain privacy guarantees. Please enable AI features in Chrome.');
+                } else {
+                    throw new Error('Language Model API not available. Please enable AI features in Chrome.');
+                }
             }
             
             // Check if model is ready
             const capabilities = this.aiCapabilities.promptApi;
             if (capabilities.available === 'after-download') {
-                throw new Error('AI model is downloading. This may take a few minutes. Please try again later.');
+                if (processingMode === 'hybrid') {
+                    throw new Error('AI model is downloading. Cloud fallback is not implemented to maintain privacy guarantees. Please wait for download to complete.');
+                } else {
+                    throw new Error('AI model is downloading. This may take a few minutes. Please try again later.');
+                }
             } else if (capabilities.available === 'no') {
-                throw new Error('Language Model API is not available. Please enable Chrome AI features in Settings > Privacy and security > Experimental AI.');
+                if (processingMode === 'hybrid') {
+                    throw new Error('Language Model API is not available. Cloud fallback is not implemented to maintain privacy guarantees. Please enable Chrome AI features in Settings > Privacy and security > Experimental AI.');
+                } else {
+                    throw new Error('Language Model API is not available. Please enable Chrome AI features in Settings > Privacy and security > Experimental AI.');
+                }
             }
             
             const fullText = this.combineThreadMessages(thread);
@@ -418,14 +451,16 @@ class InboxTriageServiceWorker {
                 sendResponse({
                     success: true,
                     drafts: fallbackFormatted,
-                    warning: 'AI response was incomplete, using fallback drafts'
+                    warning: 'AI response was incomplete, using fallback drafts',
+                    usedFallback: usedFallback
                 });
                 return;
             }
             
             sendResponse({
                 success: true,
-                drafts: formattedDrafts
+                drafts: formattedDrafts,
+                usedFallback: usedFallback
             });
             
         } catch (error) {

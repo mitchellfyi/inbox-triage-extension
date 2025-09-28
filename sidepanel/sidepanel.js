@@ -8,9 +8,13 @@ class InboxTriageSidePanel {
         this.currentThread = null;
         this.currentSummary = null;
         this.currentDrafts = [];
+        this.userSettings = {
+            processingMode: 'device-only' // default to on-device only
+        };
         
         this.initializeElements();
         this.bindEvents();
+        this.loadUserSettings();
         this.checkInitialStatus();
     }
     
@@ -92,7 +96,11 @@ class InboxTriageSidePanel {
             micBtn: document.getElementById('mic-btn'),
             micStatus: document.getElementById('mic-status'),
             generateDraftsBtn: document.getElementById('generate-drafts-btn'),
-            replyDrafts: document.getElementById('reply-drafts')
+            replyDrafts: document.getElementById('reply-drafts'),
+            // Settings elements
+            deviceOnlyRadio: document.getElementById('mode-device-only'),
+            hybridRadio: document.getElementById('mode-hybrid'),
+            privacyNotice: document.getElementById('privacy-notice')
         };
         
         // Initialize voice recognition
@@ -106,6 +114,10 @@ class InboxTriageSidePanel {
         this.elements.generateDraftsBtn.addEventListener('click', () => this.generateReplyDrafts());
         this.elements.toneSelector.addEventListener('change', () => this.onToneChange());
         this.elements.micBtn.addEventListener('click', () => this.toggleVoiceDictation());
+        
+        // Settings event listeners
+        this.elements.deviceOnlyRadio.addEventListener('change', () => this.onProcessingModeChange());
+        this.elements.hybridRadio.addEventListener('change', () => this.onProcessingModeChange());
         
         // Keyboard navigation support
         this.elements.extractBtn.addEventListener('keydown', (e) => {
@@ -202,11 +214,13 @@ class InboxTriageSidePanel {
             // Request summary generation from background script
             const response = await chrome.runtime.sendMessage({
                 action: 'generateSummary',
-                thread: this.currentThread
+                thread: this.currentThread,
+                userSettings: this.userSettings
             });
             
             if (response && response.success) {
                 this.displaySummary(response.summary, response.keyPoints);
+                this.addProcessingIndicator('summarization', response.usedFallback || false);
                 this.updateStatus('Summary generated successfully', 'success');
             } else {
                 // Error message is already sanitized by the service worker
@@ -459,12 +473,14 @@ class InboxTriageSidePanel {
                 action: 'generateDrafts',
                 thread: this.currentThread,
                 tone: tone,
-                guidance: guidance
+                guidance: guidance,
+                userSettings: this.userSettings
             });
             
             if (response && response.success) {
                 this.currentDrafts = response.drafts;
                 this.displayReplyDrafts(response.drafts);
+                this.addProcessingIndicator('drafting', response.usedFallback || false);
                 
                 // Check if there was a warning (fallback used)
                 if (response.warning) {
@@ -849,6 +865,89 @@ class InboxTriageSidePanel {
         // Add appropriate class
         if (type) {
             micStatus.classList.add(type);
+        }
+    }
+    
+    /**
+     * Load user settings from Chrome storage
+     */
+    async loadUserSettings() {
+        try {
+            if (chrome?.storage?.sync) {
+                const result = await chrome.storage.sync.get(['processingMode']);
+                if (result.processingMode) {
+                    this.userSettings.processingMode = result.processingMode;
+                }
+            }
+            
+            // Update UI to reflect loaded settings
+            this.updateProcessingModeUI();
+        } catch (error) {
+            console.error('Error loading user settings:', error);
+            // Use default settings if loading fails
+            this.updateProcessingModeUI();
+        }
+    }
+    
+    /**
+     * Save user settings to Chrome storage
+     */
+    async saveUserSettings() {
+        try {
+            if (chrome?.storage?.sync) {
+                await chrome.storage.sync.set({
+                    processingMode: this.userSettings.processingMode
+                });
+                console.log('User settings saved:', this.userSettings);
+            }
+        } catch (error) {
+            console.error('Error saving user settings:', error);
+        }
+    }
+    
+    /**
+     * Handle processing mode change
+     */
+    onProcessingModeChange() {
+        const selectedMode = document.querySelector('input[name="processing-mode"]:checked')?.value;
+        if (selectedMode) {
+            this.userSettings.processingMode = selectedMode;
+            this.saveUserSettings();
+            this.updateProcessingModeUI();
+            console.log('Processing mode changed to:', selectedMode);
+        }
+    }
+    
+    /**
+     * Update UI based on current processing mode
+     */
+    updateProcessingModeUI() {
+        // Set radio button selection
+        if (this.userSettings.processingMode === 'hybrid') {
+            this.elements.hybridRadio.checked = true;
+            this.elements.deviceOnlyRadio.checked = false;
+            this.elements.privacyNotice.classList.remove('hidden');
+        } else {
+            this.elements.deviceOnlyRadio.checked = true;
+            this.elements.hybridRadio.checked = false;
+            this.elements.privacyNotice.classList.add('hidden');
+        }
+    }
+    
+    /**
+     * Add processing indicator to status or results
+     * @param {string} operation - The operation being performed (e.g., 'summarization', 'drafting')
+     * @param {boolean} usedFallback - Whether cloud fallback was used
+     */
+    addProcessingIndicator(operation, usedFallback = false) {
+        // For now, this would show that processing happened on-device only
+        // In the future, if hybrid mode is actually implemented, this could show cloud usage
+        if (this.userSettings.processingMode === 'hybrid' && usedFallback) {
+            // This would only happen if cloud fallback was actually implemented
+            console.log(`${operation} processed using cloud fallback`);
+            // Could add UI indicator here for cloud processing
+        } else {
+            console.log(`${operation} processed on-device`);
         }
     }
 }

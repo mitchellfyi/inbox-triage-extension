@@ -532,6 +532,93 @@
             outline-offset: 2px;
         }
         
+        /* Settings section styling */
+        .settings-group {
+            margin-bottom: 16px;
+        }
+        
+        .settings-group fieldset {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 12px;
+            margin: 0;
+            background: #fafafa;
+        }
+        
+        .settings-group legend {
+            padding: 0 8px;
+            font-weight: 600;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        
+        .radio-option {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+        
+        .radio-option input[type="radio"] {
+            margin-top: 2px;
+        }
+        
+        .radio-option label {
+            font-size: 14px;
+            color: #333;
+            line-height: 1.4;
+        }
+        
+        .radio-option .description {
+            font-size: 12px;
+            color: #666;
+            margin-top: 2px;
+        }
+        
+        .privacy-notice {
+            background: #fff3e0;
+            border: 1px solid #ffb74d;
+            border-radius: 4px;
+            padding: 12px;
+            margin-top: 12px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        
+        .privacy-notice.hidden {
+            display: none;
+        }
+        
+        .privacy-notice .warning-icon {
+            color: #f57c00;
+            margin-right: 4px;
+        }
+        
+        .privacy-notice strong {
+            color: #e65100;
+        }
+        
+        .processing-indicator {
+            background: #e8f5e8;
+            border-left: 4px solid #4caf50;
+            padding: 8px 12px;
+            margin: 8px 0;
+            font-size: 13px;
+            border-radius: 4px;
+        }
+        
+        .processing-indicator.cloud-fallback {
+            background: #fff3e0;
+            border-left-color: #ff9800;
+            color: #f57c00;
+        }
+
         /* High contrast mode support */
         @media (prefers-contrast: high) {
             .status, #summary, #key-points, .draft {
@@ -540,6 +627,14 @@
             
             button:not(:disabled) {
                 border: 2px solid #333;
+            }
+            
+            .settings-group fieldset {
+                border-width: 2px;
+            }
+            
+            .privacy-notice {
+                border-width: 2px;
             }
         }
     </style>
@@ -580,6 +675,50 @@
                 <h2 id="attachments-heading">Attachments</h2>
                 <div id="attachments" class="placeholder" role="region" aria-label="Email attachments and summaries">
                     No attachments found in current thread.
+                </div>
+            </section>
+            
+            <section class="section" aria-labelledby="settings-heading">
+                <h2 id="settings-heading">Processing Settings</h2>
+                <div class="settings-group">
+                    <fieldset>
+                        <legend>AI Processing Mode</legend>
+                        <div class="radio-group">
+                            <div class="radio-option">
+                                <input type="radio" 
+                                       id="mode-device-only" 
+                                       name="processing-mode" 
+                                       value="device-only" 
+                                       checked
+                                       aria-describedby="device-only-desc">
+                                <div>
+                                    <label for="mode-device-only">On-device only (Recommended)</label>
+                                    <div id="device-only-desc" class="description">
+                                        All processing happens locally using Chrome's built-in AI. Complete privacy, no data leaves your device.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" 
+                                       id="mode-hybrid" 
+                                       name="processing-mode" 
+                                       value="hybrid"
+                                       aria-describedby="hybrid-desc">
+                                <div>
+                                    <label for="mode-hybrid">Hybrid (Allow cloud fallback)</label>
+                                    <div id="hybrid-desc" class="description">
+                                        Use cloud processing when on-device models are unavailable. Less private but more reliable.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="privacy-notice" class="privacy-notice hidden">
+                            <span class="warning-icon">⚠️</span>
+                            <strong>Privacy Notice:</strong> When hybrid mode is enabled, email text (not attachments) may be sent to a remote AI service for processing when on-device models are unavailable or exceed limits. This may result in your data being processed outside your device. 
+                            <br><br>
+                            <strong>Currently:</strong> Cloud fallback is not implemented to maintain this extension's privacy-first design. Hybrid mode selection will only show privacy warnings but will continue using on-device processing only.
+                        </div>
+                    </fieldset>
                 </div>
             </section>
             
