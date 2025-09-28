@@ -1,0 +1,21 @@
+# Global owner for the repository
+* @mitchellfyi
+
+# Documentation files require review for consistency
+*.md @mitchellfyi
+SPEC.md @mitchellfyi
+AGENTS.md @mitchellfyi
+TODO.md @mitchellfyi
+
+# Core extension architecture 
+manifest.json @mitchellfyi
+background/ @mitchellfyi
+
+# GitHub configuration and templates
+.github/ @mitchellfyi
+
+# Content scripts for email extraction
+content/ @mitchellfyi
+
+# Side panel UI and user experience
+sidepanel/ @mitchellfyi
