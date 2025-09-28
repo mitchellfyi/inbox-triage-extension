@@ -96,26 +96,26 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 ## Side Panel UI
 
 ### Core Interface
-- `[todo]` Summary display - Clean presentation of TL;DR and key points
-- `[todo]` Draft presentation - Readable format for three reply options
-- `[todo]` Tone selector - Dropdown/radio buttons for tone selection
-- `[todo]` Copy functionality - Clipboard integration for draft text
-- `[todo]` Status indicators - Loading states, error messages, success feedback
+- `[done]` Summary display - Clean presentation of TL;DR and key points with color-coded sections
+- `[done]` Draft presentation - Professional format for three reply options with proper visual hierarchy
+- `[done]` Tone selector - Enhanced dropdown with proper labeling and responsive layout
+- `[done]` Copy functionality - Clipboard integration with visual feedback for draft text
+- `[done]` Status indicators - Loading states, error messages, success feedback with color coding
 - `[todo]` Progress feedback - AI model download progress
 
 ### Accessibility
-- `[todo]` Keyboard navigation - Full keyboard accessibility
-- `[todo]` ARIA labels - Screen reader support
-- `[todo]` Focus management - Logical tab order
-- `[todo]` High contrast support - Visibility in accessibility modes
-- `[todo]` Font size scaling - Respect browser zoom settings
+- `[done]` Keyboard navigation - Full keyboard accessibility with proper tab order
+- `[done]` ARIA labels - Screen reader support with semantic HTML structure
+- `[done]` Focus management - Logical tab order with visible focus indicators
+- `[done]` High contrast support - Enhanced visibility in accessibility modes
+- `[done]` Font size scaling - Responsive design respects browser zoom settings
 - `[todo]` Screen reader testing - Validate with assistive technologies
 
 ### Responsive Design
-- `[todo]` Panel width adaptation - Handle different side panel sizes
-- `[todo]` Content overflow - Scrolling for long summaries/drafts
-- `[todo]` Button sizing - Touch-friendly interaction areas
-- `[todo]` Text wrapping - Readable text at all sizes
+- `[done]` Panel width adaptation - Handle different side panel sizes with CSS media queries
+- `[done]` Content overflow - Scrolling for long summaries/drafts with max-height constraints
+- `[done]` Button sizing - Touch-friendly interaction areas with proper hover states
+- `[done]` Text wrapping - Readable text at all sizes with proper line spacing
 
 ## Quality Assurance
 

@@ -31,6 +31,21 @@ class InboxTriageSidePanel {
         this.elements.generateDraftsBtn.addEventListener('click', () => this.generateReplyDrafts());
         this.elements.toneSelector.addEventListener('change', () => this.onToneChange());
         
+        // Keyboard navigation support
+        this.elements.extractBtn.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.extractCurrentThread();
+            }
+        });
+        
+        this.elements.generateDraftsBtn.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.generateReplyDrafts();
+            }
+        });
+        
         // Listen for messages from content scripts and background
         chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             this.handleMessage(message, sender, sendResponse);
@@ -40,7 +55,14 @@ class InboxTriageSidePanel {
     updateStatus(message, type = 'info') {
         this.elements.status.textContent = message;
         const statusElement = this.elements.status.parentElement;
-        statusElement.className = `status ${type}`;
+        
+        // Remove existing status classes
+        statusElement.classList.remove('loading', 'error', 'success', 'info');
+        // Add new status class
+        statusElement.classList.add(type);
+        
+        // Update ARIA live region for screen readers
+        this.elements.status.setAttribute('aria-label', `Status: ${message}`);
     }
     
     async extractCurrentThread() {
@@ -63,7 +85,7 @@ class InboxTriageSidePanel {
                 this.currentThread = response.thread;
                 await this.generateSummary();
                 this.elements.generateDraftsBtn.disabled = false;
-                this.updateStatus('Thread extracted successfully');
+                this.updateStatus('Thread extracted successfully', 'success');
             } else {
                 throw new Error(response?.error || 'Failed to extract thread');
             }
@@ -89,7 +111,7 @@ class InboxTriageSidePanel {
             
             if (response && response.success) {
                 this.displaySummary(response.summary, response.keyPoints);
-                this.updateStatus('Summary generated successfully');
+                this.updateStatus('Summary generated successfully', 'success');
             } else {
                 throw new Error(response?.error || 'Failed to generate summary');
             }
@@ -105,14 +127,19 @@ class InboxTriageSidePanel {
         
         if (keyPoints && keyPoints.length > 0) {
             const pointsList = document.createElement('ul');
-            keyPoints.forEach(point => {
+            pointsList.setAttribute('role', 'list');
+            
+            keyPoints.forEach((point, index) => {
                 const li = document.createElement('li');
                 li.textContent = point;
+                li.setAttribute('role', 'listitem');
                 pointsList.appendChild(li);
             });
+            
             this.elements.keyPoints.innerHTML = '';
             this.elements.keyPoints.appendChild(pointsList);
             this.elements.keyPoints.classList.remove('placeholder');
+            this.elements.keyPoints.setAttribute('aria-label', `${keyPoints.length} key points extracted from email thread`);
         }
     }
     
@@ -133,7 +160,7 @@ class InboxTriageSidePanel {
             if (response && response.success) {
                 this.currentDrafts = response.drafts;
                 this.displayReplyDrafts(response.drafts);
-                this.updateStatus('Reply drafts generated successfully');
+                this.updateStatus('Reply drafts generated successfully', 'success');
             } else {
                 throw new Error(response?.error || 'Failed to generate drafts');
             }
@@ -149,26 +176,54 @@ class InboxTriageSidePanel {
         this.elements.replyDrafts.innerHTML = '';
         this.elements.replyDrafts.classList.remove('placeholder');
         
-        drafts.forEach((draft, index) => {
-            const draftElement = this.createDraftElement(draft, index);
-            this.elements.replyDrafts.appendChild(draftElement);
-        });
+        if (drafts && drafts.length > 0) {
+            this.elements.replyDrafts.setAttribute('aria-label', `${drafts.length} reply drafts generated`);
+            
+            drafts.forEach((draft, index) => {
+                const draftElement = this.createDraftElement(draft, index);
+                this.elements.replyDrafts.appendChild(draftElement);
+            });
+        } else {
+            this.elements.replyDrafts.innerHTML = '<div class="placeholder">No drafts to display.</div>';
+            this.elements.replyDrafts.setAttribute('aria-label', 'No reply drafts available');
+        }
     }
     
     createDraftElement(draft, index) {
         const draftDiv = document.createElement('div');
         draftDiv.className = 'draft';
+        draftDiv.setAttribute('role', 'article');
+        draftDiv.setAttribute('aria-labelledby', `draft-title-${index}`);
+        
+        // Escape content to prevent XSS
+        const escapedSubject = this.escapeHtml(draft.subject || `Draft ${index + 1}`);
+        const escapedBody = this.escapeHtml(draft.body || '');
+        const escapedType = this.escapeHtml(draft.type || `Draft ${index + 1}`);
+        
         draftDiv.innerHTML = `
             <div class="draft-header">
-                <h3>${draft.type || `Draft ${index + 1}`}</h3>
-                <button type="button" onclick="copyToClipboard('${draft.subject}', '${draft.body}')">
-                    Copy
+                <h3 id="draft-title-${index}">${escapedType}</h3>
+                <button type="button" 
+                        onclick="copyToClipboard('${escapedSubject}', '${escapedBody}', this)"
+                        aria-describedby="copy-help-${index}">
+                    Copy Draft
                 </button>
+                <span id="copy-help-${index}" class="sr-only">
+                    Copy this reply draft to clipboard including subject and body
+                </span>
             </div>
-            <div class="draft-subject"><strong>Subject:</strong> ${draft.subject}</div>
-            <div class="draft-body">${draft.body}</div>
+            <div class="draft-content">
+                <div class="draft-subject"><strong>Subject:</strong> ${escapedSubject}</div>
+                <div class="draft-body">${escapedBody}</div>
+            </div>
         `;
         return draftDiv;
+    }
+    
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
     
     onToneChange() {
@@ -198,15 +253,41 @@ class InboxTriageSidePanel {
     }
 }
 
-// Global function to copy drafts to clipboard
-window.copyToClipboard = async (subject, body) => {
+// Global function to copy drafts to clipboard with visual feedback
+window.copyToClipboard = async (subject, body, buttonElement) => {
     try {
         const fullText = `Subject: ${subject}\n\n${body}`;
         await navigator.clipboard.writeText(fullText);
-        // Could show a temporary success message here
+        
+        if (buttonElement) {
+            // Show visual feedback
+            const originalText = buttonElement.textContent;
+            buttonElement.textContent = 'Copied!';
+            buttonElement.classList.add('copy-success');
+            buttonElement.setAttribute('aria-label', 'Draft copied to clipboard successfully');
+            
+            // Reset after 2 seconds
+            setTimeout(() => {
+                buttonElement.textContent = originalText;
+                buttonElement.classList.remove('copy-success');
+                buttonElement.setAttribute('aria-label', 'Copy this reply draft to clipboard');
+            }, 2000);
+        }
+        
         console.log('Draft copied to clipboard');
     } catch (error) {
         console.error('Failed to copy to clipboard:', error);
+        
+        if (buttonElement) {
+            const originalText = buttonElement.textContent;
+            buttonElement.textContent = 'Copy Failed';
+            buttonElement.style.background = '#f44336';
+            
+            setTimeout(() => {
+                buttonElement.textContent = originalText;
+                buttonElement.style.background = '';
+            }, 2000);
+        }
     }
 };
 

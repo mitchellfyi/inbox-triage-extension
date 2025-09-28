@@ -12,6 +12,7 @@
             background-color: #f5f5f5;
             min-height: 100vh;
             box-sizing: border-box;
+            line-height: 1.6;
         }
         
         .container {
@@ -26,6 +27,7 @@
             margin: 0 0 16px 0;
             font-size: 18px;
             color: #333;
+            font-weight: 600;
         }
         
         .status {
@@ -35,6 +37,29 @@
             background: #e3f2fd;
             color: #1976d2;
             border-left: 4px solid #2196f3;
+            font-size: 14px;
+            min-height: 20px;
+            display: flex;
+            align-items: center;
+            transition: background-color 0.3s ease;
+        }
+        
+        .status.loading {
+            background: #fff3e0;
+            color: #f57c00;
+            border-left-color: #ff9800;
+        }
+        
+        .status.error {
+            background: #ffebee;
+            color: #d32f2f;
+            border-left-color: #f44336;
+        }
+        
+        .status.success {
+            background: #e8f5e8;
+            color: #2e7d32;
+            border-left-color: #4caf50;
         }
         
         .section {
@@ -47,75 +72,316 @@
             color: #666;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            font-weight: 600;
         }
         
         .placeholder {
             color: #999;
             font-style: italic;
+            padding: 16px;
+            background: #fafafa;
+            border-radius: 4px;
+            border: 1px dashed #ddd;
+            text-align: center;
         }
         
         button {
             background: #1976d2;
             color: white;
             border: none;
-            padding: 8px 16px;
+            padding: 10px 16px;
             border-radius: 4px;
             cursor: pointer;
             font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            min-height: 36px;
         }
         
-        button:hover {
+        button:hover:not(:disabled) {
             background: #1565c0;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(25, 118, 210, 0.3);
+        }
+        
+        button:active:not(:disabled) {
+            transform: translateY(0);
         }
         
         button:disabled {
             background: #ccc;
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        button:focus {
+            outline: 2px solid #1976d2;
+            outline-offset: 2px;
+        }
+        
+        /* Tone selector styling */
+        .tone-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        
+        .tone-controls label {
+            font-weight: 500;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            min-width: 120px;
+        }
+        
+        select:focus {
+            outline: 2px solid #1976d2;
+            outline-offset: 2px;
+            border-color: #1976d2;
+        }
+        
+        /* Summary and key points styling */
+        #summary {
+            padding: 16px;
+            background: #fafafa;
+            border-radius: 6px;
+            border-left: 4px solid #4caf50;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        #summary:not(.placeholder) {
+            background: #f1f8e9;
+            color: #2e7d32;
+        }
+        
+        #key-points {
+            padding: 16px;
+            background: #fafafa;
+            border-radius: 6px;
+            border-left: 4px solid #2196f3;
+        }
+        
+        #key-points:not(.placeholder) {
+            background: #e3f2fd;
+        }
+        
+        #key-points ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        
+        #key-points li {
+            margin-bottom: 8px;
+            color: #1976d2;
+            font-size: 14px;
+        }
+        
+        /* Draft presentation styling */
+        .draft {
+            margin-bottom: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .draft-header {
+            padding: 16px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .draft-header h3 {
+            margin: 0;
+            font-size: 16px;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .draft-header button {
+            padding: 8px 12px;
+            font-size: 12px;
+            min-height: 32px;
+            background: #4caf50;
+        }
+        
+        .draft-header button:hover:not(:disabled) {
+            background: #45a049;
+            box-shadow: 0 2px 6px rgba(76, 175, 80, 0.3);
+        }
+        
+        .draft-content {
+            padding: 16px;
+        }
+        
+        .draft-subject {
+            margin-bottom: 12px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .draft-subject strong {
+            color: #333;
+        }
+        
+        .draft-body {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #444;
+            white-space: pre-wrap;
+        }
+        
+        /* Copy success feedback */
+        .copy-success {
+            background: #4caf50 !important;
+        }
+        
+        .copy-success::after {
+            content: " ✓";
+        }
+        
+        /* Responsive design */
+        @media (max-width: 400px) {
+            body {
+                padding: 12px;
+            }
+            
+            .container {
+                padding: 12px;
+            }
+            
+            .tone-controls {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+            
+            .draft-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+            
+            .draft-header button {
+                align-self: flex-end;
+            }
+        }
+        
+        /* Scrollable content for long summaries/drafts */
+        #summary, #key-points {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        #reply-drafts {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        /* Accessibility improvements */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+        
+        /* Focus indicators */
+        *:focus {
+            outline: 2px solid #1976d2;
+            outline-offset: 2px;
+        }
+        
+        /* High contrast mode support */
+        @media (prefers-contrast: high) {
+            .status, #summary, #key-points, .draft {
+                border-width: 2px;
+            }
+            
+            button:not(:disabled) {
+                border: 2px solid #333;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Inbox Triage</h1>
+        <header>
+            <h1>Inbox Triage</h1>
+        </header>
         
-        <div class="status" id="status">
-            <span id="status-text">Ready to analyze email threads</span>
+        <div class="status" id="status" role="status" aria-live="polite">
+            <span id="status-text">Ready to analyse email threads</span>
         </div>
         
-        <div class="section">
-            <button id="extract-btn" type="button">Extract Current Thread</button>
-        </div>
-        
-        <div class="section">
-            <h2>Summary</h2>
-            <div id="summary" class="placeholder">
-                No thread analyzed yet. Click "Extract Current Thread" to get started.
-            </div>
-        </div>
-        
-        <div class="section">
-            <h2>Key Points</h2>
-            <div id="key-points" class="placeholder">
-                Key points will appear here after analysis.
-            </div>
-        </div>
-        
-        <div class="section">
-            <h2>Reply Drafts</h2>
-            <div>
-                <label for="tone-selector">Tone:</label>
-                <select id="tone-selector">
-                    <option value="neutral">Neutral</option>
-                    <option value="friendly">Friendly</option>
-                    <option value="assertive">Assertive</option>
-                    <option value="formal">Formal</option>
-                </select>
-                <button id="generate-drafts-btn" type="button" disabled>Generate Drafts</button>
-            </div>
-            <div id="reply-drafts" class="placeholder">
-                Reply drafts will appear here after generating.
-            </div>
-        </div>
+        <main>
+            <section class="section" aria-labelledby="extraction-heading">
+                <h2 id="extraction-heading" class="sr-only">Thread Extraction</h2>
+                <button id="extract-btn" type="button" aria-describedby="status-text">
+                    Extract Current Thread
+                </button>
+            </section>
+            
+            <section class="section" aria-labelledby="summary-heading">
+                <h2 id="summary-heading">Summary</h2>
+                <div id="summary" class="placeholder" role="region" aria-label="Email thread summary">
+                    No thread analysed yet. Click "Extract Current Thread" to get started.
+                </div>
+            </section>
+            
+            <section class="section" aria-labelledby="key-points-heading">
+                <h2 id="key-points-heading">Key Points</h2>
+                <div id="key-points" class="placeholder" role="region" aria-label="Key points from email thread">
+                    Key points will appear here after analysis.
+                </div>
+            </section>
+            
+            <section class="section" aria-labelledby="reply-drafts-heading">
+                <h2 id="reply-drafts-heading">Reply Drafts</h2>
+                <div class="tone-controls">
+                    <label for="tone-selector">Tone:</label>
+                    <select id="tone-selector" aria-describedby="tone-help">
+                        <option value="neutral">Neutral</option>
+                        <option value="friendly">Friendly</option>
+                        <option value="assertive">Assertive</option>
+                        <option value="formal">Formal</option>
+                    </select>
+                    <div id="tone-help" class="sr-only">
+                        Select the tone for generated reply drafts. Changes will automatically regenerate drafts if available.
+                    </div>
+                    <button id="generate-drafts-btn" type="button" disabled aria-describedby="drafts-help">
+                        Generate Drafts
+                    </button>
+                    <div id="drafts-help" class="sr-only">
+                        Generate three reply draft options with the selected tone. Available after extracting an email thread.
+                    </div>
+                </div>
+                <div id="reply-drafts" class="placeholder" role="region" aria-label="Generated reply drafts">
+                    Reply drafts will appear here after generating.
+                </div>
+            </section>
+        </main>
     </div>
     
     <script src="sidepanel.js"></script>
