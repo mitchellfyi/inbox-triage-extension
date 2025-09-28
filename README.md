@@ -56,9 +56,10 @@ No build process required—this extension runs directly from source with no dep
 1. Navigate to Gmail or Outlook in Chrome
 2. Open an email thread
 3. Click the extension icon to open the side panel
-4. Click "Extract Current Thread" to analyze
-5. Optionally add guidance text or use voice dictation (🎤 button) to customize reply content
-6. Select tone and "Generate Drafts" for reply options
+4. **Optional:** Configure processing mode in "Processing Settings" (defaults to on-device only)
+5. Click "Extract Current Thread" to analyze
+6. Optionally add guidance text or use voice dictation (🎤 button) to customize reply content
+7. Select tone and "Generate Drafts" for reply options
 
 ### Test
 Unit and integration testing framework to be established. Currently manual testing only:
@@ -83,6 +84,7 @@ AI models download automatically on first use (may take a few minutes).
 - **AI Summarization** - Chrome's Summarizer API for TL;DR, key points, and attachment content
 - **Draft Generation** - Prompt API with JSON schema for structured replies  
 - **Tone Controls** - User-selectable tone parameters (neutral, friendly, assertive, formal)
+- **Processing Mode Settings** - User configuration for on-device vs hybrid processing with privacy controls
 
 **Message Flow:** Content Script → Service Worker → AI APIs → Side Panel UI
 
