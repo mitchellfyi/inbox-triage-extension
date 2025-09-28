@@ -6,10 +6,13 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 
 1. **Pick a task** - Choose from the sections below, focusing on [todo] items
 2. **Create branch** - Use descriptive branch names like `feature/gmail-extraction` or `fix/accessibility-labels`
-3. **Work incrementally** - Make small, focused changes
-4. **Update status** - Move tasks through [todo] → [doing] → [blocked] → [done] as appropriate
-5. **Link issues/PRs** - Add GitHub links when available
-6. **Open PR** - Submit for review when ready
+3. **Write tests first** - Create failing tests for new functionality before implementing
+4. **Work incrementally** - Make small, frequent commits with clear messages
+5. **Update status inline** - Move tasks through [todo] → [doing] → [blocked] → [done] as appropriate
+6. **Test thoroughly** - Ensure all tests pass cleanly without workarounds
+7. **Update docs after features** - Revise README.md, AGENTS.md, and this file once features are complete
+8. **Link issues/PRs** - Add GitHub links when available
+9. **Open PR** - Submit for review when ready with comprehensive testing and documentation
 
 ## Task Status Legend
 
@@ -23,9 +26,17 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 ### Core Documentation
 - `[done]` README.md overhaul - Add value prop, docs map, quickstart, architecture, privacy, contributing flow
 - `[todo]` SPEC.md improvements - Acceptance criteria format, explicit API boundaries, browser support notes
-- `[todo]` AGENTS.md refinements - Agent loop, coding rules, commit patterns, "Don't" list  
-- `[todo]` .github/copilot-instructions.md updates - "Always read SPEC first", guardrails section
+- `[done]` AGENTS.md refinements - Agent loop, coding rules, commit patterns, "Don't" list, testing requirements, commit guidelines
+- `[done]` .github/copilot-instructions.md updates - "Always read SPEC first", guardrails section, commit/test/doc guidelines
 - `[done]` TODO.md creation - This file with project-wide checklist
+
+### Post-Feature Documentation Updates
+- `[todo]` README.md feature integration - Update overview and quickstart sections after each major feature completion
+- `[todo]` AGENTS.md pattern updates - Add new coding patterns and examples discovered during development
+- `[todo]` SPEC.md requirement validation - Ensure acceptance criteria match implemented behavior
+- `[todo]` TODO.md maintenance - Archive completed sections, reorganize tasks, add follow-up work
+- `[todo]` Link validation sweep - Verify all internal documentation links work correctly
+- `[todo]` Code example updates - Ensure all documentation code snippets reflect current implementation
 
 ### GitHub Templates
 - `[todo]` PR template - What/Why/How/Tests/Docs sections
@@ -118,6 +129,13 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 - `[done]` Text wrapping - Readable text at all sizes with proper line spacing
 
 ## Quality Assurance
+
+### Unit and Integration Testing
+- `[todo]` Test framework setup - Establish testing infrastructure for unit and integration tests  
+- `[todo]` Service worker tests - Test AI API integration, message passing, and error handling
+- `[todo]` Content script tests - Test email extraction logic for Gmail and Outlook
+- `[todo]` Side panel tests - Test UI components, user interactions, and accessibility
+- `[todo]` Cross-component tests - Test message passing and integration between extension parts
 
 ### Testing Strategy
 - `[todo]` Manual test plan - Comprehensive testing checklist
