@@ -73,6 +73,99 @@ class EmailThreadExtractor {
             throw error;
         }
     }
+
+    /**
+     * Combines all thread messages into a single string with deduplication and trimming
+     * Respects the 50,000-character limit as specified in requirements
+     * @returns {string} Combined thread text or empty string if no content
+     */
+    combineThreadMessagesAsText() {
+        try {
+            const threadData = this.extractCurrentThreadSync();
+            if (!threadData || !threadData.messages || threadData.messages.length === 0) {
+                return '';
+            }
+
+            // Combine all message content with sender info
+            let combinedText = '';
+            const seenContent = new Set(); // For duplicate detection
+            
+            // Add subject if available
+            if (threadData.subject) {
+                combinedText += `Subject: ${threadData.subject}\n\n`;
+            }
+            
+            // Process each message
+            for (const message of threadData.messages) {
+                if (!message.content) continue;
+                
+                // Create a normalized version for duplicate detection
+                const normalizedContent = this.cleanText(message.content).toLowerCase();
+                
+                // Skip if we've seen this content before (duplicate removal)
+                if (seenContent.has(normalizedContent)) {
+                    continue;
+                }
+                seenContent.add(normalizedContent);
+                
+                // Add sender info and content
+                const senderName = message.sender?.name || 'Unknown';
+                const messageText = `From: ${senderName}\n${message.content}\n\n---\n\n`;
+                
+                // Check if adding this message would exceed the 50,000 character limit
+                if ((combinedText + messageText).length > 50000) {
+                    console.warn('Thread content truncated at 50,000 characters');
+                    break;
+                }
+                
+                combinedText += messageText;
+            }
+            
+            // Final cleanup and trimming
+            combinedText = combinedText.replace(/\n\n---\n\n$/, ''); // Remove trailing separator
+            combinedText = this.cleanText(combinedText);
+            
+            // Ensure we don't exceed the limit after cleanup
+            if (combinedText.length > 50000) {
+                combinedText = combinedText.substring(0, 50000);
+                // Try to end at a word boundary if possible
+                const lastSpace = combinedText.lastIndexOf(' ');
+                if (lastSpace > 49000) { // Only if we're not cutting too much
+                    combinedText = combinedText.substring(0, lastSpace) + '...';
+                }
+            }
+            
+            return combinedText;
+            
+        } catch (error) {
+            console.error('Error combining thread messages:', error);
+            return '';
+        }
+    }
+
+    /**
+     * Synchronous version of thread extraction for the global function
+     * @returns {Object|null} Thread data or null if extraction fails
+     */
+    extractCurrentThreadSync() {
+        try {
+            if (!this.isPageReady()) {
+                return null;
+            }
+            
+            return {
+                provider: this.siteConfig.provider,
+                subject: this.extractSubject(),
+                messages: this.extractMessages(),
+                extractedAt: new Date().toISOString(),
+                url: window.location.href
+            };
+            
+        } catch (error) {
+            console.error('Sync thread extraction error:', error);
+            return null;
+        }
+    }
     
     extractSubject() {
         const { selectors } = this.siteConfig;
@@ -122,6 +215,11 @@ class EmailThreadExtractor {
         
         // Skip draft or compose messages
         if (this.isDraftOrCompose(messageElement)) {
+            return null;
+        }
+        
+        // Skip hidden or collapsed messages
+        if (this.isHiddenOrTruncated(messageElement)) {
             return null;
         }
         
@@ -238,11 +336,62 @@ class EmailThreadExtractor {
         }
         
         // Check for common draft/compose indicators
-        const skipSelectors = UTILITY_SELECTORS.skipElements;
+        const skipSelectors = (typeof UTILITY_SELECTORS !== 'undefined') ? 
+            UTILITY_SELECTORS.skipElements : 
+            [
+                '[data-is-draft="true"]',
+                '.compose',
+                '.reply-box',
+                '[data-testid*="compose"]',
+                '.gmail_signature',
+                '.signature'
+            ];
+        
         for (const selector of skipSelectors) {
             if (element.matches(selector) || element.querySelector(selector)) {
                 return true;
             }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Check if an element represents hidden or truncated content that should be excluded
+     * @param {Element} element - The element to check
+     * @returns {boolean} True if the element should be skipped
+     */
+    isHiddenOrTruncated(element) {
+        // Check if element is hidden via CSS
+        const computedStyle = window.getComputedStyle(element);
+        if (computedStyle.display === 'none' || 
+            computedStyle.visibility === 'hidden' || 
+            computedStyle.opacity === '0') {
+            return true;
+        }
+        
+        // Check for collapsed/truncated message indicators
+        const truncatedIndicators = [
+            '.trimmed',
+            '.collapsed',
+            '.truncated',
+            '[data-is-collapsed="true"]',
+            '.gmail_quote_attribution', // Gmail quoted content
+            '.quote', // General quoted content
+            '[style*="display: none"]',
+            '[style*="visibility: hidden"]'
+        ];
+        
+        for (const selector of truncatedIndicators) {
+            if (element.matches(selector) || element.querySelector(selector)) {
+                return true;
+            }
+        }
+        
+        // Check if the element has very little content (likely a stub)
+        const textContent = element.textContent?.trim() || '';
+        if (textContent.length < 10) {
+            return true;
         }
         
         return false;
@@ -253,8 +402,10 @@ class EmailThreadExtractor {
         
         return text
             .replace(/\s+/g, ' ') // Normalize whitespace
-            .replace(/^\s+|\s+$/g, '') // Trim
-            .replace(/\n\s*\n/g, '\n\n') // Clean up line breaks
+            .replace(/^\s+|\s+$/g, '') // Trim start and end
+            .replace(/\n\s*\n\s*\n/g, '\n\n') // Clean up excessive line breaks
+            .replace(/\t+/g, ' ') // Replace tabs with spaces
+            .replace(/[\r\f\v]/g, '') // Remove other whitespace chars
             .trim();
     }
     
@@ -291,11 +442,30 @@ class EmailThreadExtractor {
     }
 }
 
+// Global instance reference for the global function
+let globalExtractorInstance = null;
+
 // Initialize the extractor when the page loads
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-        new EmailThreadExtractor();
+        globalExtractorInstance = new EmailThreadExtractor();
     });
 } else {
-    new EmailThreadExtractor();
+    globalExtractorInstance = new EmailThreadExtractor();
 }
+
+/**
+ * Global function exposed on window object to extract email thread text
+ * This function is called by the service worker to get the current thread text
+ * @returns {string} Combined email thread text as a single string, respecting 50,000 char limit
+ */
+window.getEmailThreadText = function() {
+    if (!globalExtractorInstance || !globalExtractorInstance.isInitialized) {
+        console.warn('EmailThreadExtractor not initialized');
+        return '';
+    }
+    
+    const threadText = globalExtractorInstance.combineThreadMessagesAsText();
+    console.log('Global function returning thread text:', threadText.length, 'characters');
+    return threadText;
+};
