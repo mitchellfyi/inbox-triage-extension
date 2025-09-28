@@ -34,10 +34,10 @@ const EMAIL_SELECTORS = {
         draftArea: '[data-is-draft="true"]',
         
         // Attachment selectors
-        attachments: '[data-message-id] .aZo',
-        attachmentLinks: '[data-message-id] .aZo a',
-        attachmentNames: '[data-message-id] .aZo .aV3',
-        attachmentSizes: '[data-message-id] .aZo .SaRA'
+        attachments: '[data-message-id] .aZo, [data-message-id] span[download_url]',
+        attachmentLinks: '[data-message-id] .aZo a, [data-message-id] span[download_url] a',
+        attachmentNames: '[data-message-id] .aV3, [data-message-id] .aZo span[title]',
+        attachmentSizes: '[data-message-id] .SaRA, [data-message-id] .aZo .SaRBLe'
     },
     
     outlook: {

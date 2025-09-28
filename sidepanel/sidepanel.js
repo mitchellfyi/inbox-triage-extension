@@ -125,7 +125,7 @@ class InboxTriageSidePanel {
         // Update ARIA live region for screen readers
         this.elements.status.setAttribute('aria-label', `Status: ${message}`);
     }
-    
+
     async extractCurrentThread() {
         try {
             this.updateStatus('Extracting thread text...', 'loading');
@@ -346,15 +346,28 @@ class InboxTriageSidePanel {
     }
     
     /**
-     * Process a single attachment (placeholder for now)
+     * Process a single attachment (now calls service worker)
      * @param {Object} attachment - Attachment to process
      */
     async processAttachment(attachment) {
-        // Simulate processing delay
-        setTimeout(() => {
-            const mockSummary = `Analysis of ${attachment.name} - This is a ${attachment.type.toUpperCase()} file containing important information. Local processing coming soon.`;
-            this.updateAttachmentSummary(attachment.index, mockSummary, false);
-        }, 1000 + Math.random() * 2000);
+        try {
+            const response = await chrome.runtime.sendMessage({
+                action: 'processAttachment',
+                attachment: attachment
+            });
+            
+            if (response && response.success) {
+                const processedAttachment = response.attachment;
+                this.updateAttachmentSummary(processedAttachment.index, processedAttachment.summary, false);
+            } else {
+                const errorMsg = response?.error || 'Failed to process attachment';
+                this.updateAttachmentSummary(attachment.index, errorMsg, true);
+            }
+            
+        } catch (error) {
+            console.error('Error processing attachment via service worker:', error);
+            this.updateAttachmentSummary(attachment.index, `Error: ${error.message}`, true);
+        }
     }
     
     /**

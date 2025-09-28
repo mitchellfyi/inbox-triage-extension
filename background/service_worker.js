@@ -232,6 +232,10 @@ class InboxTriageServiceWorker {
                     await this.generateReplyDrafts(message.thread, message.tone, sendResponse);
                     break;
                     
+                case 'processAttachment':
+                    await this.processAttachment(message.attachment, sendResponse);
+                    break;
+                    
                 case 'checkAIStatus':
                     sendResponse({ 
                         success: true, 
@@ -434,6 +438,160 @@ class InboxTriageServiceWorker {
                 success: false,
                 error: sanitizedError
             });
+        }
+    }
+    
+    /**
+     * Process a single attachment for AI analysis
+     * @param {Object} attachment - Attachment metadata and content
+     * @param {Function} sendResponse - Response callback
+     */
+    async processAttachment(attachment, sendResponse) {
+        try {
+            // Check AI capabilities first
+            if (!this.aiCapabilities.summarizer && !this.aiCapabilities.promptApi) {
+                throw new Error('AI processing is not available in this browser. Please use Chrome 120+ with AI features enabled.');
+            }
+            
+            let extractedText = '';
+            let processedContent = '';
+            
+            // For now, implement basic attachment processing based on type
+            // This is a simplified version that will be enhanced with actual file parsing
+            switch (attachment.type) {
+                case 'image':
+                    processedContent = await this.processImageAttachment(attachment);
+                    break;
+                    
+                case 'pdf':
+                case 'docx':
+                case 'xlsx':
+                    processedContent = await this.processDocumentAttachment(attachment);
+                    break;
+                    
+                default:
+                    throw new Error(`Unsupported attachment type: ${attachment.type}`);
+            }
+            
+            // Generate summary using Summarizer API
+            let summary = '';
+            if (processedContent && this.aiCapabilities.summarizer?.available === 'readily') {
+                summary = await this.generateAttachmentSummary(processedContent, attachment);
+            } else {
+                summary = `${attachment.name} (${attachment.type.toUpperCase()}) - Local processing capabilities coming soon.`;
+            }
+            
+            sendResponse({
+                success: true,
+                attachment: {
+                    ...attachment,
+                    extractedContent: processedContent,
+                    summary: summary,
+                    processed: true
+                }
+            });
+            
+        } catch (error) {
+            console.error('Attachment processing error:', error);
+            
+            const sanitizedError = this.sanitizeErrorMessage(error.message);
+            sendResponse({
+                success: false,
+                error: sanitizedError,
+                attachment: {
+                    ...attachment,
+                    summary: `Error processing ${attachment.name}: ${sanitizedError}`,
+                    processed: false
+                }
+            });
+        }
+    }
+    
+    /**
+     * Process image attachment using multimodal Prompt API
+     * @param {Object} attachment - Image attachment
+     * @returns {string} Extracted description
+     */
+    async processImageAttachment(attachment) {
+        try {
+            // Check if multimodal Prompt API is available
+            if (!this.aiCapabilities.promptApi || this.aiCapabilities.promptApi.available !== 'readily') {
+                return `Image analysis unavailable - AI model not ready`;
+            }
+            
+            // For now, return a placeholder since we need to implement actual image fetching
+            // In the full implementation, we would:
+            // 1. Fetch the image blob from attachment.downloadUrl
+            // 2. Convert to base64 or appropriate format
+            // 3. Use the multimodal Prompt API to analyze the image
+            
+            return `Image attachment: ${attachment.name}. Full image analysis capabilities coming soon with multimodal AI integration.`;
+            
+        } catch (error) {
+            console.error('Image processing error:', error);
+            return `Error analyzing image: ${error.message}`;
+        }
+    }
+    
+    /**
+     * Process document attachment (PDF, DOCX, XLSX)
+     * @param {Object} attachment - Document attachment  
+     * @returns {string} Extracted text content
+     */
+    async processDocumentAttachment(attachment) {
+        try {
+            // For now, return a placeholder since we need to implement file parsing libraries
+            // In the full implementation, we would:
+            // 1. Fetch the document blob from attachment.downloadUrl  
+            // 2. Use appropriate library (PDF.js, mammoth.js, SheetJS) to extract text
+            // 3. Return the extracted text content
+            
+            const typeMap = {
+                'pdf': 'PDF text extraction',
+                'docx': 'Word document text extraction', 
+                'xlsx': 'Spreadsheet data extraction'
+            };
+            
+            const description = typeMap[attachment.type] || 'Document processing';
+            return `${description} for ${attachment.name}. Full document parsing capabilities coming soon with integrated file processing libraries.`;
+            
+        } catch (error) {
+            console.error('Document processing error:', error);
+            return `Error processing document: ${error.message}`;
+        }
+    }
+    
+    /**
+     * Generate summary of attachment content using Summarizer API
+     * @param {string} content - Extracted content from attachment
+     * @param {Object} attachment - Attachment metadata
+     * @returns {string} Generated summary
+     */
+    async generateAttachmentSummary(content, attachment) {
+        try {
+            if (!content || content.length < 50) {
+                return `${attachment.name} - Content too short to summarize effectively`;
+            }
+            
+            // Create summarizer session for attachment content
+            const summarizer = await window.ai.summarizer.create({
+                type: 'tl;dr',
+                format: 'plain-text',
+                length: 'short'
+            });
+            
+            // Generate summary with context about the file type
+            const contextualContent = `File: ${attachment.name} (${attachment.type.toUpperCase()})\n\n${content}`;
+            const summary = await summarizer.summarize(contextualContent);
+            
+            // Clean up session
+            summarizer.destroy();
+            
+            return summary;
+            
+        } catch (error) {
+            console.error('Attachment summary generation error:', error);
+            return `${attachment.name} - Error generating summary: ${error.message}`;
         }
     }
     
