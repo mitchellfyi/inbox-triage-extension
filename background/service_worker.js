@@ -229,7 +229,7 @@ class InboxTriageServiceWorker {
                     break;
                     
                 case 'generateDrafts':
-                    await this.generateReplyDrafts(message.thread, message.tone, sendResponse);
+                    await this.generateReplyDrafts(message.thread, message.tone, message.guidance, sendResponse);
                     break;
                     
                 case 'processAttachment':
@@ -351,7 +351,7 @@ class InboxTriageServiceWorker {
         }
     }
     
-    async generateReplyDrafts(thread, tone, sendResponse) {
+    async generateReplyDrafts(thread, tone, guidance, sendResponse) {
         try {
             if (!this.aiCapabilities.promptApi) {
                 throw new Error('Language Model API not available. Please enable AI features in Chrome.');
@@ -380,7 +380,7 @@ class InboxTriageServiceWorker {
             });
             
             // Generate drafts using structured prompt
-            const prompt = this.createReplyPrompt(fullText, subject, tone);
+            const prompt = this.createReplyPrompt(fullText, subject, tone, guidance);
             const response = await session.prompt(prompt);
             
             // Clean up session immediately
@@ -809,19 +809,21 @@ Each draft must have exactly these three fields: type, subject, body. Generate e
      * @param {string} tone - The tone to use for replies
      * @returns {string} Structured prompt with JSON requirements
      */
-    createReplyPrompt(threadText, originalSubject, tone) {
+    createReplyPrompt(threadText, originalSubject, tone, guidance = '') {
+        const guidanceSection = guidance ? `\nUSER GUIDANCE:\n${guidance}\n` : '';
+        
         return `Based on this email thread, generate 3 different reply drafts in ${tone} tone.
 
 THREAD:
 ${threadText}
 
-ORIGINAL SUBJECT: ${originalSubject}
+ORIGINAL SUBJECT: ${originalSubject}${guidanceSection}
 
 Generate exactly 3 reply drafts with these characteristics:
 1. SHORT RESPONSE: Quick acknowledgment (1-2 sentences, max 500 chars body)
 2. MEDIUM RESPONSE: Detailed with clarifications (2-3 paragraphs, max 1000 chars body) 
 3. COMPREHENSIVE RESPONSE: Complete with next steps (3-4 paragraphs, max 1500 chars body)
-
+${guidance ? '\nIncorporate the user guidance above into all three drafts where relevant.\n' : ''}
 Respond with ONLY the following JSON format (no other text):
 {
   "drafts": [

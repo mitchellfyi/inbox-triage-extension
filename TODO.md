@@ -119,7 +119,15 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 - `[done]` Subject line generation - Context-aware reply subjects
 - `[done]` Tone application - Consistent tone across all draft types
 - `[done]` Word limit enforcement - Appropriate length for each draft type
+- `[done]` User guidance integration - Custom guidance text appended to prompts for personalized drafts
 - `[todo]` Context preservation - Reference key points from original thread
+
+### User Input Features
+- `[done]` Guidance text area - Allow users to provide custom instructions for draft generation
+- `[done]` Voice dictation - Web Speech API integration for hands-free guidance input
+- `[done]` Microphone UI feedback - Visual indicators for listening/idle/error states
+- `[done]` Permission handling - Graceful handling of microphone permission denials
+- `[done]` Guidance persistence - Maintain guidance text when changing tones or regenerating
 
 ### Output Quality
 - `[done]` JSON schema validation - Ensure parseable structured output

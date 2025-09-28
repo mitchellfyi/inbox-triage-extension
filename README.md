@@ -8,8 +8,9 @@ This Chrome extension transforms email overwhelm into actionable insights by ins
 
 - **Save Time**: Get instant TL;DR summaries and key points from lengthy email threads
 - **Understand Attachments**: Automatically analyze PDFs, documents, spreadsheets, and images locally
-- **Stay Responsive**: Generate professional reply drafts in multiple tones and lengths
-- **Protect Privacy**: All processing happens locally—no data or files leave your device
+- **Stay Responsive**: Generate professional reply drafts in multiple tones and lengths with custom guidance
+- **Voice Input**: Use voice dictation to quickly add guidance for your reply drafts
+- **Protect Privacy**: All processing happens locally—no data or files leave your device, including voice transcription
 - **Work Offline**: Fully functional once AI models are downloaded
 
 ## Documentation Map
@@ -56,7 +57,8 @@ No build process required—this extension runs directly from source with no dep
 2. Open an email thread
 3. Click the extension icon to open the side panel
 4. Click "Extract Current Thread" to analyze
-5. Select tone and "Generate Drafts" for reply options
+5. Optionally add guidance text or use voice dictation (🎤 button) to customize reply content
+6. Select tone and "Generate Drafts" for reply options
 
 ### Test
 Unit and integration testing framework to be established. Currently manual testing only:
@@ -92,9 +94,11 @@ AI models download automatically on first use (may take a few minutes).
 
 **On-Device Only:** Email content and attachments never leave your device. AI models and file processing libraries run entirely within Chrome's sandbox.
 
+**Voice Privacy:** Voice dictation uses the browser's built-in Web Speech API for on-device transcription. Audio is not transmitted to external servers.
+
 **Attachment Privacy:** PDF, DOCX, XLSX, and image files are processed locally using on-device parsing libraries. No attachment content is ever uploaded or transmitted.
 
-**No Data Collection:** The extension does not collect, store, or transmit any user data, email content, attachment content, or usage analytics.
+**No Data Collection:** The extension does not collect, store, or transmit any user data, email content, attachment content, voice recordings, or usage analytics.
 
 **Open Source:** All code is transparent and auditable in this public repository.
 
