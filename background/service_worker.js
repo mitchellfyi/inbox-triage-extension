@@ -815,7 +815,7 @@ Respond with ONLY the following JSON format (no other text):
         // Define patterns for technical errors and their user-friendly alternatives
         const errorMappings = [
             {
-                patterns: [/stack trace/i, /error.*stack/i, /at\s+\w+\s+\(/],
+                patterns: [/stack trace/i, /error.*stack/i, /at\s+\w+\s*\(/, /\n\s*at\s+/],
                 message: 'An unexpected error occurred. Please try again.'
             },
             {
@@ -857,8 +857,8 @@ Respond with ONLY the following JSON format (no other text):
         
         // For unknown errors, provide a generic message but preserve some context if it's safe
         const safeMessage = errorMessage.replace(/\s*at\s+.*$/gm, '') // Remove stack traces
-                                      .replace(/Error:\s*/i, '') // Remove "Error:" prefix
-                                      .replace(/^\s*\w+Error:\s*/i, '') // Remove specific error types
+                                      .split('\n')[0] // Take only first line
+                                      .replace(/^(TypeError|Error|ReferenceError|SyntaxError):\s*/i, '') // Remove error types
                                       .trim();
         
         // If the cleaned message is too short or technical, use generic message
