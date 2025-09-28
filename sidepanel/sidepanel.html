@@ -288,7 +288,99 @@
             max-height: 300px;
             overflow-y: auto;
         }
+
+        #attachments {
+            max-height: 400px;
+            overflow-y: auto;
+        }
         
+        .attachment-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            background: white;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer;
+        }
+        
+        .attachment-card:hover {
+            border-color: #1976d2;
+            box-shadow: 0 2px 8px rgba(25, 118, 210, 0.15);
+        }
+        
+        .attachment-card:focus {
+            outline: 2px solid #1976d2;
+            outline-offset: 2px;
+        }
+        
+        .attachment-header {
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid #f5f5f5;
+        }
+        
+        .attachment-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+            color: white;
+            flex-shrink: 0;
+        }
+        
+        .attachment-icon.pdf { background: #e53e3e; }
+        .attachment-icon.docx { background: #2b6cb0; }
+        .attachment-icon.xlsx { background: #38a169; }
+        .attachment-icon.image { background: #805ad5; }
+        .attachment-icon.unknown { background: #718096; }
+        
+        .attachment-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .attachment-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 14px;
+        }
+        
+        .attachment-meta {
+            font-size: 12px;
+            color: #666;
+            display: flex;
+            gap: 12px;
+        }
+        
+        .attachment-summary {
+            padding: 12px 16px;
+            border-top: 1px solid #f5f5f5;
+            font-size: 13px;
+            color: #555;
+            line-height: 1.5;
+            background: #fafafa;
+        }
+        
+        .attachment-loading {
+            color: #f57c00;
+            font-style: italic;
+        }
+        
+        .attachment-error {
+            color: #d32f2f;
+            font-style: italic;
+        }
+
         #reply-drafts {
             max-height: 600px;
             overflow-y: auto;
@@ -354,6 +446,13 @@
                 <h2 id="key-points-heading">Key Points</h2>
                 <div id="key-points" class="placeholder" role="region" aria-label="Key points from email thread">
                     Key points will appear here after analysis.
+                </div>
+            </section>
+            
+            <section class="section" aria-labelledby="attachments-heading">
+                <h2 id="attachments-heading">Attachments</h2>
+                <div id="attachments" class="placeholder" role="region" aria-label="Email attachments and summaries">
+                    No attachments found in current thread.
                 </div>
             </section>
             

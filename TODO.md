@@ -50,12 +50,35 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 - `[done]` Error handling strategy - Standardize error messages and fallback behaviors with comprehensive sanitization
 - `[done]` Model availability detection - Robust checking for AI API readiness with periodic monitoring and state management
 - `[todo]` Message passing architecture - Clean communication between components
+- `[done]` Attachment processing pipeline - Basic structure for file analysis and AI summarization
 
 ### AI Integration
 - `[done]` Summarizer API integration testing - Validate across different thread lengths
 - `[done]` Prompt API JSON schema enforcement - Ensure reliable structured output
 - `[done]` Tone parameter validation - Test all tone options (neutral, friendly, assertive, formal)
 - `[done]` Fallback draft generation - Handle AI failures gracefully
+
+## Attachment Processing
+
+### Core Functionality
+- `[done]` Attachment detection - DOM parsing for Gmail and Outlook attachment elements
+- `[done]` Metadata extraction - File names, sizes, types, and processability detection  
+- `[done]` UI integration - Card-based display with file type icons and processing status
+- `[done]` Service worker integration - Message passing for attachment processing
+- `[done]` AI summarization structure - Framework for using Summarizer API on extracted content
+
+### File Processing
+- `[todo]` PDF text extraction - Integrate PDF.js or equivalent for local PDF parsing
+- `[todo]` DOCX text extraction - Integrate mammoth.js or equivalent for Word document parsing
+- `[todo]` XLSX data extraction - Integrate SheetJS or equivalent for spreadsheet parsing
+- `[todo]` Image analysis - Use Prompt API multimodal capabilities for image description
+- `[todo]` Content validation - Ensure extracted content is suitable for AI processing
+
+### Advanced Features
+- `[todo]` Detailed view modal - Full content display and comprehensive analysis
+- `[todo]` Large file handling - Size limits and progressive processing
+- `[todo]` Cloud processing fallback - Optional external processing for unsupported cases
+- `[todo]` Privacy controls - User configuration for processing preferences
 
 ## Gmail Extraction
 
@@ -113,6 +136,7 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 - `[done]` Copy functionality - Clipboard integration with visual feedback for draft text
 - `[done]` Status indicators - Loading states, error messages, success feedback with color coding
 - `[done]` Progress feedback - AI model download progress
+- `[done]` Attachment display - Card-based layout with file type icons, metadata, and processing status
 
 ### Accessibility
 - `[done]` Keyboard navigation - Full keyboard accessibility with proper tab order

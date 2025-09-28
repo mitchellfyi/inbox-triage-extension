@@ -18,6 +18,12 @@ class InboxTriageSidePanel {
         try {
             this.updateStatus('Checking AI model availability...', 'loading');
             
+            // Check if we're in an extension context
+            if (!chrome?.runtime?.sendMessage) {
+                this.updateStatus('Running outside Chrome extension context - AI features unavailable', 'error');
+                return;
+            }
+            
             // Request current AI status from background script
             const response = await chrome.runtime.sendMessage({
                 action: 'checkAIStatus'
@@ -80,6 +86,7 @@ class InboxTriageSidePanel {
             extractBtn: document.getElementById('extract-btn'),
             summary: document.getElementById('summary'),
             keyPoints: document.getElementById('key-points'),
+            attachments: document.getElementById('attachments'),
             toneSelector: document.getElementById('tone-selector'),
             generateDraftsBtn: document.getElementById('generate-drafts-btn'),
             replyDrafts: document.getElementById('reply-drafts')
@@ -107,9 +114,11 @@ class InboxTriageSidePanel {
         });
         
         // Listen for messages from content scripts and background
-        chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-            this.handleMessage(message, sender, sendResponse);
-        });
+        if (chrome?.runtime?.onMessage) {
+            chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+                this.handleMessage(message, sender, sendResponse);
+            });
+        }
     }
     
     updateStatus(message, type = 'info') {
@@ -124,11 +133,16 @@ class InboxTriageSidePanel {
         // Update ARIA live region for screen readers
         this.elements.status.setAttribute('aria-label', `Status: ${message}`);
     }
-    
+
     async extractCurrentThread() {
         try {
             this.updateStatus('Extracting thread text...', 'loading');
             this.elements.extractBtn.disabled = true;
+            
+            // Check if we're in an extension context
+            if (!chrome?.tabs?.sendMessage) {
+                throw new Error('Chrome extension API not available. Please load this as a Chrome extension.');
+            }
             
             // Get current active tab
             const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -144,6 +158,7 @@ class InboxTriageSidePanel {
             if (response && response.success) {
                 this.currentThread = response.thread;
                 await this.generateSummary();
+                this.displayAttachments();
                 this.elements.generateDraftsBtn.disabled = false;
                 this.updateStatus('Thread extracted successfully', 'success');
             } else {
@@ -162,6 +177,11 @@ class InboxTriageSidePanel {
         
         try {
             this.updateStatus('Generating summary...', 'loading');
+            
+            // Check if we're in an extension context
+            if (!chrome?.runtime?.sendMessage) {
+                throw new Error('Chrome extension API not available. Please load this as a Chrome extension.');
+            }
             
             // Request summary generation from background script
             const response = await chrome.runtime.sendMessage({
@@ -205,12 +225,217 @@ class InboxTriageSidePanel {
         }
     }
     
+    /**
+     * Display attachments in the side panel
+     */
+    displayAttachments() {
+        const attachments = this.currentThread?.attachments || [];
+        
+        if (attachments.length === 0) {
+            this.elements.attachments.innerHTML = '<div class="placeholder">No attachments found in current thread.</div>';
+            return;
+        }
+        
+        // Create attachments list
+        const attachmentsContainer = document.createElement('div');
+        attachmentsContainer.className = 'attachments-container';
+        
+        attachments.forEach((attachment, index) => {
+            const attachmentCard = this.createAttachmentCard(attachment, index);
+            attachmentsContainer.appendChild(attachmentCard);
+        });
+        
+        this.elements.attachments.innerHTML = '';
+        this.elements.attachments.appendChild(attachmentsContainer);
+        this.elements.attachments.classList.remove('placeholder');
+        this.elements.attachments.setAttribute('aria-label', `${attachments.length} attachments found in email thread`);
+        
+        // Process attachments for summaries
+        this.processAttachments(attachments);
+    }
+    
+    /**
+     * Create an attachment card element
+     * @param {Object} attachment - Attachment metadata
+     * @param {number} index - Card index
+     * @returns {HTMLElement} Attachment card element
+     */
+    createAttachmentCard(attachment, index) {
+        const card = document.createElement('div');
+        card.className = 'attachment-card';
+        card.tabIndex = 0;
+        card.setAttribute('role', 'button');
+        card.setAttribute('aria-label', `Attachment: ${attachment.name}, ${attachment.size || 'unknown size'}`);
+        
+        // Create attachment header
+        const header = document.createElement('div');
+        header.className = 'attachment-header';
+        
+        // Create file type icon
+        const icon = document.createElement('div');
+        icon.className = `attachment-icon ${attachment.type}`;
+        icon.textContent = this.getFileTypeIcon(attachment.type);
+        
+        // Create attachment info
+        const info = document.createElement('div');
+        info.className = 'attachment-info';
+        
+        const name = document.createElement('div');
+        name.className = 'attachment-name';
+        name.textContent = attachment.name;
+        name.title = attachment.name; // For overflow tooltip
+        
+        const meta = document.createElement('div');
+        meta.className = 'attachment-meta';
+        
+        const size = document.createElement('span');
+        size.textContent = attachment.size || 'Unknown size';
+        
+        const processable = document.createElement('span');
+        processable.textContent = attachment.processable ? 'Processable' : 'View only';
+        
+        meta.appendChild(size);
+        meta.appendChild(processable);
+        
+        info.appendChild(name);
+        info.appendChild(meta);
+        
+        header.appendChild(icon);
+        header.appendChild(info);
+        
+        card.appendChild(header);
+        
+        // Create summary section (initially with placeholder)
+        const summary = document.createElement('div');
+        summary.className = 'attachment-summary';
+        
+        if (attachment.processable) {
+            summary.innerHTML = '<span class="attachment-loading">Analyzing attachment...</span>';
+        } else {
+            summary.innerHTML = '<span class="attachment-error">File type not supported for analysis</span>';
+        }
+        
+        card.appendChild(summary);
+        
+        // Add click handler for future detailed view
+        card.addEventListener('click', () => this.showAttachmentDetails(attachment));
+        card.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.showAttachmentDetails(attachment);
+            }
+        });
+        
+        return card;
+    }
+    
+    /**
+     * Get icon text for file type
+     * @param {string} fileType - File type category
+     * @returns {string} Icon text
+     */
+    getFileTypeIcon(fileType) {
+        switch (fileType) {
+            case 'pdf': return 'PDF';
+            case 'docx': return 'DOC';
+            case 'xlsx': return 'XLS';
+            case 'image': return 'IMG';
+            default: return '?';
+        }
+    }
+    
+    /**
+     * Process attachments for AI summarization
+     * @param {Array} attachments - List of attachments to process
+     */
+    async processAttachments(attachments) {
+        for (const attachment of attachments) {
+            if (attachment.processable) {
+                try {
+                    // For now, just show a placeholder
+                    // TODO: Implement actual file processing and AI summarization
+                    await this.processAttachment(attachment);
+                } catch (error) {
+                    console.error('Error processing attachment:', error);
+                    this.updateAttachmentSummary(attachment.index, 'Error processing attachment', true);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Process a single attachment (now calls service worker)
+     * @param {Object} attachment - Attachment to process
+     */
+    async processAttachment(attachment) {
+        try {
+            // Check if we're in an extension context
+            if (!chrome?.runtime?.sendMessage) {
+                throw new Error('Chrome extension API not available');
+            }
+            
+            const response = await chrome.runtime.sendMessage({
+                action: 'processAttachment',
+                attachment: attachment
+            });
+            
+            if (response && response.success) {
+                const processedAttachment = response.attachment;
+                this.updateAttachmentSummary(processedAttachment.index, processedAttachment.summary, false);
+            } else {
+                const errorMsg = response?.error || 'Failed to process attachment';
+                this.updateAttachmentSummary(attachment.index, errorMsg, true);
+            }
+            
+        } catch (error) {
+            console.error('Error processing attachment via service worker:', error);
+            
+            // Provide fallback message for non-extension contexts
+            if (error.message.includes('Chrome extension API not available')) {
+                this.updateAttachmentSummary(attachment.index, 'Extension API required for attachment processing', true);
+            } else {
+                this.updateAttachmentSummary(attachment.index, `Error: ${error.message}`, true);
+            }
+        }
+    }
+    
+    /**
+     * Update attachment summary in the UI
+     * @param {number} attachmentIndex - Index of attachment
+     * @param {string} summary - Summary text
+     * @param {boolean} isError - Whether this is an error message
+     */
+    updateAttachmentSummary(attachmentIndex, summary, isError = false) {
+        const cards = this.elements.attachments.querySelectorAll('.attachment-card');
+        if (cards[attachmentIndex]) {
+            const summaryEl = cards[attachmentIndex].querySelector('.attachment-summary');
+            if (summaryEl) {
+                summaryEl.innerHTML = `<span class="${isError ? 'attachment-error' : ''}">${summary}</span>`;
+            }
+        }
+    }
+    
+    /**
+     * Show detailed view of attachment (placeholder for now)
+     * @param {Object} attachment - Attachment to show details for
+     */
+    showAttachmentDetails(attachment) {
+        // TODO: Implement modal or expanded view
+        console.log('Showing details for attachment:', attachment);
+        alert(`Detailed view for ${attachment.name}\n\nThis feature will show full extracted content and detailed analysis.`);
+    }
+    
     async generateReplyDrafts() {
         if (!this.currentThread) return;
         
         try {
             this.updateStatus('Generating reply drafts...', 'loading');
             this.elements.generateDraftsBtn.disabled = true;
+            
+            // Check if we're in an extension context
+            if (!chrome?.runtime?.sendMessage) {
+                throw new Error('Chrome extension API not available. Please load this as a Chrome extension.');
+            }
             
             const tone = this.elements.toneSelector.value;
             const response = await chrome.runtime.sendMessage({

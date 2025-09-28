@@ -56,6 +56,7 @@ class EmailThreadExtractor {
                 provider: this.siteConfig.provider,
                 subject: this.extractSubject(),
                 messages: this.extractMessages(),
+                attachments: this.extractAttachments(),
                 extractedAt: new Date().toISOString(),
                 url: window.location.href
             };
@@ -278,6 +279,130 @@ class EmailThreadExtractor {
         }
         
         return null;
+    }
+    
+    /**
+     * Extract attachments from the current email thread
+     * @returns {Array<Object>} Array of attachment objects with metadata
+     */
+    extractAttachments() {
+        const { selectors } = this.siteConfig;
+        const attachments = [];
+        
+        try {
+            // Find all attachment elements in the thread
+            const attachmentElements = document.querySelectorAll(selectors.attachments);
+            
+            attachmentElements.forEach((attachmentEl, index) => {
+                const attachment = this.extractSingleAttachment(attachmentEl, index);
+                if (attachment) {
+                    attachments.push(attachment);
+                }
+            });
+            
+            console.log(`Found ${attachments.length} attachments`);
+            return attachments;
+            
+        } catch (error) {
+            console.error('Error extracting attachments:', error);
+            return [];
+        }
+    }
+    
+    /**
+     * Extract metadata from a single attachment element
+     * @param {Element} attachmentElement - DOM element containing attachment
+     * @param {number} index - Index of attachment in the thread
+     * @returns {Object|null} Attachment metadata object or null if invalid
+     */
+    extractSingleAttachment(attachmentElement, index) {
+        const { selectors } = this.siteConfig;
+        
+        try {
+            // Extract attachment name
+            let name = '';
+            const nameEl = attachmentElement.querySelector(selectors.attachmentNames);
+            if (nameEl) {
+                name = this.cleanText(nameEl.textContent);
+            }
+            
+            // Extract attachment link
+            let downloadUrl = '';
+            const linkEl = attachmentElement.querySelector(selectors.attachmentLinks);
+            if (linkEl) {
+                downloadUrl = linkEl.href || linkEl.getAttribute('href') || '';
+            }
+            
+            // Extract size if available
+            let size = '';
+            const sizeEl = attachmentElement.querySelector(selectors.attachmentSizes);
+            if (sizeEl) {
+                size = this.cleanText(sizeEl.textContent);
+            }
+            
+            // Skip if no name or download URL
+            if (!name && !downloadUrl) {
+                return null;
+            }
+            
+            // Determine file type from extension
+            const fileType = this.getAttachmentType(name);
+            
+            return {
+                index,
+                name: name || `Attachment ${index + 1}`,
+                size,
+                type: fileType,
+                downloadUrl,
+                processable: this.isProcessableAttachment(fileType),
+                summary: null, // Will be populated during processing
+                extractedContent: null // Will be populated during processing
+            };
+            
+        } catch (error) {
+            console.error('Error extracting single attachment:', error);
+            return null;
+        }
+    }
+    
+    /**
+     * Determine attachment type from filename
+     * @param {string} filename - Name of the attachment file
+     * @returns {string} File type category
+     */
+    getAttachmentType(filename) {
+        if (!filename) return 'unknown';
+        
+        const extension = filename.toLowerCase().split('.').pop();
+        
+        switch (extension) {
+            case 'pdf':
+                return 'pdf';
+            case 'docx':
+            case 'doc':
+                return 'docx';
+            case 'xlsx':
+            case 'xls':
+                return 'xlsx';
+            case 'png':
+            case 'jpg':
+            case 'jpeg':
+            case 'gif':
+            case 'bmp':
+            case 'webp':
+                return 'image';
+            default:
+                return 'unknown';
+        }
+    }
+    
+    /**
+     * Check if attachment type can be processed locally
+     * @param {string} fileType - File type category
+     * @returns {boolean} True if processable
+     */
+    isProcessableAttachment(fileType) {
+        return ['pdf', 'docx', 'xlsx', 'image'].includes(fileType);
     }
     
     extractSenderInfo(messageElement) {
