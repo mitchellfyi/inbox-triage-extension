@@ -31,7 +31,13 @@ const EMAIL_SELECTORS = {
         
         // Compose/reply area (to avoid extracting)
         composeArea: '.M9[data-message-id]',
-        draftArea: '[data-is-draft="true"]'
+        draftArea: '[data-is-draft="true"]',
+        
+        // Attachment selectors
+        attachments: '[data-message-id] .aZo',
+        attachmentLinks: '[data-message-id] .aZo a',
+        attachmentNames: '[data-message-id] .aZo .aV3',
+        attachmentSizes: '[data-message-id] .aZo .SaRA'
     },
     
     outlook: {
@@ -61,7 +67,13 @@ const EMAIL_SELECTORS = {
         
         // Areas to avoid
         composeArea: '[data-testid="compose-body-wrapper"]',
-        replyArea: '[data-testid="reply-compose-box"]'
+        replyArea: '[data-testid="reply-compose-box"]',
+        
+        // Attachment selectors
+        attachments: '[data-testid*="attachment"]',
+        attachmentLinks: '[data-testid*="attachment"] a',
+        attachmentNames: '[data-testid="attachment-name"]',
+        attachmentSizes: '[data-testid="attachment-size"]'
     }
 };
 
