@@ -11,7 +11,31 @@ class InboxTriageSidePanel {
         
         this.initializeElements();
         this.bindEvents();
-        this.updateStatus('Ready to analyze email threads');
+        this.checkInitialStatus();
+    }
+    
+    async checkInitialStatus() {
+        try {
+            this.updateStatus('Checking AI model availability...', 'loading');
+            
+            // Request current AI status from background script
+            const response = await chrome.runtime.sendMessage({
+                action: 'checkAIStatus'
+            });
+            
+            if (response && response.success) {
+                if (response.capabilities.available) {
+                    this.updateStatus('Ready to analyse email threads', 'success');
+                } else {
+                    this.updateStatus('AI models not ready. Some features may be limited.', 'error');
+                }
+            } else {
+                this.updateStatus('Ready to analyse email threads');
+            }
+        } catch (error) {
+            console.error('Error checking initial status:', error);
+            this.updateStatus('Ready to analyse email threads');
+        }
     }
     
     initializeElements() {
@@ -240,16 +264,83 @@ class InboxTriageSidePanel {
                 break;
             case 'modelStatus':
                 // Handle AI model availability updates
-                this.updateModelStatus(message.status);
+                this.updateModelStatus(message.type, message.capabilities);
                 break;
             default:
                 console.log('Unhandled message:', message);
         }
     }
     
-    updateModelStatus(status) {
-        // TODO: Update UI based on AI model availability
-        console.log('Model status:', status);
+    updateModelStatus(type, capabilities) {
+        console.log('Model status update:', type, capabilities);
+        
+        switch (type) {
+            case 'none':
+                this.updateStatus('AI features not available in this browser. Please use Chrome 120+.', 'error');
+                break;
+                
+            case 'error':
+                this.updateStatus(`AI initialization error: ${capabilities?.error || 'Unknown error'}`, 'error');
+                break;
+                
+            case 'summarizer':
+                this.handleSummarizerStatus(capabilities);
+                break;
+                
+            case 'promptApi':
+                this.handlePromptApiStatus(capabilities);
+                break;
+                
+            case 'summarizing':
+                this.handleSummarizingProgress(capabilities);
+                break;
+                
+            default:
+                console.log('Unknown model status type:', type);
+        }
+    }
+    
+    handleSummarizerStatus(capabilities) {
+        if (!capabilities) return;
+        
+        if (capabilities.available === 'readily') {
+            console.log('Summarizer model is ready');
+        } else if (capabilities.available === 'after-download') {
+            this.updateStatus('Summarizer model is downloading. This may take a few minutes...', 'loading');
+        } else if (capabilities.available === 'no') {
+            this.updateStatus('Summarizer model is not available. Please enable Chrome AI features.', 'error');
+        }
+    }
+    
+    handlePromptApiStatus(capabilities) {
+        if (!capabilities) return;
+        
+        if (capabilities.available === 'readily') {
+            console.log('Language model is ready');
+        } else if (capabilities.available === 'after-download') {
+            console.log('Language model is downloading...');
+        } else if (capabilities.available === 'no') {
+            console.log('Language model is not available');
+        }
+    }
+    
+    handleSummarizingProgress(capabilities) {
+        if (!capabilities) return;
+        
+        switch (capabilities.stage) {
+            case 'generating_tldr':
+                this.updateStatus('Generating TL;DR summary...', 'loading');
+                break;
+            case 'generating_key_points':
+                this.updateStatus('Extracting key points...', 'loading');
+                break;
+            case 'completed':
+                // Don't update status here - let the generateSummary method handle success
+                break;
+            case 'error':
+                this.updateStatus(`Summarization error: ${capabilities.error}`, 'error');
+                break;
+        }
     }
 }
 

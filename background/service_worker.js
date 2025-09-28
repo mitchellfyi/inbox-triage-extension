@@ -54,6 +54,9 @@ class InboxTriageServiceWorker {
                     const summarizerCapabilities = await window.ai.summarizer.capabilities();
                     this.aiCapabilities.summarizer = summarizerCapabilities;
                     console.log('Summarizer API available:', summarizerCapabilities);
+                    
+                    // Broadcast initial model status to side panel if it's open
+                    this.broadcastModelStatus('summarizer', summarizerCapabilities);
                 }
                 
                 // Check Language Model API (Prompt API)
@@ -61,6 +64,9 @@ class InboxTriageServiceWorker {
                     const languageModelCapabilities = await window.ai.languageModel.capabilities();
                     this.aiCapabilities.promptApi = languageModelCapabilities;
                     console.log('Language Model API available:', languageModelCapabilities);
+                    
+                    // Broadcast initial model status to side panel if it's open
+                    this.broadcastModelStatus('promptApi', languageModelCapabilities);
                 }
                 
                 this.aiCapabilities.available = !!(
@@ -69,9 +75,31 @@ class InboxTriageServiceWorker {
                 );
             } else {
                 console.log('AI APIs not available in this browser');
+                this.broadcastModelStatus('none', null);
             }
         } catch (error) {
             console.error('Error initializing AI capabilities:', error);
+            this.broadcastModelStatus('error', { error: error.message });
+        }
+    }
+    
+    /**
+     * Broadcast model status updates to the side panel
+     * @param {string} type - Type of model (summarizer, promptApi, none, error)
+     * @param {Object} capabilities - Capabilities object or null
+     */
+    broadcastModelStatus(type, capabilities) {
+        try {
+            chrome.runtime.sendMessage({
+                action: 'modelStatus',
+                type: type,
+                capabilities: capabilities
+            }).catch(error => {
+                // Ignore errors if no listeners (side panel might not be open)
+                console.debug('No model status listeners:', error.message);
+            });
+        } catch (error) {
+            console.debug('Error broadcasting model status:', error);
         }
     }
     
@@ -129,8 +157,17 @@ class InboxTriageServiceWorker {
     
     async generateSummary(thread, sendResponse) {
         try {
+            // Check AI capabilities first
             if (!this.aiCapabilities.summarizer) {
                 throw new Error('Summarizer API not available. Please enable AI features in Chrome.');
+            }
+            
+            // Check if model is ready
+            const capabilities = this.aiCapabilities.summarizer;
+            if (capabilities.available === 'after-download') {
+                throw new Error('Summarizer model is downloading. Please wait and try again.');
+            } else if (capabilities.available === 'no') {
+                throw new Error('Summarizer model is not available. Please check Chrome AI settings.');
             }
             
             // Combine all message content
@@ -140,21 +177,47 @@ class InboxTriageServiceWorker {
                 throw new Error('Not enough content to summarize');
             }
             
-            // Create summarizer session
-            const summarizer = await window.ai.summarizer.create({
+            // Broadcast progress update
+            this.broadcastModelStatus('summarizing', { stage: 'generating_tldr' });
+            
+            // Create TL;DR summarizer session
+            const tldrSummarizer = await window.ai.summarizer.create({
                 type: 'tl;dr',
                 format: 'plain-text',
                 length: 'short'
             });
             
-            // Generate summary
-            const summary = await summarizer.summarize(fullText);
+            // Generate TL;DR summary
+            const summary = await tldrSummarizer.summarize(fullText);
+            tldrSummarizer.destroy();
             
-            // Generate key points (simplified approach)
-            const keyPoints = this.extractKeyPoints(fullText, 5);
+            // Broadcast progress update
+            this.broadcastModelStatus('summarizing', { stage: 'generating_key_points' });
             
-            // Clean up
-            summarizer.destroy();
+            let keyPoints = [];
+            
+            // Try to use key-points summarizer if available, fallback to manual extraction
+            try {
+                const keyPointsSummarizer = await window.ai.summarizer.create({
+                    type: 'key-points',
+                    format: 'plain-text',
+                    length: 'short'
+                });
+                
+                const keyPointsText = await keyPointsSummarizer.summarize(fullText);
+                keyPointsSummarizer.destroy();
+                
+                // Parse the key points text into an array
+                keyPoints = this.parseKeyPointsFromText(keyPointsText);
+                
+            } catch (keyPointsError) {
+                console.warn('Key-points summarizer not available, using fallback extraction:', keyPointsError.message);
+                // Fallback to manual extraction
+                keyPoints = this.extractKeyPoints(fullText, 5);
+            }
+            
+            // Broadcast completion
+            this.broadcastModelStatus('summarizing', { stage: 'completed' });
             
             sendResponse({
                 success: true,
@@ -164,6 +227,7 @@ class InboxTriageServiceWorker {
             
         } catch (error) {
             console.error('Summary generation error:', error);
+            this.broadcastModelStatus('summarizing', { stage: 'error', error: error.message });
             sendResponse({
                 success: false,
                 error: error.message
@@ -226,6 +290,26 @@ class InboxTriageServiceWorker {
         return thread.messages
             .map(msg => `From: ${msg.sender?.name || 'Unknown'}\n${msg.content}`)
             .join('\n\n---\n\n');
+    }
+    
+    /**
+     * Parse key points text returned by the AI into an array
+     * @param {string} keyPointsText - Text containing key points from AI
+     * @returns {Array<string>} Array of key points
+     */
+    parseKeyPointsFromText(keyPointsText) {
+        if (!keyPointsText || typeof keyPointsText !== 'string') {
+            return [];
+        }
+        
+        // Split by common delimiters and clean up
+        const points = keyPointsText
+            .split(/[\n\r•\-\*]\s*/)
+            .map(point => point.trim())
+            .filter(point => point.length > 10 && !point.match(/^(\d+\.|\•|\-|\*)/))
+            .slice(0, 5); // Limit to 5 key points
+        
+        return points.length > 0 ? points : [keyPointsText.trim()];
     }
     
     extractKeyPoints(text, maxPoints = 5) {
