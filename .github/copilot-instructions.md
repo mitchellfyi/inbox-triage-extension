@@ -156,12 +156,16 @@ const replySchema = {
 8. **Test accessibility** - Keyboard navigation and screen reader compatibility required
 9. **Use proper commit messages** - Follow type(scope): summary pattern from AGENTS.md
 10. **Make surgical changes** - Small, focused modifications that maintain working state
+11. **Commit early and often** - Make frequent commits with clear, descriptive messages that capture logical units of work
+12. **Write tests first** - Create comprehensive unit and integration tests that pass cleanly without workarounds or hacks
+13. **Follow best practices** - Ensure code readability, maintainability, performance optimization, and accessibility compliance
+14. **Update documentation after features** - Revise README.md, AGENTS.md, and TODO.md once features are complete to reflect current state
 
 ## Resources
 
 Project documentation (use these relative links):
 - [SPEC.md](../SPEC.md) - Complete requirements and acceptance criteria
-- [AGENTS.md](../AGENTS.md) - Development workflow and coding standards
+- [AGENTS.md](../AGENTS.md) - Development workflow and coding standards (includes detailed commit, testing, and documentation guidelines)
 - [README.md](../README.md) - Overview, quickstart, and architecture
 - [TODO.md](../TODO.md) - Current tasks and project progress
 

@@ -58,7 +58,13 @@ No build process required—this extension runs directly from source with no dep
 5. Select tone and "Generate Drafts" for reply options
 
 ### Test
-Currently manual testing only. AI models download automatically on first use (may take a few minutes).
+Unit and integration testing framework to be established. Currently manual testing only:
+1. Test across different email formats and thread lengths
+2. Test AI model states (available, downloading, unavailable)  
+3. Test accessibility with keyboard navigation and screen readers
+4. Verify privacy compliance (no external network calls)
+
+AI models download automatically on first use (may take a few minutes).
 
 ## Architecture at a Glance
 

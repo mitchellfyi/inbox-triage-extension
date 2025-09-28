@@ -27,6 +27,78 @@ This document serves as a guide for AI coding agents working on the Inbox Triage
 - Maintain working state after every change
 - Update documentation inline with code changes
 
+## Commit Early and Often
+
+**Follow these commit practices to maintain clean, reviewable history:**
+
+### Frequency Guidelines
+- **Commit after each logical unit of work** - Don't wait until a feature is completely finished
+- **Commit working code daily** - Even if the feature isn't complete, commit progress that compiles and doesn't break existing functionality
+- **Create checkpoint commits** - Save progress before attempting risky refactors or major changes
+- **Commit before switching contexts** - Always commit current work before switching to a different task or feature
+
+### Commit Message Quality
+- **Use descriptive, specific messages** - "Fix button styling" not "Fix bug"
+- **Explain the why, not just the what** - Include context for future maintainers
+- **Reference issues and requirements** - Link to SPEC.md acceptance criteria when relevant
+- **Follow the established patterns** - Use type(scope): format consistently
+
+### Atomic Commits
+- **One logical change per commit** - Don't mix refactoring with new features
+- **Complete, working changes** - Each commit should leave the code in a working state
+- **Self-contained updates** - Commits should be understandable without external context
+- **Reviewable size** - Keep commits small enough for thorough code review
+
+## Testing Requirements
+
+**All new features and changes must include comprehensive testing:**
+
+### Unit Testing
+- **Write tests first when possible** - Follow TDD practices for core functionality
+- **Test all public APIs** - Cover every function, method, and interface exposed by your modules
+- **Test edge cases** - Include boundary conditions, error states, and unexpected inputs
+- **Maintain test coverage** - Don't reduce existing coverage with new changes
+
+### Integration Testing
+- **Test component interactions** - Verify that modules work correctly together
+- **Test AI API integrations** - Mock and test Summarizer API and Prompt API usage
+- **Test user workflows** - End-to-end testing of complete user scenarios
+- **Test error handling** - Verify graceful degradation when dependencies fail
+
+### Testing Standards
+- **Tests must pass without workarounds** - Don't skip failing tests or use temporary fixes
+- **No hacks or temporary solutions** - If tests don't pass cleanly, fix the underlying issue
+- **Test in isolation** - Each test should be independent and repeatable
+- **Clear test descriptions** - Test names should describe the expected behavior
+
+### Manual Testing Requirements
+- **Test across target browsers** - Chrome versions and variants as specified in SPEC.md
+- **Test AI model states** - Available, downloading, and unavailable scenarios
+- **Test accessibility** - Keyboard navigation and screen reader compatibility
+- **Test privacy compliance** - Verify no external network calls or data leakage
+
+## Documentation Maintenance
+
+**Keep documentation current and accurate throughout development:**
+
+### During Development
+- **Update TODO.md inline** - Mark progress as [doing] → [done] while working
+- **Document new APIs** - Add JSDoc comments for new functions and classes
+- **Update technical decisions** - Record architectural choices and rationale
+- **Note known limitations** - Document temporary constraints or future improvements needed
+
+### After Feature Completion
+- **Update README.md** - Reflect new capabilities in the overview and quickstart sections
+- **Review AGENTS.md** - Add new patterns, update coding rules, revise workflows if needed
+- **Update SPEC.md** - Ensure acceptance criteria match implemented behavior
+- **Revise TODO.md** - Archive completed tasks, add follow-up work, reorganize sections
+
+### Documentation Quality Standards
+- **Accuracy first** - Ensure all code examples work and all links are valid
+- **User-focused content** - Write from the perspective of someone new to the project
+- **Consistent formatting** - Follow established markdown conventions and link patterns
+- **Complete information** - Don't leave gaps that require external knowledge to fill
+
 ## Coding Rules
 
 ### Directory Structure and Organization
@@ -124,13 +196,30 @@ Closes #issue-number
 - ❌ **Ignore error states** - Always handle AI model unavailability and provide user feedback
 - ❌ **Break privacy guarantees** - Email content must never leave the user's device
 - ❌ **Skip documentation** - Update TODO.md and relevant docs with every change
+- ❌ **Submit untested code** - All features must have passing tests without workarounds
+- ❌ **Make monolithic commits** - Keep commits small, focused, and logically separated
+- ❌ **Leave broken builds** - Every commit should maintain a working, testable state
 
 ## Workflow
 
-1. Pick a task from `TODO.md` or the issue tracker.
-2. Review the relevant sections in `SPEC.md` and existing code.
-3. Implement the feature in a new branch, following the above principles.
-4. Update `TODO.md` to reflect progress, and create or comment on issues as needed.
-5. Open a pull request for review once the task is complete.
+1. **Pick a task** from `TODO.md` or the issue tracker, update status to `[doing]`
+2. **Review requirements** in `SPEC.md` and study existing code patterns
+3. **Create feature branch** with descriptive name following `type/brief-description` format
+4. **Write tests first** for new functionality, ensuring they initially fail
+5. **Implement incrementally** making small commits as you progress
+6. **Run tests frequently** ensuring they pass without workarounds or hacks  
+7. **Update docs inline** as you add new functionality or change behavior
+8. **Test manually** across browsers, AI states, and accessibility requirements
+9. **Final doc review** - Update README.md, AGENTS.md, and TODO.md to reflect completed work
+10. **Open pull request** with comprehensive description following PR template
+11. **Mark task complete** in TODO.md and link to the merged PR
+
+**Quality Gates Before PR:**
+- ✅ All tests pass cleanly without skipped or failing tests
+- ✅ Manual testing completed for core user workflows  
+- ✅ Documentation updated to reflect new functionality
+- ✅ Code follows established patterns and style guidelines
+- ✅ Accessibility requirements met (keyboard navigation, ARIA labels)
+- ✅ Privacy compliance verified (no external network calls)
 
 By adhering to this guide, agents will produce consistent, high‑quality contributions that align with the project’s goals and constraints.
