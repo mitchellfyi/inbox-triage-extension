@@ -95,6 +95,14 @@ All AI processing happens locally using Chrome's built-in language models, ensur
 ## Contributing
 
 Please see [SPEC.md](SPEC.md) for detailed technical specifications and requirements.
+For AI coding guidelines, see [agents.md](agents.md). To track progress and tasks, refer to [TODO.md](TODO.md).
+
+## Documentation
+
+- **SPEC.md**: Comprehensive technical and functional specification for the extension.
+- **agents.md**: Guidelines for AI coding agents and contributors on how to approach development, including best practices.
+- **TODO.md**: Living checklist of tasks and their status to help track progress across features and improvements.
+
 
 ## License
 
