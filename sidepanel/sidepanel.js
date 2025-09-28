@@ -88,15 +88,24 @@ class InboxTriageSidePanel {
             keyPoints: document.getElementById('key-points'),
             attachments: document.getElementById('attachments'),
             toneSelector: document.getElementById('tone-selector'),
+            guidanceText: document.getElementById('guidance-text'),
+            micBtn: document.getElementById('mic-btn'),
+            micStatus: document.getElementById('mic-status'),
             generateDraftsBtn: document.getElementById('generate-drafts-btn'),
             replyDrafts: document.getElementById('reply-drafts')
         };
+        
+        // Initialize voice recognition
+        this.speechRecognition = null;
+        this.isListening = false;
+        this.initializeSpeechRecognition();
     }
     
     bindEvents() {
         this.elements.extractBtn.addEventListener('click', () => this.extractCurrentThread());
         this.elements.generateDraftsBtn.addEventListener('click', () => this.generateReplyDrafts());
         this.elements.toneSelector.addEventListener('change', () => this.onToneChange());
+        this.elements.micBtn.addEventListener('click', () => this.toggleVoiceDictation());
         
         // Keyboard navigation support
         this.elements.extractBtn.addEventListener('keydown', (e) => {
@@ -110,6 +119,13 @@ class InboxTriageSidePanel {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 this.generateReplyDrafts();
+            }
+        });
+        
+        this.elements.micBtn.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.toggleVoiceDictation();
             }
         });
         
@@ -438,10 +454,12 @@ class InboxTriageSidePanel {
             }
             
             const tone = this.elements.toneSelector.value;
+            const guidance = this.elements.guidanceText.value.trim();
             const response = await chrome.runtime.sendMessage({
                 action: 'generateDrafts',
                 thread: this.currentThread,
-                tone: tone
+                tone: tone,
+                guidance: guidance
             });
             
             if (response && response.success) {
@@ -664,6 +682,173 @@ class InboxTriageSidePanel {
             summaryBtn.disabled = true;
             summaryBtn.textContent = reason;
             summaryBtn.title = `Cannot generate summary: ${reason}`;
+        }
+    }
+    
+    /**
+     * Initialize Speech Recognition API for voice dictation
+     */
+    initializeSpeechRecognition() {
+        // Check if Web Speech API is supported
+        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+            console.log('Speech recognition not supported');
+            this.elements.micBtn.disabled = true;
+            this.elements.micBtn.title = 'Speech recognition not supported in this browser';
+            return;
+        }
+        
+        // Use the webkit prefix if available, fallback to standard
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        this.speechRecognition = new SpeechRecognition();
+        
+        // Configure speech recognition
+        this.speechRecognition.continuous = false;
+        this.speechRecognition.interimResults = true;
+        this.speechRecognition.lang = 'en-US';
+        
+        // Event handlers
+        this.speechRecognition.onstart = () => {
+            this.isListening = true;
+            this.updateMicrophoneUI('listening');
+        };
+        
+        this.speechRecognition.onresult = (event) => {
+            let finalTranscript = '';
+            let interimTranscript = '';
+            
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const transcript = event.results[i][0].transcript;
+                if (event.results[i].isFinal) {
+                    finalTranscript += transcript;
+                } else {
+                    interimTranscript += transcript;
+                }
+            }
+            
+            if (finalTranscript) {
+                // Add the transcribed text to the guidance text area
+                const currentText = this.elements.guidanceText.value;
+                const newText = currentText ? `${currentText} ${finalTranscript}` : finalTranscript;
+                this.elements.guidanceText.value = newText.trim();
+                
+                // Focus on the textarea and move cursor to end
+                this.elements.guidanceText.focus();
+                this.elements.guidanceText.setSelectionRange(newText.length, newText.length);
+            }
+            
+            if (interimTranscript) {
+                this.updateMicStatus(`Listening: ${interimTranscript}`, 'listening');
+            }
+        };
+        
+        this.speechRecognition.onend = () => {
+            this.isListening = false;
+            this.updateMicrophoneUI('idle');
+        };
+        
+        this.speechRecognition.onerror = (event) => {
+            console.error('Speech recognition error:', event.error);
+            this.isListening = false;
+            
+            let errorMessage = 'Voice recognition error';
+            switch (event.error) {
+                case 'not-allowed':
+                case 'service-not-allowed':
+                    errorMessage = 'Microphone permission denied. Please allow microphone access.';
+                    break;
+                case 'no-speech':
+                    errorMessage = 'No speech detected. Try again.';
+                    break;
+                case 'network':
+                    errorMessage = 'Network error. Voice recognition requires internet connection.';
+                    break;
+                case 'audio-capture':
+                    errorMessage = 'Microphone not available.';
+                    break;
+                default:
+                    errorMessage = `Voice recognition error: ${event.error}`;
+            }
+            
+            this.updateMicStatus(errorMessage, 'error');
+            this.updateMicrophoneUI('error');
+            
+            // Clear error message after 5 seconds
+            setTimeout(() => {
+                if (!this.isListening) {
+                    this.updateMicStatus('', '');
+                    this.updateMicrophoneUI('idle');
+                }
+            }, 5000);
+        };
+    }
+    
+    /**
+     * Toggle voice dictation on/off
+     */
+    toggleVoiceDictation() {
+        if (!this.speechRecognition) {
+            this.updateMicStatus('Speech recognition not supported', 'error');
+            return;
+        }
+        
+        if (this.isListening) {
+            // Stop listening
+            this.speechRecognition.stop();
+        } else {
+            // Start listening
+            try {
+                this.speechRecognition.start();
+                this.updateMicStatus('Starting voice recognition...', 'listening');
+            } catch (error) {
+                console.error('Error starting speech recognition:', error);
+                this.updateMicStatus('Failed to start voice recognition', 'error');
+            }
+        }
+    }
+    
+    /**
+     * Update microphone button UI state
+     * @param {string} state - Current state: 'idle', 'listening', 'error'
+     */
+    updateMicrophoneUI(state) {
+        const micBtn = this.elements.micBtn;
+        
+        // Remove all state classes
+        micBtn.classList.remove('listening');
+        
+        switch (state) {
+            case 'listening':
+                micBtn.classList.add('listening');
+                micBtn.setAttribute('aria-label', 'Stop voice dictation');
+                micBtn.title = 'Click to stop voice dictation';
+                break;
+            case 'error':
+                micBtn.setAttribute('aria-label', 'Voice dictation error');
+                micBtn.title = 'Voice dictation error - try again';
+                break;
+            case 'idle':
+            default:
+                micBtn.setAttribute('aria-label', 'Start voice dictation');
+                micBtn.title = 'Click to start voice dictation';
+                break;
+        }
+    }
+    
+    /**
+     * Update microphone status text
+     * @param {string} message - Status message to display
+     * @param {string} type - Status type: 'listening', 'error', or empty string
+     */
+    updateMicStatus(message, type = '') {
+        const micStatus = this.elements.micStatus;
+        micStatus.textContent = message;
+        
+        // Remove all status classes
+        micStatus.classList.remove('listening', 'error');
+        
+        // Add appropriate class
+        if (type) {
+            micStatus.classList.add(type);
         }
     }
 }
