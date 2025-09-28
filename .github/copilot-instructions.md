@@ -1,5 +1,7 @@
 # Copilot Instructions for inbox-triage-extension
 
+**Always read SPEC.md and AGENTS.md first before making any code changes.** These documents contain complete requirements, constraints, and development guidelines that must be followed.
+
 ## Project Overview
 
 This is a Chrome extension for inbox triage that summarizes email threads and generates reply drafts using on-device AI capabilities. The extension runs entirely client-side with Chrome's built-in AI APIs to ensure privacy and zero server dependencies.
@@ -144,13 +146,44 @@ const replySchema = {
 
 ## When Contributing
 
-1.1. **Read SPEC.md and agents.md first** - Understand all requirements, constraints, and guidelines
-2. **Test offline functionality** - Ensure extension works without internet
-3. **Validate privacy compliance** - No external data transmission
-4. **Check model availability** - Handle graceful degradation
-5. **Test accessibility** - Keyboard navigation and screen readers
-6. **Cross-browser testing** - Gmail and Outlook compatibility
-7. **Keep TODO.md updated** - Document progress and tasks to track what's done and what's next
+1. **Read SPEC.md and AGENTS.md first** - Understand all requirements, constraints, and guidelines
+2. **Never add network calls or new dependencies** - Extension must remain on-device only with zero external dependencies
+3. **Keep TODO.md updated after each change** - Track progress and update task status inline with code changes
+4. **Follow Given-When-Then acceptance criteria** - Validate changes against SPEC.md requirements
+5. **Test offline functionality** - Ensure extension works without internet once AI models are downloaded
+6. **Validate privacy compliance** - No external data transmission ever
+7. **Check model availability gracefully** - Handle AI API unavailability with user-friendly messages
+8. **Test accessibility** - Keyboard navigation and screen reader compatibility required
+9. **Use proper commit messages** - Follow type(scope): summary pattern from AGENTS.md
+10. **Make surgical changes** - Small, focused modifications that maintain working state
+
+## Resources
+
+Project documentation (use these relative links):
+- [SPEC.md](../SPEC.md) - Complete requirements and acceptance criteria
+- [AGENTS.md](../AGENTS.md) - Development workflow and coding standards
+- [README.md](../README.md) - Overview, quickstart, and architecture
+- [TODO.md](../TODO.md) - Current tasks and project progress
+
+## Guardrails
+
+### Privacy Requirements
+- All AI processing must happen locally using Chrome's built-in APIs only
+- Never collect, store, or transmit user data to external servers
+- Email content must never leave the user's device
+- No analytics, tracking, or usage data collection
+
+### Performance Requirements
+- Minimize memory usage in content scripts
+- Keep UI responsive with loading states for AI operations
+- Cache results appropriately but don't store personal data
+- Handle large email threads efficiently without blocking
+
+### Accessibility Requirements  
+- Ensure all UI controls are keyboard accessible
+- Provide proper ARIA labels for screen readers
+- Support high contrast and font scaling
+- Test with accessibility tools before submitting changes
 
 ## Common Gotchas
 

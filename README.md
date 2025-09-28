@@ -1,15 +1,111 @@
 # Inbox Triage Extension
 
-A Chrome extension that uses on-device AI to summarize email threads and generate reply drafts for Gmail and Outlook, ensuring complete privacy with zero server dependencies.
+**Triage your inbox with AI-powered email summaries and reply drafts—all processed locally for complete privacy.**
 
-## Features
+This Chrome extension transforms email overwhelm into actionable insights by instantly summarizing email threads and generating three tailored reply drafts. Built entirely on Chrome's on-device AI APIs with zero server dependencies.
 
-- **Email Thread Extraction**: Automatically extracts content from Gmail and Outlook email threads
-- **AI-Powered Summarization**: Uses Chrome's built-in Summarizer API to generate concise TL;DR summaries and key points
-- **Reply Draft Generation**: Creates three different reply options (quick, detailed, action-oriented) using the Prompt API
-- **Tone Selection**: Choose from neutral, friendly, assertive, or formal tones for reply generation
-- **Privacy First**: All processing happens locally on-device - no data is sent to external servers
-- **Side Panel Interface**: Clean, accessible UI within Chrome's side panel
+## Value Proposition
+
+- **Save Time**: Get instant TL;DR summaries and key points from lengthy email threads
+- **Stay Responsive**: Generate professional reply drafts in multiple tones and lengths
+- **Protect Privacy**: All processing happens locally—no data leaves your device
+- **Work Offline**: Fully functional once AI models are downloaded
+
+## Documentation Map
+
+Start here to understand the project and contribute effectively:
+
+- **[SPEC.md](SPEC.md)** - Complete functional and technical requirements
+- **[AGENTS.md](AGENTS.md)** - Development guidelines for AI coding agents and contributors  
+- **[TODO.md](TODO.md)** - Project tasks and progress tracking
+- **[.github/copilot-instructions.md](.github/copilot-instructions.md)** - GitHub Copilot configuration and rules
+
+## Quickstart
+
+### Prerequisites
+- **Chrome 120+** with Manifest V3 support
+- **Gmail or Outlook** account access in Chrome
+- **Chrome AI features enabled** (flags configuration required)
+
+### Install
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/mitchellfyi/inbox-triage-extension.git
+   cd inbox-triage-extension
+   ```
+
+2. Enable Chrome AI features:
+   - Navigate to `chrome://flags/`
+   - Enable these flags:
+     - `#optimization-guide-on-device-model` → Enabled BypassPerfRequirement
+     - `#prompt-api-for-gemini-nano` → Enabled
+     - `#summarization-api-for-gemini-nano` → Enabled
+   - Restart Chrome
+
+3. Load the extension:
+   - Open `chrome://extensions/`
+   - Enable "Developer mode"
+   - Click "Load unpacked" and select the project directory
+
+### Dev Build
+No build process required—this extension runs directly from source with no dependencies or compilation step.
+
+### Run
+1. Navigate to Gmail or Outlook in Chrome
+2. Open an email thread
+3. Click the extension icon to open the side panel
+4. Click "Extract Current Thread" to analyze
+5. Select tone and "Generate Drafts" for reply options
+
+### Test
+Currently manual testing only. AI models download automatically on first use (may take a few minutes).
+
+## Architecture at a Glance
+
+**Extension Surfaces:**
+- **Side Panel** - Main UI for summaries and drafts (`sidepanel/`)
+- **Content Scripts** - Extract email content from Gmail/Outlook (`content/`)
+- **Service Worker** - AI processing and message coordination (`background/`)
+- **Manifest V3** - Extension configuration and permissions
+
+**Core Modules:**
+- **Email Extraction** - DOM parsing with provider-specific selectors
+- **AI Summarization** - Chrome's Summarizer API for TL;DR and key points
+- **Draft Generation** - Prompt API with JSON schema for structured replies  
+- **Tone Controls** - User-selectable tone parameters (neutral, friendly, assertive, formal)
+
+**Message Flow:** Content Script → Service Worker → AI APIs → Side Panel UI
+
+*For detailed architecture, see [SPEC.md](SPEC.md).*
+
+## Privacy Guarantees
+
+**Zero External Calls:** All processing happens locally using Chrome's built-in AI APIs. No data is transmitted to external servers, APIs, or services.
+
+**On-Device Only:** Email content never leaves your device. AI models run entirely within Chrome's sandbox.
+
+**No Data Collection:** The extension does not collect, store, or transmit any user data, email content, or usage analytics.
+
+**Open Source:** All code is transparent and auditable in this public repository.
+
+## Contributing Flow
+
+**For AI Agents and Human Contributors:**
+
+1. **Read SPEC.md first** - Understand complete requirements and constraints
+2. **Review AGENTS.md** - Follow development principles and workflow
+3. **Check TODO.md** - Pick or create tasks, track progress  
+4. **Open/assign tasks** - Create issues or assign yourself to existing ones
+5. **Submit focused PRs** - Small, incremental changes with tests
+6. **Update docs** - Keep TODO.md and relevant docs current
+
+**Key Principles:**
+- Privacy-first: On-device AI only, no external network calls
+- Manifest V3: Modern Chrome extension architecture
+- Accessibility: Keyboard navigation and screen reader support
+- Minimal dependencies: Avoid third-party frameworks
+
+*For detailed development guidelines, see [AGENTS.md](AGENTS.md).*
 
 ## Project Structure
 
@@ -18,9 +114,6 @@ inbox-triage-extension/
 ├── manifest.json              # Chrome extension manifest (Manifest V3)
 ├── assets/
 │   └── icons/                # Extension icons (16px, 48px, 128px)
-│       ├── icon16.png
-│       ├── icon48.png
-│       └── icon128.png
 ├── background/
 │   └── service_worker.js     # Background service worker for AI processing
 ├── content/
@@ -30,79 +123,10 @@ inbox-triage-extension/
 │   ├── sidepanel.html        # Side panel UI
 │   └── sidepanel.js          # Side panel JavaScript logic
 ├── SPEC.md                   # Detailed project specifications
+├── AGENTS.md                 # Development guidelines for contributors
+├── TODO.md                   # Task tracking and progress
 └── README.md                 # This file
 ```
-
-## Installation
-
-### Development Setup
-
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/mitchellfyi/inbox-triage-extension.git
-   cd inbox-triage-extension
-   ```
-
-2. Load the extension in Chrome:
-   - Open Chrome and navigate to `chrome://extensions/`
-   - Enable "Developer mode" in the top right
-   - Click "Load unpacked" and select the project directory
-   - The extension should now appear in your extensions list
-
-3. Enable Chrome AI features (required):
-   - Navigate to `chrome://flags/`
-   - Enable the following flags:
-     - `#optimization-guide-on-device-model` → Enabled BypassPerfRequirement
-     - `#prompt-api-for-gemini-nano` → Enabled
-     - `#summarization-api-for-gemini-nano` → Enabled
-   - Restart Chrome after enabling these flags
-
-### Using the Extension
-
-1. Navigate to Gmail or Outlook in Chrome
-2. Open an email thread you want to analyze
-3. Click the extension icon in the toolbar to open the side panel
-4. Click "Extract Current Thread" to analyze the email
-5. View the generated summary and key points
-6. Select a tone and click "Generate Drafts" to create reply options
-7. Copy any draft to your clipboard for use
-
-## Requirements
-
-- Chrome 120+ with AI features enabled
-- Active Gmail or Outlook email thread
-- On-device AI models (will be downloaded automatically when first used)
-
-## Technical Details
-
-- **Manifest V3**: Uses the latest Chrome extension format
-- **Side Panel API**: Provides persistent UI alongside email interfaces
-- **Built-in AI APIs**: Leverages Chrome's Summarizer and Prompt APIs
-- **Content Scripts**: Extract email content from Gmail and Outlook DOM
-- **Privacy Focused**: No external API calls or data transmission
-
-## Development
-
-The extension is structured with clear separation of concerns:
-
-- `content/`: Handles email extraction from web pages
-- `sidepanel/`: Manages user interface and interactions  
-- `background/`: Processes AI requests and coordinates communication
-- `assets/`: Static resources like icons
-
-All AI processing happens locally using Chrome's built-in language models, ensuring user privacy and enabling offline functionality once models are downloaded.
-
-## Contributing
-
-Please see [SPEC.md](SPEC.md) for detailed technical specifications and requirements.
-For AI coding guidelines, see [agents.md](agents.md). To track progress and tasks, refer to [TODO.md](TODO.md).
-
-## Documentation
-
-- **SPEC.md**: Comprehensive technical and functional specification for the extension.
-- **agents.md**: Guidelines for AI coding agents and contributors on how to approach development, including best practices.
-- **TODO.md**: Living checklist of tasks and their status to help track progress across features and improvements.
-
 
 ## License
 
