@@ -1,0 +1,161 @@
+# Copilot Instructions for inbox-triage-extension
+
+## Project Overview
+
+This is a Chrome extension for inbox triage that summarizes email threads and generates reply drafts using on-device AI capabilities. The extension runs entirely client-side with Chrome's built-in AI APIs to ensure privacy and zero server dependencies.
+
+## Key Architecture Principles
+
+### Privacy-First Design
+- All processing happens locally using Chrome's built-in AI APIs
+- Never collect, store, or transmit user data to external servers
+- Use only on-device models (Summarizer API, Prompt API)
+
+### Chrome Extension Constraints
+- **Manifest V3** - Use modern extension architecture
+- **Side Panel API** - UI runs in Chrome's side panel
+- **Content Scripts** - Extract email content from Gmail and Outlook
+- **No external dependencies** - Keep bundle size minimal, avoid third-party frameworks
+
+## Core Features & APIs
+
+### Email Processing
+- Extract text from active email threads in Gmail and Outlook
+- Use content scripts to safely access page content
+- Handle different email client DOM structures
+
+### AI Integration
+- **Summarizer API**: Generate TL;DR and key points (up to 5)
+- **Prompt API**: Generate 3 reply drafts with JSON schema enforcement
+- **Tone Support**: neutral, friendly, assertive, formal
+- **Error Handling**: Detect model availability and download status
+
+### Reply Draft Structure
+Each draft should include:
+- Subject line
+- Body content
+- Different lengths: short answer, medium with clarifications, polite with next steps
+- Respect word limits and tone parameters
+
+## Technical Guidelines
+
+### Code Organization
+Structure code with separate modules:
+- `extraction/` - Content scripts for Gmail/Outlook
+- `summarization/` - Summarizer API integration
+- `drafting/` - Prompt API and reply generation
+- `ui/` - Side panel interface logic
+
+### JSON Schema Usage
+- Enforce predictable, parseable output from Prompt API
+- Structure reply drafts consistently
+- Handle schema validation errors gracefully
+
+### Accessibility Requirements
+- Ensure UI controls are keyboard accessible
+- Provide proper ARIA labels
+- Support screen readers
+- Test with accessibility tools
+
+### Error Handling
+- Detect when on-device models are downloading or unavailable
+- Provide clear user feedback and suggested actions
+- Handle API rate limits and failures gracefully
+- Test offline functionality
+
+## Development Best Practices
+
+### Privacy & Security
+- Never use external APIs or services
+- Validate all user inputs
+- Follow Chrome extension security best practices
+- Regular security audits of content scripts
+
+### Performance
+- Minimize memory usage in content scripts
+- Optimize for fast email thread extraction
+- Cache model responses when appropriate
+- Handle large email threads efficiently
+
+### Testing Strategy
+- Test with various email formats and lengths
+- Validate across Gmail and Outlook interfaces
+- Test with different model availability states
+- Accessibility testing required
+
+## Common Patterns
+
+### Model Availability Check
+```javascript
+// Always check model availability before use
+const canSummarize = await window.ai?.summarizer?.capabilities();
+if (canSummarize?.available !== 'readily') {
+  // Handle download or unavailable state
+}
+```
+
+### JSON Schema for Replies
+```javascript
+const replySchema = {
+  type: "object",
+  properties: {
+    drafts: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          subject: { type: "string" },
+          body: { type: "string" },
+          length: { enum: ["short", "medium", "detailed"] }
+        }
+      }
+    }
+  }
+};
+```
+
+### Content Script Safety
+- Use MutationObserver for DOM changes
+- Implement proper cleanup on page navigation
+- Handle single-page app routing in Gmail/Outlook
+
+## File Structure Expectations
+
+```
+/
+├── manifest.json           # Extension manifest (V3)
+├── src/
+│   ├── content/           # Content scripts
+│   │   ├── gmail.js
+│   │   └── outlook.js
+│   ├── sidepanel/         # Side panel UI
+│   │   ├── index.html
+│   │   ├── script.js
+│   │   └── styles.css
+│   ├── background/        # Service worker
+│   │   └── service-worker.js
+│   └── lib/              # Shared utilities
+│       ├── summarizer.js
+│       ├── drafter.js
+│       └── extractor.js
+├── SPEC.md               # Project specifications
+└── README.md             # Installation & usage
+```
+
+## When Contributing
+
+1. **Read SPEC.md first** - Understand all requirements and constraints
+2. **Test offline functionality** - Ensure extension works without internet
+3. **Validate privacy compliance** - No external data transmission
+4. **Check model availability** - Handle graceful degradation
+5. **Test accessibility** - Keyboard navigation and screen readers
+6. **Cross-browser testing** - Gmail and Outlook compatibility
+
+## Common Gotchas
+
+- Chrome AI APIs are experimental - check availability
+- Content Security Policy restrictions in Manifest V3
+- Side panel API requires Chrome 114+
+- Gmail uses dynamic class names - use stable selectors
+- Outlook has different DOM structure than Gmail
+- Model download can take time - show progress indicators
