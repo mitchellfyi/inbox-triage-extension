@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inbox Triage</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 16px;
+            background-color: #f5f5f5;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        
+        .container {
+            max-width: 100%;
+            background: white;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            margin: 0 0 16px 0;
+            font-size: 18px;
+            color: #333;
+        }
+        
+        .status {
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 16px;
+            background: #e3f2fd;
+            color: #1976d2;
+            border-left: 4px solid #2196f3;
+        }
+        
+        .section {
+            margin-bottom: 24px;
+        }
+        
+        .section h2 {
+            font-size: 14px;
+            margin: 0 0 8px 0;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .placeholder {
+            color: #999;
+            font-style: italic;
+        }
+        
+        button {
+            background: #1976d2;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        button:hover {
+            background: #1565c0;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Inbox Triage</h1>
+        
+        <div class="status" id="status">
+            <span id="status-text">Ready to analyze email threads</span>
+        </div>
+        
+        <div class="section">
+            <button id="extract-btn" type="button">Extract Current Thread</button>
+        </div>
+        
+        <div class="section">
+            <h2>Summary</h2>
+            <div id="summary" class="placeholder">
+                No thread analyzed yet. Click "Extract Current Thread" to get started.
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>Key Points</h2>
+            <div id="key-points" class="placeholder">
+                Key points will appear here after analysis.
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>Reply Drafts</h2>
+            <div>
+                <label for="tone-selector">Tone:</label>
+                <select id="tone-selector">
+                    <option value="neutral">Neutral</option>
+                    <option value="friendly">Friendly</option>
+                    <option value="assertive">Assertive</option>
+                    <option value="formal">Formal</option>
+                </select>
+                <button id="generate-drafts-btn" type="button" disabled>Generate Drafts</button>
+            </div>
+            <div id="reply-drafts" class="placeholder">
+                Reply drafts will appear here after generating.
+            </div>
+        </div>
+    </div>
+    
+    <script src="sidepanel.js"></script>
+</body>
+</html>
