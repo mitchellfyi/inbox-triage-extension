@@ -9,7 +9,9 @@ This project builds a Chrome extension for inbox triage that summarises email th
 - Provide a succinct TL;DR and key points for the active email thread in Gmail or Outlook.
 - Generate three candidate reply drafts (short answer, medium with clarifications, and polite with next steps) using an on-device model and a JSON schema to structure the output.
 - Allow the user to select tone (neutral, friendly, assertive, formal) and regenerate drafts accordingly.
-- Offer a simple UI within Chrome's side panel for capturing thread text, displaying summaries, and copying drafts.
+- Extract and analyse email attachments (PDF, DOCX, XLSX, images) locally using on-device AI capabilities.
+- Provide attachment summaries and content analysis without transmitting files externally.
+- Offer a simple UI within Chrome's side panel for capturing thread text, displaying summaries, attachment analysis, and copying drafts.
 
 ## Non-Goals and Constraints
 
@@ -97,6 +99,28 @@ This project builds a Chrome extension for inbox triage that summarises email th
 **Then** the full draft text (subject + body) should be copied to the clipboard  
 **And** the user should receive visual confirmation of the successful copy  
 
+### Attachment Detection and Analysis
+**Given** a user is viewing an email thread containing attachments in Gmail or Outlook  
+**When** they extract the thread content  
+**Then** the extension should detect and list all attachments with metadata (name, size, type)  
+**And** identify which attachments can be processed locally (PDF, DOCX, XLSX, images)  
+**And** display attachment cards with appropriate file type indicators  
+
+### Attachment Content Processing  
+**Given** processable attachments have been detected  
+**When** the system begins attachment analysis  
+**Then** files should be processed entirely on-device using local parsing libraries  
+**And** extracted content should be summarised using the built-in Summarizer API  
+**And** image attachments should be analysed using the Prompt API's multimodal capabilities  
+**And** no attachment content should be transmitted to external servers  
+
+### Attachment Summary Display
+**Given** attachments have been successfully processed  
+**When** the analysis is complete  
+**Then** each attachment card should display a concise summary of the content  
+**And** users should be able to click cards to view detailed extracted content  
+**And** processing errors should be clearly indicated with helpful messages  
+
 ### AI Model Availability Handling
 **Given** the extension is loaded but AI models are not available  
 **When** the user attempts to use AI features  
@@ -108,11 +132,12 @@ This project builds a Chrome extension for inbox triage that summarises email th
 ## Technical Requirements
 
 - Manifest V3 Chrome extension using the Side Panel API.
-- Content scripts to extract thread text from Gmail and Outlook.
-- Use built-in on-device AI tasks (Summarizer, Prompt API) exclusively for summarisation and drafting; avoid external calls.
+- Content scripts to extract thread text and attachment metadata from Gmail and Outlook.
+- Use built-in on-device AI tasks (Summarizer, Prompt API) exclusively for summarisation, drafting, and attachment analysis; avoid external calls.
+- Local file processing libraries (PDF.js, mammoth.js, SheetJS) for attachment content extraction.
 - JSON schema enforcement to ensure predictable and parseable reply drafts.
 - Basic styling and accessible UI; do not rely on third-party UI frameworks; keep file size minimal.
-- Code must be well-structured with separate modules for extraction, summarisation, drafting, and UI logic.
+- Code must be well-structured with separate modules for extraction, summarisation, drafting, attachment processing, and UI logic.
 
 ## Evaluation Criteria
 
@@ -126,6 +151,8 @@ A submission must include a public repository with install instructions, a short
 
 ## Non‑Functional Requirements
 
-- Privacy: All processing must happen locally; do not collect or transmit user data.
-- Maintainability: Organise code for readability and future enhancements.
-- Accessibility: Ensure UI controls are keyboard accessible and labelled.
+- **Privacy**: All processing must happen locally; do not collect or transmit user data. Email content and attachments never leave the user's device.
+- **Attachment Privacy**: File processing (PDF, DOCX, XLSX, images) must occur entirely on-device using local parsing libraries. No attachment content should be sent to external services.
+- **Maintainability**: Organise code for readability and future enhancements.
+- **Accessibility**: Ensure UI controls are keyboard accessible and labelled.
+- **Performance**: Attachment processing should not block the UI and should handle large files gracefully with appropriate size limits.
