@@ -159,15 +159,15 @@ class InboxTriageServiceWorker {
         try {
             // Check AI capabilities first
             if (!this.aiCapabilities.summarizer) {
-                throw new Error('Summarizer API not available. Please enable AI features in Chrome.');
+                throw new Error('AI summarization is not available in this browser. Please use Chrome 120+ with AI features enabled.');
             }
             
             // Check if model is ready
             const capabilities = this.aiCapabilities.summarizer;
             if (capabilities.available === 'after-download') {
-                throw new Error('Summarizer model is downloading. Please wait and try again.');
+                throw new Error('AI model is downloading. This may take a few minutes. Please try again later.');
             } else if (capabilities.available === 'no') {
-                throw new Error('Summarizer model is not available. Please check Chrome AI settings.');
+                throw new Error('AI summarization is not available. Please enable Chrome AI features in Settings > Privacy and security > Experimental AI.');
             }
             
             // Combine all message content

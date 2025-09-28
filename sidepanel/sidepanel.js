@@ -276,7 +276,7 @@ class InboxTriageSidePanel {
         
         switch (type) {
             case 'none':
-                this.updateStatus('AI features not available in this browser. Please use Chrome 120+.', 'error');
+                this.updateStatus('AI features not available. Please use Chrome 120+ with experimental AI enabled.', 'error');
                 break;
                 
             case 'error':
@@ -306,9 +306,9 @@ class InboxTriageSidePanel {
         if (capabilities.available === 'readily') {
             console.log('Summarizer model is ready');
         } else if (capabilities.available === 'after-download') {
-            this.updateStatus('Summarizer model is downloading. This may take a few minutes...', 'loading');
+            this.updateStatus('AI model is downloading. This may take several minutes...', 'loading');
         } else if (capabilities.available === 'no') {
-            this.updateStatus('Summarizer model is not available. Please enable Chrome AI features.', 'error');
+            this.updateStatus('AI summarization is not available. Please enable Chrome AI in Settings > Privacy and security > Experimental AI.', 'error');
         }
     }
     
