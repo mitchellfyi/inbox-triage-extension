@@ -47,8 +47,8 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 
 ### Architecture & Configuration
 - `[todo]` Manifest V3 validation - Ensure all permissions are minimal and necessary
-- `[todo]` Error handling strategy - Standardize error messages and fallback behaviors
-- `[done]` Model availability detection - Robust checking for AI API readiness
+- `[done]` Error handling strategy - Standardize error messages and fallback behaviors with comprehensive sanitization
+- `[done]` Model availability detection - Robust checking for AI API readiness with periodic monitoring and state management
 - `[todo]` Message passing architecture - Clean communication between components
 
 ### AI Integration
