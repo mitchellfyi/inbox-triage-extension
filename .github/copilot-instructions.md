@@ -144,12 +144,13 @@ const replySchema = {
 
 ## When Contributing
 
-1. **Read SPEC.md first** - Understand all requirements and constraints
+1.1. **Read SPEC.md and agents.md first** - Understand all requirements, constraints, and guidelines
 2. **Test offline functionality** - Ensure extension works without internet
 3. **Validate privacy compliance** - No external data transmission
 4. **Check model availability** - Handle graceful degradation
 5. **Test accessibility** - Keyboard navigation and screen readers
 6. **Cross-browser testing** - Gmail and Outlook compatibility
+7. **Keep TODO.md updated** - Document progress and tasks to track what's done and what's next
 
 ## Common Gotchas
 
