@@ -24,17 +24,53 @@ class InboxTriageSidePanel {
             });
             
             if (response && response.success) {
-                if (response.capabilities.available) {
-                    this.updateStatus('Ready to analyse email threads', 'success');
+                const { summarizer, promptApi, available } = response.capabilities;
+                
+                if (available) {
+                    // Check individual model status
+                    let readyModels = [];
+                    let downloadingModels = [];
+                    let unavailableModels = [];
+                    
+                    if (summarizer) {
+                        if (summarizer.available === 'readily') {
+                            readyModels.push('Summarization');
+                        } else if (summarizer.available === 'after-download') {
+                            downloadingModels.push('Summarization');
+                        } else {
+                            unavailableModels.push('Summarization');
+                        }
+                    }
+                    
+                    if (promptApi) {
+                        if (promptApi.available === 'readily') {
+                            readyModels.push('Reply Drafting');
+                        } else if (promptApi.available === 'after-download') {
+                            downloadingModels.push('Reply Drafting');
+                        } else {
+                            unavailableModels.push('Reply Drafting');
+                        }
+                    }
+                    
+                    // Update status based on model states
+                    if (readyModels.length > 0 && downloadingModels.length === 0 && unavailableModels.length === 0) {
+                        this.updateStatus('AI models ready. You can analyze email threads.', 'success');
+                    } else if (downloadingModels.length > 0) {
+                        this.updateStatus(`AI models downloading: ${downloadingModels.join(', ')}. This may take several minutes...`, 'loading');
+                    } else if (unavailableModels.length > 0) {
+                        this.updateStatus('Some AI features are not available. Please enable Chrome AI features in Settings > Privacy and security > Experimental AI.', 'error');
+                    } else {
+                        this.updateStatus('Ready to analyze email threads', 'success');
+                    }
                 } else {
-                    this.updateStatus('AI models not ready. Some features may be limited.', 'error');
+                    this.updateStatus('AI features not available. Please use Chrome 120+ with experimental AI enabled.', 'error');
                 }
             } else {
-                this.updateStatus('Ready to analyse email threads');
+                this.updateStatus('Unable to check AI model status. Ready to analyze email threads.', 'info');
             }
         } catch (error) {
             console.error('Error checking initial status:', error);
-            this.updateStatus('Ready to analyse email threads');
+            this.updateStatus('Unable to check AI model status. Ready to analyze email threads.', 'info');
         }
     }
     
@@ -137,10 +173,12 @@ class InboxTriageSidePanel {
                 this.displaySummary(response.summary, response.keyPoints);
                 this.updateStatus('Summary generated successfully', 'success');
             } else {
+                // Error message is already sanitized by the service worker
                 throw new Error(response?.error || 'Failed to generate summary');
             }
         } catch (error) {
             console.error('Error generating summary:', error);
+            // Display the sanitized error message from the service worker
             this.updateStatus(`Summary error: ${error.message}`, 'error');
         }
     }
@@ -192,20 +230,14 @@ class InboxTriageSidePanel {
                     this.updateStatus('Reply drafts generated successfully', 'success');
                 }
             } else {
+                // Error message is already sanitized by the service worker
                 throw new Error(response?.error || 'Failed to generate drafts');
             }
         } catch (error) {
             console.error('Error generating drafts:', error);
             
-            // Provide more specific error messages
-            let errorMessage = error.message;
-            if (errorMessage.includes('Language Model API not available')) {
-                errorMessage = 'AI drafting feature is not available. Please use Chrome 120+ with experimental AI features enabled.';
-            } else if (errorMessage.includes('downloading')) {
-                errorMessage = 'AI model is still downloading. This can take several minutes. Please try again shortly.';
-            }
-            
-            this.updateStatus(`Draft error: ${errorMessage}`, 'error');
+            // Display the sanitized error message from the service worker
+            this.updateStatus(`Draft error: ${error.message}`, 'error');
         } finally {
             this.elements.generateDraftsBtn.disabled = false;
         }
@@ -322,10 +354,19 @@ class InboxTriageSidePanel {
         
         if (capabilities.available === 'readily') {
             console.log('Summarizer model is ready');
+            // Enable summary button if available
+            const summaryBtn = document.querySelector('#generate-summary-btn, .generate-summary');
+            if (summaryBtn) {
+                summaryBtn.disabled = false;
+                summaryBtn.textContent = 'Generate Summary';
+                summaryBtn.title = '';
+            }
         } else if (capabilities.available === 'after-download') {
-            this.updateStatus('AI model is downloading. This may take several minutes...', 'loading');
+            this.updateStatus('AI summarization model is downloading. This may take several minutes...', 'loading');
+            this.disableSummaryGeneration('Model downloading...');
         } else if (capabilities.available === 'no') {
-            this.updateStatus('AI summarization is not available. Please enable Chrome AI in Settings > Privacy and security > Experimental AI.', 'error');
+            this.updateStatus('AI summarization is not available. Please enable Chrome AI in Settings > Privacy and security > Experimental AI, or try using Chrome 120+.', 'error');
+            this.disableSummaryGeneration('AI summarization unavailable');
         }
     }
     
@@ -334,10 +375,14 @@ class InboxTriageSidePanel {
         
         if (capabilities.available === 'readily') {
             console.log('Language model is ready');
+            // Enable draft generation if summarizer is also available
+            this.updateDraftButtonState();
         } else if (capabilities.available === 'after-download') {
-            console.log('Language model is downloading...');
+            this.updateStatus('AI reply drafting model is downloading. This can take several minutes...', 'loading');
+            this.disableDraftGeneration('Model downloading...');
         } else if (capabilities.available === 'no') {
-            console.log('Language model is not available');
+            this.updateStatus('AI reply drafting is not available. Please enable Chrome AI in Settings > Privacy and security > Experimental AI, or try using Chrome 120+.', 'error');
+            this.disableDraftGeneration('AI drafting unavailable');
         }
     }
     
@@ -357,6 +402,43 @@ class InboxTriageSidePanel {
             case 'error':
                 this.updateStatus(`Summarization error: ${capabilities.error}`, 'error');
                 break;
+        }
+    }
+    
+    /**
+     * Update draft generation button state based on model availability
+     */
+    updateDraftButtonState() {
+        // Check if we have at least one AI model available
+        if (this.elements.generateDraftsBtn) {
+            this.elements.generateDraftsBtn.disabled = false;
+            this.elements.generateDraftsBtn.textContent = 'Generate Drafts';
+            this.elements.generateDraftsBtn.title = '';
+        }
+    }
+    
+    /**
+     * Disable draft generation with user-friendly message
+     * @param {string} reason - Reason for disabling
+     */
+    disableDraftGeneration(reason) {
+        if (this.elements.generateDraftsBtn) {
+            this.elements.generateDraftsBtn.disabled = true;
+            this.elements.generateDraftsBtn.textContent = reason;
+            this.elements.generateDraftsBtn.title = `Cannot generate drafts: ${reason}`;
+        }
+    }
+    
+    /**
+     * Disable summary generation with user-friendly message
+     * @param {string} reason - Reason for disabling
+     */
+    disableSummaryGeneration(reason) {
+        const summaryBtn = document.querySelector('#generate-summary-btn, .generate-summary');
+        if (summaryBtn) {
+            summaryBtn.disabled = true;
+            summaryBtn.textContent = reason;
+            summaryBtn.title = `Cannot generate summary: ${reason}`;
         }
     }
 }

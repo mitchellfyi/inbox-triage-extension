@@ -11,6 +11,9 @@ class InboxTriageServiceWorker {
             available: false
         };
         
+        // Periodic check interval (30 seconds)
+        this.modelCheckInterval = null;
+        
         this.init();
     }
     
@@ -79,7 +82,108 @@ class InboxTriageServiceWorker {
             }
         } catch (error) {
             console.error('Error initializing AI capabilities:', error);
-            this.broadcastModelStatus('error', { error: error.message });
+            this.broadcastModelStatus('error', { error: this.sanitizeErrorMessage(error.message) });
+        }
+        
+        // Start periodic checks for model availability
+        this.startPeriodicModelCheck();
+    }
+    
+    /**
+     * Start periodic checks for AI model availability
+     * This helps detect when models finish downloading
+     */
+    startPeriodicModelCheck() {
+        // Only check if we have at least one model that might become available
+        const shouldCheck = (!this.aiCapabilities.summarizer || 
+                            this.aiCapabilities.summarizer?.available !== 'readily') ||
+                           (!this.aiCapabilities.promptApi || 
+                            this.aiCapabilities.promptApi?.available !== 'readily');
+        
+        if (!shouldCheck) {
+            return;
+        }
+        
+        // Clear existing interval if any
+        if (this.modelCheckInterval) {
+            clearInterval(this.modelCheckInterval);
+        }
+        
+        // Check every 30 seconds
+        this.modelCheckInterval = setInterval(async () => {
+            await this.recheckModelAvailability();
+        }, 30000);
+    }
+    
+    /**
+     * Stop periodic model checking
+     */
+    stopPeriodicModelCheck() {
+        if (this.modelCheckInterval) {
+            clearInterval(this.modelCheckInterval);
+            this.modelCheckInterval = null;
+        }
+    }
+    
+    /**
+     * Recheck AI model availability (used for periodic updates)
+     */
+    async recheckModelAvailability() {
+        try {
+            let hasUpdates = false;
+            
+            // Check Summarizer API
+            if ('ai' in window && 'summarizer' in window.ai) {
+                const newCapabilities = await window.ai.summarizer.capabilities();
+                
+                // Check if status changed
+                if (!this.aiCapabilities.summarizer || 
+                    this.aiCapabilities.summarizer.available !== newCapabilities.available) {
+                    
+                    this.aiCapabilities.summarizer = newCapabilities;
+                    this.broadcastModelStatus('summarizer', newCapabilities);
+                    hasUpdates = true;
+                }
+            }
+            
+            // Check Language Model API
+            if ('ai' in window && 'languageModel' in window.ai) {
+                const newCapabilities = await window.ai.languageModel.capabilities();
+                
+                // Check if status changed
+                if (!this.aiCapabilities.promptApi || 
+                    this.aiCapabilities.promptApi.available !== newCapabilities.available) {
+                    
+                    this.aiCapabilities.promptApi = newCapabilities;
+                    this.broadcastModelStatus('promptApi', newCapabilities);
+                    hasUpdates = true;
+                }
+            }
+            
+            // Update overall availability
+            const newOverallAvailability = !!(
+                this.aiCapabilities.summarizer || 
+                this.aiCapabilities.promptApi
+            );
+            
+            if (this.aiCapabilities.available !== newOverallAvailability) {
+                this.aiCapabilities.available = newOverallAvailability;
+                hasUpdates = true;
+            }
+            
+            // Stop periodic checking if both models are ready
+            if (this.aiCapabilities.summarizer?.available === 'readily' && 
+                this.aiCapabilities.promptApi?.available === 'readily') {
+                this.stopPeriodicModelCheck();
+            }
+            
+            if (hasUpdates) {
+                console.log('AI capabilities updated:', this.aiCapabilities);
+            }
+            
+        } catch (error) {
+            console.error('Error rechecking AI capabilities:', error);
+            // Don't broadcast errors from periodic checks to avoid spam
         }
     }
     
@@ -150,7 +254,7 @@ class InboxTriageServiceWorker {
             console.error('Error handling message:', error);
             sendResponse({ 
                 success: false, 
-                error: error.message 
+                error: this.sanitizeErrorMessage(error.message)
             });
         }
     }
@@ -227,10 +331,18 @@ class InboxTriageServiceWorker {
             
         } catch (error) {
             console.error('Summary generation error:', error);
-            this.broadcastModelStatus('summarizing', { stage: 'error', error: error.message });
+            
+            // Sanitize error message for user display
+            const sanitizedError = this.sanitizeErrorMessage(error.message);
+            
+            this.broadcastModelStatus('summarizing', { 
+                stage: 'error', 
+                error: sanitizedError
+            });
+            
             sendResponse({
                 success: false,
-                error: error.message
+                error: sanitizedError
             });
         }
     }
@@ -314,9 +426,13 @@ class InboxTriageServiceWorker {
             
         } catch (error) {
             console.error('Draft generation error:', error);
+            
+            // Sanitize error message for user display
+            const sanitizedError = this.sanitizeErrorMessage(error.message);
+            
             sendResponse({
                 success: false,
-                error: error.message
+                error: sanitizedError
             });
         }
     }
@@ -684,6 +800,74 @@ Respond with ONLY the following JSON format (no other text):
         return sanitized.length > maxLength 
             ? sanitized.substring(0, maxLength - 3) + '...' 
             : sanitized;
+    }
+    
+    /**
+     * Sanitize error messages to prevent technical details from reaching users
+     * @param {string} errorMessage - Raw error message
+     * @returns {string} User-friendly error message
+     */
+    sanitizeErrorMessage(errorMessage) {
+        if (!errorMessage || typeof errorMessage !== 'string') {
+            return 'An unexpected error occurred. Please try again.';
+        }
+        
+        // Define patterns for technical errors and their user-friendly alternatives
+        const errorMappings = [
+            {
+                patterns: [/stack trace/i, /error.*stack/i, /at\s+\w+\s+\(/],
+                message: 'An unexpected error occurred. Please try again.'
+            },
+            {
+                patterns: [/language model.*not available/i, /prompt api.*not available/i],
+                message: 'AI reply drafting is not available. Please enable Chrome AI features or try using Chrome 120+.'
+            },
+            {
+                patterns: [/summarizer.*not available/i, /summarization.*not available/i],
+                message: 'AI summarization is not available. Please enable Chrome AI features or try using Chrome 120+.'
+            },
+            {
+                patterns: [/downloading/i, /after.*download/i],
+                message: 'AI models are still downloading. This can take several minutes. Please try again shortly.'
+            },
+            {
+                patterns: [/session.*failed/i, /session.*error/i],
+                message: 'AI processing session failed. Please try again.'
+            },
+            {
+                patterns: [/invalid.*json/i, /json.*parse/i, /unexpected token/i],
+                message: 'AI response was malformed. Please try regenerating.'
+            },
+            {
+                patterns: [/network.*error/i, /connection.*failed/i, /timeout/i],
+                message: 'Connection error occurred. Please check your internet connection and try again.'
+            },
+            {
+                patterns: [/permission.*denied/i, /not.*authorized/i],
+                message: 'Permission denied. Please ensure Chrome AI features are enabled.'
+            }
+        ];
+        
+        // Check for known error patterns
+        for (const mapping of errorMappings) {
+            if (mapping.patterns.some(pattern => pattern.test(errorMessage))) {
+                return mapping.message;
+            }
+        }
+        
+        // For unknown errors, provide a generic message but preserve some context if it's safe
+        const safeMessage = errorMessage.replace(/\s*at\s+.*$/gm, '') // Remove stack traces
+                                      .replace(/Error:\s*/i, '') // Remove "Error:" prefix
+                                      .replace(/^\s*\w+Error:\s*/i, '') // Remove specific error types
+                                      .trim();
+        
+        // If the cleaned message is too short or technical, use generic message
+        if (safeMessage.length < 10 || /^[A-Z_]+$/i.test(safeMessage)) {
+            return 'An unexpected error occurred. Please try again.';
+        }
+        
+        // Return the cleaned message if it seems user-friendly
+        return safeMessage.charAt(0).toUpperCase() + safeMessage.slice(1);
     }
     
     async openSidePanel(tab) {
