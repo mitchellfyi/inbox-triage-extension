@@ -241,32 +241,71 @@ class InboxTriageServiceWorker {
                 throw new Error('Language Model API not available. Please enable AI features in Chrome.');
             }
             
+            // Check if model is ready
+            const capabilities = this.aiCapabilities.promptApi;
+            if (capabilities.available === 'after-download') {
+                throw new Error('AI model is downloading. This may take a few minutes. Please try again later.');
+            } else if (capabilities.available === 'no') {
+                throw new Error('Language Model API is not available. Please enable Chrome AI features in Settings > Privacy and security > Experimental AI.');
+            }
+            
             const fullText = this.combineThreadMessages(thread);
             const subject = thread.subject || 'Re: Email Thread';
             
-            // Create language model session
+            if (!fullText || fullText.length < 20) {
+                throw new Error('Not enough content to generate meaningful replies');
+            }
+            
+            // Create language model session with enhanced configuration
             const session = await window.ai.languageModel.create({
-                systemPrompt: this.createSystemPrompt(tone)
+                systemPrompt: this.createSystemPrompt(tone),
+                temperature: 0.7,
+                topK: 3
             });
             
             // Generate drafts using structured prompt
             const prompt = this.createReplyPrompt(fullText, subject, tone);
             const response = await session.prompt(prompt);
             
-            // Parse JSON response
+            // Clean up session immediately
+            session.destroy();
+            
+            // Parse and validate JSON response
             let drafts;
             try {
-                drafts = JSON.parse(response);
+                // Clean the response - remove any non-JSON text
+                const cleanedResponse = this.cleanJsonResponse(response);
+                drafts = JSON.parse(cleanedResponse);
+                
+                // Validate against schema
+                const validation = this.validateDraftsSchema(drafts);
+                if (!validation.isValid) {
+                    console.warn('Schema validation failed:', validation.errors);
+                    throw new Error(`Invalid response format: ${validation.errors.join(', ')}`);
+                }
+                
             } catch (parseError) {
-                // Fallback if JSON parsing fails
+                console.warn('JSON parsing failed, using fallback:', parseError.message);
+                // Enhanced fallback with original response
                 drafts = this.createFallbackDrafts(response, subject, tone);
             }
             
             // Validate and format drafts
             const formattedDrafts = this.validateAndFormatDrafts(drafts, subject);
             
-            // Clean up
-            session.destroy();
+            // Ensure we always have exactly 3 drafts
+            if (formattedDrafts.length !== 3) {
+                console.warn(`Expected 3 drafts, got ${formattedDrafts.length}, using fallback`);
+                const fallback = this.createFallbackDrafts('', subject, tone);
+                const fallbackFormatted = this.validateAndFormatDrafts(fallback, subject);
+                
+                sendResponse({
+                    success: true,
+                    drafts: fallbackFormatted,
+                    warning: 'AI response was incomplete, using fallback drafts'
+                });
+                return;
+            }
             
             sendResponse({
                 success: true,
@@ -280,6 +319,23 @@ class InboxTriageServiceWorker {
                 error: error.message
             });
         }
+    }
+    
+    /**
+     * Clean JSON response by removing non-JSON text
+     * @param {string} response - Raw response from AI
+     * @returns {string} Cleaned JSON string
+     */
+    cleanJsonResponse(response) {
+        // Find JSON object boundaries
+        const startIndex = response.indexOf('{');
+        const lastIndex = response.lastIndexOf('}');
+        
+        if (startIndex === -1 || lastIndex === -1) {
+            throw new Error('No JSON object found in response');
+        }
+        
+        return response.substring(startIndex, lastIndex + 1);
     }
     
     combineThreadMessages(thread) {
@@ -342,6 +398,116 @@ class InboxTriageServiceWorker {
         return keyPoints.filter(point => point.length > 0);
     }
     
+    /**
+     * JSON Schema for reply drafts to ensure structured output
+     * @returns {Object} JSON schema object for validation
+     */
+    getReplyDraftsSchema() {
+        return {
+            type: "object",
+            required: ["drafts"],
+            properties: {
+                drafts: {
+                    type: "array",
+                    minItems: 3,
+                    maxItems: 3,
+                    items: {
+                        type: "object",
+                        required: ["type", "subject", "body"],
+                        properties: {
+                            type: {
+                                type: "string",
+                                minLength: 1,
+                                maxLength: 50
+                            },
+                            subject: {
+                                type: "string",
+                                minLength: 1,
+                                maxLength: 100
+                            },
+                            body: {
+                                type: "string",
+                                minLength: 10,
+                                maxLength: 1500
+                            }
+                        },
+                        additionalProperties: false
+                    }
+                }
+            },
+            additionalProperties: false
+        };
+    }
+    
+    /**
+     * Validate reply drafts against JSON schema
+     * @param {Object} drafts - The drafts object to validate
+     * @returns {Object} Validation result with isValid and errors
+     */
+    validateDraftsSchema(drafts) {
+        const schema = this.getReplyDraftsSchema();
+        const errors = [];
+        
+        try {
+            // Basic structure validation
+            if (!drafts || typeof drafts !== 'object') {
+                errors.push('Response must be a valid JSON object');
+                return { isValid: false, errors };
+            }
+            
+            if (!drafts.drafts || !Array.isArray(drafts.drafts)) {
+                errors.push('Response must contain a "drafts" array');
+                return { isValid: false, errors };
+            }
+            
+            if (drafts.drafts.length !== 3) {
+                errors.push(`Must contain exactly 3 drafts, found ${drafts.drafts.length}`);
+                return { isValid: false, errors };
+            }
+            
+            // Validate each draft
+            drafts.drafts.forEach((draft, index) => {
+                if (!draft || typeof draft !== 'object') {
+                    errors.push(`Draft ${index + 1} must be an object`);
+                    return;
+                }
+                
+                // Check required fields
+                const requiredFields = ['type', 'subject', 'body'];
+                requiredFields.forEach(field => {
+                    if (!draft[field] || typeof draft[field] !== 'string') {
+                        errors.push(`Draft ${index + 1} missing or invalid "${field}" field`);
+                    }
+                });
+                
+                // Check field length constraints
+                if (draft.type && draft.type.length > 50) {
+                    errors.push(`Draft ${index + 1} type too long (max 50 chars)`);
+                }
+                if (draft.subject && draft.subject.length > 100) {
+                    errors.push(`Draft ${index + 1} subject too long (max 100 chars)`);
+                }
+                if (draft.body && draft.body.length > 1500) {
+                    errors.push(`Draft ${index + 1} body too long (max 1500 chars)`);
+                }
+                if (draft.body && draft.body.length < 10) {
+                    errors.push(`Draft ${index + 1} body too short (min 10 chars)`);
+                }
+            });
+            
+            return { isValid: errors.length === 0, errors };
+            
+        } catch (error) {
+            errors.push(`Validation error: ${error.message}`);
+            return { isValid: false, errors };
+        }
+    }
+    
+    /**
+     * Create system prompt with JSON schema constraints
+     * @param {string} tone - The tone to use for replies
+     * @returns {string} System prompt with schema requirements
+     */
     createSystemPrompt(tone) {
         return `You are an AI assistant helping to draft email replies. Generate responses that are:
 - ${tone} in tone
@@ -350,75 +516,174 @@ class InboxTriageServiceWorker {
 - Properly structured with subject and body
 - Return responses as valid JSON with exactly 3 drafts
 
-Always respond with a JSON object containing an array of drafts, each with 'type', 'subject', and 'body' fields.`;
+CRITICAL: You must respond with ONLY valid JSON in the exact format below. Do not include any other text or explanations:
+{
+  "drafts": [
+    {"type": "string", "subject": "string (max 100 chars)", "body": "string (max 500 chars)"},
+    {"type": "string", "subject": "string (max 100 chars)", "body": "string (max 1000 chars)"},
+    {"type": "string", "subject": "string (max 100 chars)", "body": "string (max 1500 chars)"}
+  ]
+}
+
+Each draft must have exactly these three fields: type, subject, body. Generate exactly 3 drafts.`;
     }
     
+    /**
+     * Create a structured prompt for reply generation with JSON schema specification
+     * @param {string} threadText - The email thread content
+     * @param {string} originalSubject - The original email subject
+     * @param {string} tone - The tone to use for replies
+     * @returns {string} Structured prompt with JSON requirements
+     */
     createReplyPrompt(threadText, originalSubject, tone) {
-        return `Based on this email thread, generate 3 different reply drafts in ${tone} tone:
+        return `Based on this email thread, generate 3 different reply drafts in ${tone} tone.
 
 THREAD:
 ${threadText}
 
-Original Subject: ${originalSubject}
+ORIGINAL SUBJECT: ${originalSubject}
 
-Generate 3 reply options:
-1. Short/Quick response (1-2 sentences)
-2. Medium response with clarifications (2-3 paragraphs) 
-3. Detailed response with next steps (3-4 paragraphs)
+Generate exactly 3 reply drafts with these characteristics:
+1. SHORT RESPONSE: Quick acknowledgment (1-2 sentences, max 500 chars body)
+2. MEDIUM RESPONSE: Detailed with clarifications (2-3 paragraphs, max 1000 chars body) 
+3. COMPREHENSIVE RESPONSE: Complete with next steps (3-4 paragraphs, max 1500 chars body)
 
-Return as JSON:
+Respond with ONLY the following JSON format (no other text):
 {
   "drafts": [
     {
       "type": "Quick Response",
       "subject": "Re: ${originalSubject}",
-      "body": "..."
+      "body": "Brief acknowledgment and next steps in ${tone} tone"
     },
     {
       "type": "Detailed Response", 
       "subject": "Re: ${originalSubject}",
-      "body": "..."
+      "body": "Comprehensive response with clarifications in ${tone} tone"
     },
     {
       "type": "Action-Oriented Response",
       "subject": "Re: ${originalSubject}", 
-      "body": "..."
+      "body": "Complete response with specific next steps in ${tone} tone"
     }
   ]
 }`;
     }
     
+    /**
+     * Create fallback drafts if AI response parsing fails
+     * @param {string} response - The failed AI response (for context)
+     * @param {string} subject - The original email subject
+     * @param {string} tone - The selected tone
+     * @returns {Object} Fallback drafts object
+     */
     createFallbackDrafts(response, subject, tone) {
-        // Create basic drafts if AI response parsing fails
+        const toneAdjustments = {
+            neutral: {
+                quick: 'Thank you for your email. I will review this and get back to you soon.',
+                medium: 'I received your email and understand your request. Let me look into this and provide you with a detailed response by end of day.',
+                detailed: 'Thank you for reaching out. I will review the information you provided and schedule a follow-up meeting to discuss next steps. I will send you a meeting invite within the next 24 hours.'
+            },
+            friendly: {
+                quick: 'Thanks so much for your email! I\'ll take a look and get back to you shortly.',
+                medium: 'Hi there! I got your email and really appreciate you reaching out. Let me dive into this and I\'ll send you a thoughtful response later today.',
+                detailed: 'Hi! Thanks for your message - I really appreciate you taking the time to reach out. I want to give this the attention it deserves, so I\'ll review everything carefully and set up some time for us to chat about next steps. Expect a meeting invite from me soon!'
+            },
+            assertive: {
+                quick: 'I have received your email and will respond with the requested information shortly.',
+                medium: 'I understand your request and will provide a comprehensive response. I will review the details and deliver my analysis by the end of the business day.',
+                detailed: 'I have carefully noted your requirements and will address each point systematically. I will conduct a thorough review of the information provided and schedule a meeting to present my findings and recommended action items. You can expect my detailed response within 24 hours.'
+            },
+            formal: {
+                quick: 'Thank you for your correspondence. I shall review your request and respond accordingly.',
+                medium: 'I acknowledge receipt of your message and appreciate you bringing this matter to my attention. I will conduct a thorough review of the information provided and respond with a comprehensive analysis by close of business today.',
+                detailed: 'Dear colleague, I am writing to acknowledge receipt of your correspondence. I appreciate you taking the time to outline your requirements in detail. I shall conduct a comprehensive review of all materials provided and prepare a thorough response addressing each of your points. I will schedule a follow-up meeting to discuss the matter further and present my recommendations. Please expect my detailed response within one business day.'
+            }
+        };
+        
+        const selectedTone = toneAdjustments[tone] || toneAdjustments.neutral;
+        
         return {
             drafts: [
                 {
                     type: 'Quick Response',
                     subject: `Re: ${subject}`,
-                    body: 'Thank you for your email. I will review this and get back to you soon.'
+                    body: selectedTone.quick
                 },
                 {
                     type: 'Acknowledgment',
                     subject: `Re: ${subject}`,
-                    body: 'I received your email and understand your request. Let me look into this and provide you with a detailed response by end of day.'
+                    body: selectedTone.medium
                 },
                 {
                     type: 'Next Steps',
                     subject: `Re: ${subject}`,
-                    body: 'Thank you for reaching out. I will review the information you provided and schedule a follow-up meeting to discuss next steps. I will send you a meeting invite within the next 24 hours.'
+                    body: selectedTone.detailed
                 }
             ]
         };
     }
     
+    /**
+     * Validate and format drafts with enhanced error checking
+     * @param {Object} drafts - The drafts object to validate and format
+     * @param {string} originalSubject - The original email subject for fallback
+     * @returns {Array} Array of validated and formatted draft objects
+     */
     validateAndFormatDrafts(drafts, originalSubject) {
         const draftArray = drafts.drafts || drafts || [];
         
-        return draftArray.map((draft, index) => ({
-            type: draft.type || `Draft ${index + 1}`,
-            subject: draft.subject || `Re: ${originalSubject}`,
-            body: draft.body || 'No content generated.'
-        }));
+        if (!Array.isArray(draftArray)) {
+            console.warn('Drafts is not an array, creating empty array');
+            return [];
+        }
+        
+        return draftArray.slice(0, 3).map((draft, index) => {
+            // Ensure draft is an object
+            if (!draft || typeof draft !== 'object') {
+                console.warn(`Draft ${index + 1} is not an object, using defaults`);
+                draft = {};
+            }
+            
+            // Sanitize and validate each field
+            const type = this.sanitizeString(draft.type, 50) || `Draft ${index + 1}`;
+            const subject = this.sanitizeString(draft.subject, 100) || `Re: ${originalSubject}`;
+            const body = this.sanitizeString(draft.body, 1500) || 'No content generated.';
+            
+            return {
+                type,
+                subject,
+                body
+            };
+        });
+    }
+    
+    /**
+     * Sanitize and truncate string fields
+     * @param {*} value - The value to sanitize
+     * @param {number} maxLength - Maximum allowed length
+     * @returns {string|null} Sanitized string or null if invalid
+     */
+    sanitizeString(value, maxLength) {
+        if (typeof value !== 'string') {
+            return null;
+        }
+        
+        // Remove any potentially harmful content
+        const sanitized = value
+            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove scripts
+            .replace(/<[^>]*>/g, '') // Remove HTML tags
+            .replace(/javascript:/gi, '') // Remove javascript: URLs
+            .trim();
+        
+        if (sanitized.length === 0) {
+            return null;
+        }
+        
+        // Truncate if too long
+        return sanitized.length > maxLength 
+            ? sanitized.substring(0, maxLength - 3) + '...' 
+            : sanitized;
     }
     
     async openSidePanel(tab) {

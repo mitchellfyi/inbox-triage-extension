@@ -42,9 +42,9 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 
 ### AI Integration
 - `[done]` Summarizer API integration testing - Validate across different thread lengths
-- `[todo]` Prompt API JSON schema enforcement - Ensure reliable structured output
+- `[done]` Prompt API JSON schema enforcement - Ensure reliable structured output
 - `[todo]` Tone parameter validation - Test all tone options (neutral, friendly, assertive, formal)
-- `[todo]` Fallback draft generation - Handle AI failures gracefully
+- `[done]` Fallback draft generation - Handle AI failures gracefully
 
 ## Gmail Extraction
 
@@ -81,16 +81,16 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 ## Reply Drafting
 
 ### Content Generation
-- `[todo]` Three-draft structure - Short, medium, detailed responses
-- `[todo]` Subject line generation - Context-aware reply subjects
-- `[todo]` Tone application - Consistent tone across all draft types
-- `[todo]` Word limit enforcement - Appropriate length for each draft type
+- `[done]` Three-draft structure - Short, medium, detailed responses
+- `[done]` Subject line generation - Context-aware reply subjects
+- `[done]` Tone application - Consistent tone across all draft types
+- `[done]` Word limit enforcement - Appropriate length for each draft type
 - `[todo]` Context preservation - Reference key points from original thread
 
 ### Output Quality
-- `[todo]` JSON schema validation - Ensure parseable structured output
-- `[todo]` Content sanitization - Remove potentially harmful content
-- `[todo]` Professional language - Business-appropriate responses
+- `[done]` JSON schema validation - Ensure parseable structured output
+- `[done]` Content sanitization - Remove potentially harmful content
+- `[done]` Professional language - Business-appropriate responses
 - `[todo]` Customizable signatures - User signature integration options
 
 ## Side Panel UI

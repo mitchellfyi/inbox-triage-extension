@@ -184,13 +184,28 @@ class InboxTriageSidePanel {
             if (response && response.success) {
                 this.currentDrafts = response.drafts;
                 this.displayReplyDrafts(response.drafts);
-                this.updateStatus('Reply drafts generated successfully', 'success');
+                
+                // Check if there was a warning (fallback used)
+                if (response.warning) {
+                    this.updateStatus(`Reply drafts generated with fallback: ${response.warning}`, 'success');
+                } else {
+                    this.updateStatus('Reply drafts generated successfully', 'success');
+                }
             } else {
                 throw new Error(response?.error || 'Failed to generate drafts');
             }
         } catch (error) {
             console.error('Error generating drafts:', error);
-            this.updateStatus(`Draft error: ${error.message}`, 'error');
+            
+            // Provide more specific error messages
+            let errorMessage = error.message;
+            if (errorMessage.includes('Language Model API not available')) {
+                errorMessage = 'AI drafting feature is not available. Please use Chrome 120+ with experimental AI features enabled.';
+            } else if (errorMessage.includes('downloading')) {
+                errorMessage = 'AI model is still downloading. This can take several minutes. Please try again shortly.';
+            }
+            
+            this.updateStatus(`Draft error: ${errorMessage}`, 'error');
         } finally {
             this.elements.generateDraftsBtn.disabled = false;
         }
@@ -252,6 +267,8 @@ class InboxTriageSidePanel {
     
     onToneChange() {
         if (this.currentThread && this.currentDrafts.length > 0) {
+            // Show immediate feedback that tone is being applied
+            this.updateStatus('Regenerating drafts with new tone...', 'loading');
             // Auto-regenerate drafts when tone changes
             this.generateReplyDrafts();
         }
