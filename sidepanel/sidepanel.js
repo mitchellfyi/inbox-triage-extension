@@ -18,6 +18,12 @@ class InboxTriageSidePanel {
         try {
             this.updateStatus('Checking AI model availability...', 'loading');
             
+            // Check if we're in an extension context
+            if (!chrome?.runtime?.sendMessage) {
+                this.updateStatus('Running outside Chrome extension context - AI features unavailable', 'error');
+                return;
+            }
+            
             // Request current AI status from background script
             const response = await chrome.runtime.sendMessage({
                 action: 'checkAIStatus'
@@ -108,9 +114,11 @@ class InboxTriageSidePanel {
         });
         
         // Listen for messages from content scripts and background
-        chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-            this.handleMessage(message, sender, sendResponse);
-        });
+        if (chrome?.runtime?.onMessage) {
+            chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+                this.handleMessage(message, sender, sendResponse);
+            });
+        }
     }
     
     updateStatus(message, type = 'info') {
@@ -130,6 +138,11 @@ class InboxTriageSidePanel {
         try {
             this.updateStatus('Extracting thread text...', 'loading');
             this.elements.extractBtn.disabled = true;
+            
+            // Check if we're in an extension context
+            if (!chrome?.tabs?.sendMessage) {
+                throw new Error('Chrome extension API not available. Please load this as a Chrome extension.');
+            }
             
             // Get current active tab
             const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -164,6 +177,11 @@ class InboxTriageSidePanel {
         
         try {
             this.updateStatus('Generating summary...', 'loading');
+            
+            // Check if we're in an extension context
+            if (!chrome?.runtime?.sendMessage) {
+                throw new Error('Chrome extension API not available. Please load this as a Chrome extension.');
+            }
             
             // Request summary generation from background script
             const response = await chrome.runtime.sendMessage({
@@ -351,6 +369,11 @@ class InboxTriageSidePanel {
      */
     async processAttachment(attachment) {
         try {
+            // Check if we're in an extension context
+            if (!chrome?.runtime?.sendMessage) {
+                throw new Error('Chrome extension API not available');
+            }
+            
             const response = await chrome.runtime.sendMessage({
                 action: 'processAttachment',
                 attachment: attachment
@@ -366,7 +389,13 @@ class InboxTriageSidePanel {
             
         } catch (error) {
             console.error('Error processing attachment via service worker:', error);
-            this.updateAttachmentSummary(attachment.index, `Error: ${error.message}`, true);
+            
+            // Provide fallback message for non-extension contexts
+            if (error.message.includes('Chrome extension API not available')) {
+                this.updateAttachmentSummary(attachment.index, 'Extension API required for attachment processing', true);
+            } else {
+                this.updateAttachmentSummary(attachment.index, `Error: ${error.message}`, true);
+            }
         }
     }
     
@@ -402,6 +431,11 @@ class InboxTriageSidePanel {
         try {
             this.updateStatus('Generating reply drafts...', 'loading');
             this.elements.generateDraftsBtn.disabled = true;
+            
+            // Check if we're in an extension context
+            if (!chrome?.runtime?.sendMessage) {
+                throw new Error('Chrome extension API not available. Please load this as a Chrome extension.');
+            }
             
             const tone = this.elements.toneSelector.value;
             const response = await chrome.runtime.sendMessage({
