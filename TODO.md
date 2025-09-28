@@ -37,11 +37,11 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 ### Architecture & Configuration
 - `[todo]` Manifest V3 validation - Ensure all permissions are minimal and necessary
 - `[todo]` Error handling strategy - Standardize error messages and fallback behaviors
-- `[todo]` Model availability detection - Robust checking for AI API readiness
+- `[done]` Model availability detection - Robust checking for AI API readiness
 - `[todo]` Message passing architecture - Clean communication between components
 
 ### AI Integration
-- `[todo]` Summarizer API integration testing - Validate across different thread lengths
+- `[done]` Summarizer API integration testing - Validate across different thread lengths
 - `[todo]` Prompt API JSON schema enforcement - Ensure reliable structured output
 - `[todo]` Tone parameter validation - Test all tone options (neutral, friendly, assertive, formal)
 - `[todo]` Fallback draft generation - Handle AI failures gracefully
@@ -101,7 +101,7 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 - `[done]` Tone selector - Enhanced dropdown with proper labeling and responsive layout
 - `[done]` Copy functionality - Clipboard integration with visual feedback for draft text
 - `[done]` Status indicators - Loading states, error messages, success feedback with color coding
-- `[todo]` Progress feedback - AI model download progress
+- `[done]` Progress feedback - AI model download progress
 
 ### Accessibility
 - `[done]` Keyboard navigation - Full keyboard accessibility with proper tab order
