@@ -50,8 +50,8 @@ class InboxTriageServiceWorker {
     
     async initializeAI() {
         try {
-            // Check if AI capabilities are available
-            if (typeof Summarizer !== 'undefined') {
+            // Check if AI capabilities are available using documented feature detection
+            if ('Summarizer' in self) {
                 try {
                     const summarizerAvailability = await Summarizer.availability();
                     this.aiCapabilities.summarizer = summarizerAvailability;
@@ -65,7 +65,7 @@ class InboxTriageServiceWorker {
             }
             
             // Check Language Model API (Prompt API)
-            if (typeof LanguageModel !== 'undefined') {
+            if ('LanguageModel' in self) {
                 try {
                     const languageModelAvailability = await LanguageModel.availability();
                     this.aiCapabilities.promptApi = languageModelAvailability;
@@ -139,8 +139,8 @@ class InboxTriageServiceWorker {
         try {
             let hasUpdates = false;
             
-            // Check Summarizer API
-            if (typeof Summarizer !== 'undefined') {
+            // Check Summarizer API using documented feature detection
+            if ('Summarizer' in self) {
                 try {
                     const newCapabilities = await Summarizer.availability();
                     
@@ -158,7 +158,7 @@ class InboxTriageServiceWorker {
             }
             
             // Check Language Model API
-            if (typeof LanguageModel !== 'undefined') {
+            if ('LanguageModel' in self) {
                 try {
                     const newCapabilities = await LanguageModel.availability();
                     
