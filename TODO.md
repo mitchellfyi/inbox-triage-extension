@@ -77,8 +77,8 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 ### Advanced Features
 - `[todo]` Detailed view modal - Full content display and comprehensive analysis
 - `[todo]` Large file handling - Size limits and progressive processing
-- `[done]` Cloud processing fallback - Hybrid mode configuration with privacy notices (cloud calls not implemented to maintain privacy)
-- `[done]` Privacy controls - User configuration for processing preferences with persistent storage
+- `[done]` Cloud processing fallback - Hybrid mode configuration with comprehensive privacy notices and decision rules implemented
+- `[done]` Privacy controls - User configuration for processing preferences with persistent storage and cloud processing indicators
 
 ## Gmail Extraction
 

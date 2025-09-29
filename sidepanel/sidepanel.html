@@ -618,6 +618,60 @@
             border-left-color: #ff9800;
             color: #f57c00;
         }
+        
+        /* Cloud processing indicator styles */
+        .cloud-indicator {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin: 8px 0;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            position: relative;
+        }
+        
+        .cloud-indicator .cloud-icon {
+            font-size: 16px;
+        }
+        
+        .cloud-indicator .indicator-text {
+            flex: 1;
+            color: #1565c0;
+            font-weight: 500;
+        }
+        
+        .cloud-indicator .info-button {
+            background: none;
+            border: 1px solid #2196f3;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            color: #1976d2;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+        
+        .cloud-indicator .info-button:hover {
+            background: #2196f3;
+            color: white;
+        }
+        
+        .privacy-notice ul {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+        
+        .privacy-notice li {
+            margin-bottom: 4px;
+            font-size: 12px;
+        }
 
         /* High contrast mode support */
         @media (prefers-contrast: high) {
@@ -707,16 +761,35 @@
                                 <div>
                                     <label for="mode-hybrid">Hybrid (Allow cloud fallback)</label>
                                     <div id="hybrid-desc" class="description">
-                                        Use cloud processing when on-device models are unavailable. Less private but more reliable.
+                                        Uses cloud processing only when on-device models are unavailable or content exceeds device limits. Enhanced reliability with privacy controls.
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="privacy-notice" class="privacy-notice hidden">
                             <span class="warning-icon">⚠️</span>
-                            <strong>Privacy Notice:</strong> When hybrid mode is enabled, email text (not attachments) may be sent to a remote AI service for processing when on-device models are unavailable or exceed limits. This may result in your data being processed outside your device. 
+                            <strong>Privacy Notice: Hybrid Mode Data Handling</strong>
                             <br><br>
-                            <strong>Currently:</strong> Cloud fallback is not implemented to maintain this extension's privacy-first design. Hybrid mode selection will only show privacy warnings but will continue using on-device processing only.
+                            <strong>What is sent to cloud services:</strong>
+                            <ul>
+                                <li>Extracted email text content only (no attachments, images, or files)</li>
+                                <li>Basic metadata like thread length and subject line</li>
+                            </ul>
+                            <strong>What is NEVER sent:</strong>
+                            <ul>
+                                <li>Attachment files, images, or documents</li>
+                                <li>Personal identifiers or contact details</li>
+                                <li>Voice recordings or audio data</li>
+                            </ul>
+                            <strong>When cloud processing occurs:</strong>
+                            <ul>
+                                <li>Device models are unavailable or unsupported</li>
+                                <li>Content exceeds on-device processing limits (32,000+ characters)</li>
+                                <li>Local processing fails due to memory constraints</li>
+                            </ul>
+                            <strong>Your control:</strong> You can disable cloud fallback anytime by selecting "On-device only" mode. Processing indicators will show when cloud services are used.
+                            <br><br>
+                            <strong>Current Status:</strong> Cloud fallback is not yet implemented to maintain this extension's privacy-first design. Hybrid mode selection shows this privacy notice but continues using on-device processing only.
                         </div>
                     </fieldset>
                 </div>

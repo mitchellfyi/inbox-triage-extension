@@ -92,15 +92,25 @@ AI models download automatically on first use (may take a few minutes).
 
 ## Privacy Guarantees
 
-**Zero External Calls:** All processing happens locally using Chrome's built-in AI APIs. No data is transmitted to external servers, APIs, or services.
+**Primary Mode - On-Device Only:** All processing happens locally using Chrome's built-in AI APIs. No data is transmitted to external servers, APIs, or services.
+
+**Hybrid Mode Privacy Controls:** When hybrid mode is enabled, the extension follows strict privacy rules:
+- **Only extracted email text** may be sent to cloud services—never attachments, images, or files
+- **Clear user indicators** show when cloud processing occurs with opt-out controls
+- **Minimal data transmission** limited to essential content only when local processing fails
+- **Graceful degradation** ensures functionality even if cloud services are unavailable
+
+**Detailed Privacy Protections:**
 
 **On-Device Only:** Email content and attachments never leave your device. AI models and file processing libraries run entirely within Chrome's sandbox.
 
 **Voice Privacy:** Voice dictation uses the browser's built-in Web Speech API for on-device transcription. Audio is not transmitted to external servers.
 
-**Attachment Privacy:** PDF, DOCX, XLSX, and image files are processed locally using on-device parsing libraries. No attachment content is ever uploaded or transmitted.
+**Attachment Privacy:** PDF, DOCX, XLSX, and image files are processed locally using on-device parsing libraries. No attachment content is ever uploaded or transmitted, even in hybrid mode.
 
 **No Data Collection:** The extension does not collect, store, or transmit any user data, email content, attachment content, voice recordings, or usage analytics.
+
+**User Control:** Processing mode is fully user-controlled with persistent settings and clear privacy notices explaining data handling.
 
 **Open Source:** All code is transparent and auditable in this public repository.
 

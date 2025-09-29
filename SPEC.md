@@ -140,6 +140,20 @@ This project builds a Chrome extension for inbox triage that summarises email th
 **And** their selection should be persisted across browser sessions  
 **And** all AI operations should continue using on-device processing only
 
+### Hybrid Fallback Decision Rules
+**Given** hybrid mode is enabled and on-device models are unavailable  
+**When** AI processing is requested  
+**Then** the system should follow these fallback criteria:
+- **Model Availability**: If `Summarizer.availability()` or `LanguageModel.availability()` returns `unavailable`, consider cloud fallback
+- **Content Size Limits**: If email thread text exceeds 32,000 characters, truncate to essential content before processing
+- **Memory Constraints**: If local processing fails due to memory limits, retry with reduced content
+- **Token Limits**: Respect on-device model context windows (~4,000 tokens for summarization, ~8,000 for drafting)
+- **Attachment Limits**: Files larger than 10MB should show size warning; only text content sent to cloud, never raw files
+- **Network Requirements**: Cloud fallback only triggered when local models definitively unavailable, not during download
+**And** cloud processing should only send extracted text content, never attachments or raw files
+**And** users should see clear indicators when cloud processing is used
+**And** processing should gracefully fall back to local extraction if cloud services fail
+
 ## Technical Requirements
 
 - Manifest V3 Chrome extension using the Side Panel API.
@@ -165,6 +179,8 @@ A submission must include a public repository with install instructions, a short
 - **Privacy**: All processing must happen locally; do not collect or transmit user data. Email content and attachments never leave the user's device.
 - **Attachment Privacy**: File processing (PDF, DOCX, XLSX, images) must occur entirely on-device using local parsing libraries. No attachment content should be sent to external services.
 - **Processing Mode Configuration**: Users can select between "On-device only" (default) and "Hybrid (Allow cloud fallback)" modes. The hybrid mode displays privacy notices but currently maintains on-device processing only to preserve privacy guarantees.
+- **Hybrid Fallback Privacy**: When hybrid mode is enabled and cloud fallback occurs, only extracted email text content may be transmitted—never attachments, images, or raw files. Cloud processing is limited to text summarization and reply generation only.
+- **User Control**: Users must have explicit control over hybrid mode via settings toggle and clear understanding of when cloud processing is used through in-panel indicators.
 - **Maintainability**: Organise code for readability and future enhancements.
 - **Accessibility**: Ensure UI controls are keyboard accessible and labelled.
 - **Performance**: Attachment processing should not block the UI and should handle large files gracefully with appropriate size limits.

@@ -181,7 +181,41 @@ Closes #issue-number
 - **Performance**: Optimise DOM queries and avoid expensive operations in loops. Keep response times quick for a smooth user experience.
 - **Error handling**: Always check availability of built‑in APIs. Provide user‑friendly error messages and fallback behaviour if models are unavailable or still downloading.
 - **Security and privacy**: Respect user privacy by never sending data off device. Request only the minimum permissions needed in the manifest.
+- **Hybrid fallback privacy**: When implementing cloud fallback features, ensure only extracted email text is transmitted—never attachments, images, or raw files. Provide clear user indicators when cloud processing occurs.
 - **British English**: When generating user‑visible text (e.g., labels, descriptions), use British English.
+
+## Hybrid Fallback Decision Rules
+
+**When implementing cloud fallback logic, follow these documented rules from SPEC.md:**
+
+### Model Availability Checks
+- Use `Summarizer.availability()` and `LanguageModel.availability()` to determine local model status
+- Never fallback during model download (`after-download` state) - wait for completion
+- Only consider fallback when availability is `unavailable` or `no`
+
+### Content Size Limits
+- **Email text**: Maximum 32,000 characters for on-device processing
+- **Token limits**: ~4,000 tokens for summarization, ~8,000 tokens for drafting
+- **Memory constraints**: Implement graceful degradation for large content
+
+### Privacy Requirements for Cloud Fallback
+- **Send only**: Extracted email text content and basic metadata
+- **Never send**: Attachments, images, files, personal identifiers, or voice recordings
+- **User control**: Clear indicators when cloud processing occurs, opt-out available
+- **Graceful fallback**: If cloud services fail, fall back to local extraction methods
+
+### Implementation Pattern
+```javascript
+// Check fallback decision using documented rules
+const fallbackDecision = this.shouldUseCloudFallback(operation, processingMode, thread);
+if (fallbackDecision.shouldFallback && processingMode === 'hybrid') {
+    // Prepare sanitized content for cloud processing
+    const cloudContent = this.prepareContentForCloudProcessing(thread);
+    // Show user indicator
+    this.addProcessingIndicator(operation, true);
+    // Implement cloud processing here
+}
+```
 
 ## Critical "Don't" List
 
