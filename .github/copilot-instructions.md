@@ -158,8 +158,11 @@ const replySchema = {
 10. **Make surgical changes** - Small, focused modifications that maintain working state
 11. **Commit early and often** - Make frequent commits with clear, descriptive messages that capture logical units of work
 12. **Write tests first** - Create comprehensive unit and integration tests that pass cleanly without workarounds or hacks
-13. **Follow best practices** - Ensure code readability, maintainability, performance optimization, and accessibility compliance
-14. **Update documentation after features** - Revise README.md, AGENTS.md, and TODO.md once features are complete to reflect current state
+13. **Use test:e2e before opening PRs** - Run Playwright tests locally to ensure extension functionality works end-to-end
+14. **Prefer Playwright locators over brittle selectors** - Use semantic selectors like `getByRole` and `getByLabelText` 
+15. **When editing popup/panel markup, update tests and snapshots** - Keep automated tests synchronized with UI changes
+16. **Follow best practices** - Ensure code readability, maintainability, performance optimization, and accessibility compliance
+17. **Update documentation after features** - Revise README.md, AGENTS.md, and TODO.md once features are complete to reflect current state
 
 ## Resources
 

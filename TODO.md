@@ -163,10 +163,12 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 ## Quality Assurance
 
 ### Unit and Integration Testing
-- `[todo]` Test framework setup - Establish testing infrastructure for unit and integration tests  
-- `[todo]` Service worker tests - Test AI API integration, message passing, and error handling
+- `[done]` Test framework setup - Establish testing infrastructure for unit and integration tests with Playwright
+- `[done]` E2E extension testing - Playwright fixtures for loading unpacked extension in Chromium
+- `[done]` Side panel tests - Test UI components, user interactions, and accessibility with Playwright
+- `[done]` Service worker tests - Test AI API integration, message passing, and error handling with Playwright
+- `[done]` Deep-link URL generation tests - Test thread metadata URL generation with proper encoding
 - `[todo]` Content script tests - Test email extraction logic for Gmail and Outlook
-- `[todo]` Side panel tests - Test UI components, user interactions, and accessibility
 - `[todo]` Cross-component tests - Test message passing and integration between extension parts
 
 ### Testing Strategy
@@ -178,6 +180,9 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 - `[todo]` Privacy audit - Verify no external network calls
 
 ### Documentation Testing
+- `[done]` Testing guide creation - docs/testing.md with manual dev and automated testing instructions
+- `[done]` AGENTS.md testing updates - Add Playwright guidelines and testing best practices 
+- `[done]` Copilot instructions testing updates - Add test:e2e and Playwright locator guidelines
 - `[todo]` Installation instructions - Verify setup process works
 - `[todo]` Link validation - All internal documentation links work
 - `[todo]` Code examples - Ensure code snippets are accurate and current
