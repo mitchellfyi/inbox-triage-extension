@@ -53,6 +53,13 @@ This document serves as a guide for AI coding agents working on the Inbox Triage
 
 **All new features and changes must include comprehensive testing:**
 
+### End-to-End Testing with Playwright
+- **Run tests locally before pushing** - Execute `npm run test:e2e` before committing changes
+- **Use test:e2e before opening PRs** - Ensure all Playwright tests pass in your development environment
+- **Prefer Playwright locators over brittle selectors** - Use `getByRole`, `getByLabelText`, and semantic selectors
+- **When editing popup/panel markup, update tests and snapshots** - Keep tests synchronized with UI changes
+- **Test extension installation and loading** - Verify extension functionality in realistic browser environment
+
 ### Unit Testing
 - **Write tests first when possible** - Follow TDD practices for core functionality
 - **Test all public APIs** - Cover every function, method, and interface exposed by your modules
@@ -70,6 +77,7 @@ This document serves as a guide for AI coding agents working on the Inbox Triage
 - **No hacks or temporary solutions** - If tests don't pass cleanly, fix the underlying issue
 - **Test in isolation** - Each test should be independent and repeatable
 - **Clear test descriptions** - Test names should describe the expected behavior
+- **Commit early, run tests locally before pushing** - Validate changes in development environment
 
 ### Manual Testing Requirements
 - **Test across target browsers** - Chrome versions and variants as specified in SPEC.md
