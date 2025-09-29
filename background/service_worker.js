@@ -51,10 +51,10 @@ class InboxTriageServiceWorker {
     async initializeAI() {
         try {
             // Check if AI capabilities are available
-            if ('ai' in window && window.ai) {
+            if ('ai' in self) {
                 // Check Summarizer API
-                if ('summarizer' in window.ai) {
-                    const summarizerCapabilities = await window.ai.summarizer.capabilities();
+                if ('summarizer' in self.ai) {
+                    const summarizerCapabilities = await self.ai.summarizer.capabilities();
                     this.aiCapabilities.summarizer = summarizerCapabilities;
                     console.log('Summarizer API available:', summarizerCapabilities);
                     
@@ -63,8 +63,8 @@ class InboxTriageServiceWorker {
                 }
                 
                 // Check Language Model API (Prompt API)
-                if ('languageModel' in window.ai) {
-                    const languageModelCapabilities = await window.ai.languageModel.capabilities();
+                if ('languageModel' in self.ai) {
+                    const languageModelCapabilities = await self.ai.languageModel.capabilities();
                     this.aiCapabilities.promptApi = languageModelCapabilities;
                     console.log('Language Model API available:', languageModelCapabilities);
                     
@@ -133,8 +133,8 @@ class InboxTriageServiceWorker {
             let hasUpdates = false;
             
             // Check Summarizer API
-            if ('ai' in window && window.ai && 'summarizer' in window.ai) {
-                const newCapabilities = await window.ai.summarizer.capabilities();
+            if ('ai' in self && 'summarizer' in self.ai) {
+                const newCapabilities = await self.ai.summarizer.capabilities();
                 
                 // Check if status changed
                 if (!this.aiCapabilities.summarizer || 
@@ -147,8 +147,8 @@ class InboxTriageServiceWorker {
             }
             
             // Check Language Model API
-            if ('ai' in window && window.ai && 'languageModel' in window.ai) {
-                const newCapabilities = await window.ai.languageModel.capabilities();
+            if ('ai' in self && 'languageModel' in self.ai) {
+                const newCapabilities = await self.ai.languageModel.capabilities();
                 
                 // Check if status changed
                 if (!this.aiCapabilities.promptApi || 
@@ -319,7 +319,7 @@ class InboxTriageServiceWorker {
             this.broadcastModelStatus('summarizing', { stage: 'generating_tldr' });
             
             // Create TL;DR summarizer session
-            const tldrSummarizer = await window.ai.summarizer.create({
+            const tldrSummarizer = await self.ai.summarizer.create({
                 type: 'tl;dr',
                 format: 'plain-text',
                 length: 'short'
@@ -336,7 +336,7 @@ class InboxTriageServiceWorker {
             
             // Try to use key-points summarizer if available, fallback to manual extraction
             try {
-                const keyPointsSummarizer = await window.ai.summarizer.create({
+                const keyPointsSummarizer = await self.ai.summarizer.create({
                     type: 'key-points',
                     format: 'plain-text',
                     length: 'short'
@@ -428,7 +428,7 @@ class InboxTriageServiceWorker {
             }
             
             // Create language model session with enhanced configuration
-            const session = await window.ai.languageModel.create({
+            const session = await self.ai.languageModel.create({
                 systemPrompt: this.createSystemPrompt(tone),
                 temperature: 0.7,
                 topK: 3
@@ -631,7 +631,7 @@ class InboxTriageServiceWorker {
             }
             
             // Create summarizer session for attachment content
-            const summarizer = await window.ai.summarizer.create({
+            const summarizer = await self.ai.summarizer.create({
                 type: 'tl;dr',
                 format: 'plain-text',
                 length: 'short'
