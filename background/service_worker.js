@@ -51,32 +51,39 @@ class InboxTriageServiceWorker {
     async initializeAI() {
         try {
             // Check if AI capabilities are available
-            if ('ai' in self) {
-                // Check Summarizer API
-                if ('summarizer' in self.ai) {
-                    const summarizerCapabilities = await self.ai.summarizer.capabilities();
-                    this.aiCapabilities.summarizer = summarizerCapabilities;
-                    console.log('Summarizer API available:', summarizerCapabilities);
+            if (typeof Summarizer !== 'undefined') {
+                try {
+                    const summarizerAvailability = await Summarizer.availability();
+                    this.aiCapabilities.summarizer = summarizerAvailability;
+                    console.log('Summarizer API available:', summarizerAvailability);
                     
                     // Broadcast initial model status to side panel if it's open
-                    this.broadcastModelStatus('summarizer', summarizerCapabilities);
+                    this.broadcastModelStatus('summarizer', summarizerAvailability);
+                } catch (error) {
+                    console.log('Summarizer API not available:', error.message);
                 }
-                
-                // Check Language Model API (Prompt API)
-                if ('languageModel' in self.ai) {
-                    const languageModelCapabilities = await self.ai.languageModel.capabilities();
-                    this.aiCapabilities.promptApi = languageModelCapabilities;
-                    console.log('Language Model API available:', languageModelCapabilities);
+            }
+            
+            // Check Language Model API (Prompt API)
+            if (typeof LanguageModel !== 'undefined') {
+                try {
+                    const languageModelAvailability = await LanguageModel.availability();
+                    this.aiCapabilities.promptApi = languageModelAvailability;
+                    console.log('Language Model API available:', languageModelAvailability);
                     
                     // Broadcast initial model status to side panel if it's open
-                    this.broadcastModelStatus('promptApi', languageModelCapabilities);
+                    this.broadcastModelStatus('promptApi', languageModelAvailability);
+                } catch (error) {
+                    console.log('Language Model API not available:', error.message);
                 }
-                
-                this.aiCapabilities.available = !!(
-                    this.aiCapabilities.summarizer || 
-                    this.aiCapabilities.promptApi
-                );
-            } else {
+            }
+            
+            this.aiCapabilities.available = !!(
+                this.aiCapabilities.summarizer || 
+                this.aiCapabilities.promptApi
+            );
+            
+            if (!this.aiCapabilities.available) {
                 console.log('AI APIs not available in this browser');
                 this.broadcastModelStatus('none', null);
             }
@@ -133,30 +140,38 @@ class InboxTriageServiceWorker {
             let hasUpdates = false;
             
             // Check Summarizer API
-            if ('ai' in self && 'summarizer' in self.ai) {
-                const newCapabilities = await self.ai.summarizer.capabilities();
-                
-                // Check if status changed
-                if (!this.aiCapabilities.summarizer || 
-                    this.aiCapabilities.summarizer.available !== newCapabilities.available) {
+            if (typeof Summarizer !== 'undefined') {
+                try {
+                    const newCapabilities = await Summarizer.availability();
                     
-                    this.aiCapabilities.summarizer = newCapabilities;
-                    this.broadcastModelStatus('summarizer', newCapabilities);
-                    hasUpdates = true;
+                    // Check if status changed
+                    if (!this.aiCapabilities.summarizer || 
+                        this.aiCapabilities.summarizer.available !== newCapabilities.available) {
+                        
+                        this.aiCapabilities.summarizer = newCapabilities;
+                        this.broadcastModelStatus('summarizer', newCapabilities);
+                        hasUpdates = true;
+                    }
+                } catch (error) {
+                    console.log('Summarizer API check failed:', error.message);
                 }
             }
             
             // Check Language Model API
-            if ('ai' in self && 'languageModel' in self.ai) {
-                const newCapabilities = await self.ai.languageModel.capabilities();
-                
-                // Check if status changed
-                if (!this.aiCapabilities.promptApi || 
-                    this.aiCapabilities.promptApi.available !== newCapabilities.available) {
+            if (typeof LanguageModel !== 'undefined') {
+                try {
+                    const newCapabilities = await LanguageModel.availability();
                     
-                    this.aiCapabilities.promptApi = newCapabilities;
-                    this.broadcastModelStatus('promptApi', newCapabilities);
-                    hasUpdates = true;
+                    // Check if status changed
+                    if (!this.aiCapabilities.promptApi || 
+                        this.aiCapabilities.promptApi.available !== newCapabilities.available) {
+                        
+                        this.aiCapabilities.promptApi = newCapabilities;
+                        this.broadcastModelStatus('promptApi', newCapabilities);
+                        hasUpdates = true;
+                    }
+                } catch (error) {
+                    console.log('Language Model API check failed:', error.message);
                 }
             }
             
@@ -319,7 +334,7 @@ class InboxTriageServiceWorker {
             this.broadcastModelStatus('summarizing', { stage: 'generating_tldr' });
             
             // Create TL;DR summarizer session
-            const tldrSummarizer = await self.ai.summarizer.create({
+            const tldrSummarizer = await Summarizer.create({
                 type: 'tl;dr',
                 format: 'plain-text',
                 length: 'short'
@@ -336,7 +351,7 @@ class InboxTriageServiceWorker {
             
             // Try to use key-points summarizer if available, fallback to manual extraction
             try {
-                const keyPointsSummarizer = await self.ai.summarizer.create({
+                const keyPointsSummarizer = await Summarizer.create({
                     type: 'key-points',
                     format: 'plain-text',
                     length: 'short'
@@ -428,7 +443,7 @@ class InboxTriageServiceWorker {
             }
             
             // Create language model session with enhanced configuration
-            const session = await self.ai.languageModel.create({
+            const session = await LanguageModel.create({
                 systemPrompt: this.createSystemPrompt(tone),
                 temperature: 0.7,
                 topK: 3
@@ -631,7 +646,7 @@ class InboxTriageServiceWorker {
             }
             
             // Create summarizer session for attachment content
-            const summarizer = await self.ai.summarizer.create({
+            const summarizer = await Summarizer.create({
                 type: 'tl;dr',
                 format: 'plain-text',
                 length: 'short'
