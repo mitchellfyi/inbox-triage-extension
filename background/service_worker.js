@@ -268,18 +268,25 @@ class InboxTriageServiceWorker {
             const processingMode = userSettings?.processingMode || 'device-only';
             let usedFallback = false;
             
+            // Apply hybrid fallback decision rules as documented in SPEC.md
+            const fallbackDecision = this.shouldUseCloudFallback('summarization', processingMode, thread);
+            
+            if (fallbackDecision.shouldFallback && processingMode === 'hybrid') {
+                // Cloud fallback would be implemented here
+                // For now, show privacy-preserving error message
+                throw new Error(`${fallbackDecision.reason}. Cloud fallback is not implemented to maintain privacy guarantees.`);
+            }
+            
             // Check AI capabilities first
             if (!this.aiCapabilities.summarizer) {
                 if (processingMode === 'hybrid') {
-                    // In a real implementation, this would trigger cloud fallback
-                    // For now, we show a message about privacy constraints
                     throw new Error('AI summarization is not available in this browser. Cloud fallback is not implemented to maintain privacy guarantees. Please use Chrome 120+ with AI features enabled.');
                 } else {
                     throw new Error('AI summarization is not available in this browser. Please use Chrome 120+ with AI features enabled.');
                 }
             }
             
-            // Check if model is ready
+            // Check if model is ready  
             const capabilities = this.aiCapabilities.summarizer;
             if (capabilities.available === 'after-download') {
                 if (processingMode === 'hybrid') {
@@ -295,8 +302,14 @@ class InboxTriageServiceWorker {
                 }
             }
             
-            // Combine all message content
-            const fullText = this.combineThreadMessages(thread);
+            // Combine all message content and apply content size limits
+            let fullText = this.combineThreadMessages(thread);
+            
+            // Apply content size limits as per SPEC.md (32,000 characters max)
+            if (fullText && fullText.length > 32000) {
+                console.warn('Content exceeds 32,000 character limit, truncating for on-device processing');
+                fullText = this.truncateContentForProcessing(fullText, 32000);
+            }
             
             if (!fullText || fullText.length < 50) {
                 throw new Error('Not enough content to summarize');
@@ -373,6 +386,15 @@ class InboxTriageServiceWorker {
         try {
             const processingMode = userSettings?.processingMode || 'device-only';
             let usedFallback = false;
+            
+            // Apply hybrid fallback decision rules as documented in SPEC.md  
+            const fallbackDecision = this.shouldUseCloudFallback('drafting', processingMode, thread);
+            
+            if (fallbackDecision.shouldFallback && processingMode === 'hybrid') {
+                // Cloud fallback would be implemented here
+                // For now, show privacy-preserving error message
+                throw new Error(`${fallbackDecision.reason}. Cloud fallback is not implemented to maintain privacy guarantees.`);
+            }
             
             if (!this.aiCapabilities.promptApi) {
                 if (processingMode === 'hybrid') {
@@ -1063,6 +1085,134 @@ Respond with ONLY the following JSON format (no other text):
         
         // Return the cleaned message if it seems user-friendly
         return safeMessage.charAt(0).toUpperCase() + safeMessage.slice(1);
+    }
+    
+    /**
+     * Determine if cloud fallback should be used based on documented decision rules
+     * Reference: SPEC.md - Hybrid Fallback Decision Rules
+     * @param {string} operation - 'summarization' or 'drafting'
+     * @param {string} processingMode - 'device-only' or 'hybrid'
+     * @param {Object} thread - Email thread data
+     * @returns {Object} Decision result with shouldFallback flag and reason
+     */
+    shouldUseCloudFallback(operation, processingMode, thread = null) {
+        // Never fallback if not in hybrid mode
+        if (processingMode !== 'hybrid') {
+            return { shouldFallback: false, reason: 'Device-only mode selected' };
+        }
+        
+        // Check model availability - as per SPEC.md requirements
+        const capabilities = operation === 'summarization' ? 
+            this.aiCapabilities.summarizer : this.aiCapabilities.promptApi;
+        
+        if (!capabilities) {
+            return { 
+                shouldFallback: true, 
+                reason: `${operation} API not available in this browser`,
+                trigger: 'model_unavailable'
+            };
+        }
+        
+        if (capabilities.available === 'no') {
+            return { 
+                shouldFallback: true, 
+                reason: `${operation} model is not available`,
+                trigger: 'model_unavailable'
+            };
+        }
+        
+        // Don't fallback during download - wait for completion as per SPEC.md
+        if (capabilities.available === 'after-download') {
+            return { 
+                shouldFallback: false, 
+                reason: 'Model is downloading, waiting for completion',
+                trigger: 'model_downloading'
+            };
+        }
+        
+        // Check content size limits if thread provided
+        if (thread) {
+            const fullText = this.combineThreadMessages(thread);
+            
+            // Content size limit check (32,000 characters as per SPEC.md)
+            if (fullText && fullText.length > 32000) {
+                return { 
+                    shouldFallback: true, 
+                    reason: 'Content exceeds on-device processing limits',
+                    trigger: 'content_size_limit',
+                    contentLength: fullText.length
+                };
+            }
+            
+            // Token estimation (rough approximation: 1 token ≈ 4 characters)
+            const estimatedTokens = Math.ceil((fullText?.length || 0) / 4);
+            const tokenLimit = operation === 'summarization' ? 4000 : 8000;
+            
+            if (estimatedTokens > tokenLimit) {
+                return { 
+                    shouldFallback: true, 
+                    reason: `Content exceeds ${operation} token limits`,
+                    trigger: 'token_limit',
+                    estimatedTokens,
+                    tokenLimit
+                };
+            }
+        }
+        
+        // If all checks pass, use local processing
+        return { shouldFallback: false, reason: 'Local processing available' };
+    }
+    
+    /**
+     * Truncate content for local processing while preserving essential information
+     * @param {string} content - Original content
+     * @param {number} maxLength - Maximum character length  
+     * @returns {string} Truncated content
+     */
+    truncateContentForProcessing(content, maxLength) {
+        if (!content || content.length <= maxLength) return content;
+        
+        // Try to truncate at sentence boundaries to preserve coherence
+        const sentences = content.split(/[.!?]+/);
+        let truncated = '';
+        let totalLength = 0;
+        
+        for (const sentence of sentences) {
+            const sentenceWithPunct = sentence.trim() + '.';
+            if (totalLength + sentenceWithPunct.length > maxLength - 100) {
+                // Leave some buffer for essential information marker
+                break;
+            }
+            truncated += sentenceWithPunct + ' ';
+            totalLength += sentenceWithPunct.length + 1;
+        }
+        
+        // Add truncation indicator
+        truncated += '\n\n[Content truncated for processing...]';
+        
+        return truncated.trim();
+    }
+    
+    /**
+     * Prepare content for cloud processing (text only, no attachments)
+     * This ensures only extracted text is sent, never raw files or images
+     * @param {Object} thread - Email thread data
+     * @returns {Object} Sanitized content for cloud processing
+     */
+    prepareContentForCloudProcessing(thread) {
+        // Extract only text content, never attachments or images
+        const textContent = this.combineThreadMessages(thread);
+        
+        return {
+            content: textContent,
+            metadata: {
+                threadLength: thread.messages?.length || 0,
+                subject: thread.subject || '',
+                // Never include attachment content or personal identifiers
+                hasAttachments: (thread.attachments?.length || 0) > 0,
+                attachmentCount: thread.attachments?.length || 0
+            }
+        };
     }
     
     async openSidePanel(tab) {

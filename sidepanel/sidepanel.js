@@ -935,20 +935,76 @@ class InboxTriageSidePanel {
     }
     
     /**
-     * Add processing indicator to status or results
+     * Add processing indicator to status or results  
      * @param {string} operation - The operation being performed (e.g., 'summarization', 'drafting')
      * @param {boolean} usedFallback - Whether cloud fallback was used
      */
     addProcessingIndicator(operation, usedFallback = false) {
-        // For now, this would show that processing happened on-device only
-        // In the future, if hybrid mode is actually implemented, this could show cloud usage
         if (this.userSettings.processingMode === 'hybrid' && usedFallback) {
-            // This would only happen if cloud fallback was actually implemented
+            // Show cloud processing indicator
+            this.showCloudProcessingIndicator(operation);
             console.log(`${operation} processed using cloud fallback`);
-            // Could add UI indicator here for cloud processing
         } else {
             console.log(`${operation} processed on-device`);
         }
+    }
+    
+    /**
+     * Display cloud processing indicator in the UI
+     * @param {string} operation - The operation that used cloud processing
+     */
+    showCloudProcessingIndicator(operation) {
+        // Create or update cloud processing indicator
+        let indicator = document.getElementById('cloud-processing-indicator');
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.id = 'cloud-processing-indicator';
+            indicator.className = 'cloud-indicator';
+            indicator.innerHTML = `
+                <span class="cloud-icon">☁️</span>
+                <span class="indicator-text">Cloud processing used</span>
+                <button class="info-button" onclick="this.showCloudInfo()" aria-label="Learn more about cloud processing">ⓘ</button>
+            `;
+            
+            // Add to the appropriate section
+            const targetSection = operation === 'summarization' ? 
+                document.getElementById('summary') : 
+                document.getElementById('drafts');
+                
+            if (targetSection) {
+                targetSection.insertBefore(indicator, targetSection.firstChild);
+            }
+        }
+        
+        // Update the text for current operation
+        const textElement = indicator.querySelector('.indicator-text');
+        if (textElement) {
+            textElement.textContent = `${operation} processed in cloud for enhanced reliability`;
+        }
+        
+        // Auto-hide after 10 seconds
+        setTimeout(() => {
+            if (indicator && indicator.parentNode) {
+                indicator.remove();
+            }
+        }, 10000);
+    }
+    
+    /**
+     * Show information about cloud processing
+     */
+    showCloudInfo() {
+        const message = `
+Cloud Processing Information:
+
+✅ Only extracted email text was sent to cloud services
+✅ No attachments, images, or files were transmitted  
+✅ Processing occurred due to device limitations or content size
+✅ You can disable cloud fallback in Processing Settings
+
+Your privacy remains protected with minimal necessary data transmission.
+        `;
+        alert(message);
     }
 }
 
