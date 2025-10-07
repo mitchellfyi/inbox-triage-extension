@@ -50,40 +50,33 @@ class InboxTriageServiceWorker {
     
     async initializeAI() {
         try {
-            // Check if AI capabilities are available using documented feature detection
-            if ('Summarizer' in self) {
-                try {
-                    const summarizerAvailability = await Summarizer.availability();
-                    this.aiCapabilities.summarizer = summarizerAvailability;
-                    console.log('Summarizer API available:', summarizerAvailability);
+            // Check if AI capabilities are available
+            if ('ai' in self) {
+                // Check Summarizer API
+                if ('summarizer' in self.ai) {
+                    const summarizerCapabilities = await self.ai.summarizer.capabilities();
+                    this.aiCapabilities.summarizer = summarizerCapabilities;
+                    console.log('Summarizer API available:', summarizerCapabilities);
                     
                     // Broadcast initial model status to side panel if it's open
-                    this.broadcastModelStatus('summarizer', summarizerAvailability);
-                } catch (error) {
-                    console.log('Summarizer API not available:', error.message);
+                    this.broadcastModelStatus('summarizer', summarizerCapabilities);
                 }
-            }
-            
-            // Check Language Model API (Prompt API)
-            if ('LanguageModel' in self) {
-                try {
-                    const languageModelAvailability = await LanguageModel.availability();
-                    this.aiCapabilities.promptApi = languageModelAvailability;
-                    console.log('Language Model API available:', languageModelAvailability);
+                
+                // Check Language Model API (Prompt API)
+                if ('languageModel' in self.ai) {
+                    const languageModelCapabilities = await self.ai.languageModel.capabilities();
+                    this.aiCapabilities.promptApi = languageModelCapabilities;
+                    console.log('Language Model API available:', languageModelCapabilities);
                     
                     // Broadcast initial model status to side panel if it's open
-                    this.broadcastModelStatus('promptApi', languageModelAvailability);
-                } catch (error) {
-                    console.log('Language Model API not available:', error.message);
+                    this.broadcastModelStatus('promptApi', languageModelCapabilities);
                 }
-            }
-            
-            this.aiCapabilities.available = !!(
-                this.aiCapabilities.summarizer || 
-                this.aiCapabilities.promptApi
-            );
-            
-            if (!this.aiCapabilities.available) {
+                
+                this.aiCapabilities.available = !!(
+                    this.aiCapabilities.summarizer || 
+                    this.aiCapabilities.promptApi
+                );
+            } else {
                 console.log('AI APIs not available in this browser');
                 this.broadcastModelStatus('none', null);
             }
@@ -139,39 +132,31 @@ class InboxTriageServiceWorker {
         try {
             let hasUpdates = false;
             
-            // Check Summarizer API using documented feature detection
-            if ('Summarizer' in self) {
-                try {
-                    const newCapabilities = await Summarizer.availability();
+            // Check Summarizer API
+            if ('ai' in self && 'summarizer' in self.ai) {
+                const newCapabilities = await self.ai.summarizer.capabilities();
+                
+                // Check if status changed
+                if (!this.aiCapabilities.summarizer || 
+                    this.aiCapabilities.summarizer.available !== newCapabilities.available) {
                     
-                    // Check if status changed
-                    if (!this.aiCapabilities.summarizer || 
-                        this.aiCapabilities.summarizer.available !== newCapabilities.available) {
-                        
-                        this.aiCapabilities.summarizer = newCapabilities;
-                        this.broadcastModelStatus('summarizer', newCapabilities);
-                        hasUpdates = true;
-                    }
-                } catch (error) {
-                    console.log('Summarizer API check failed:', error.message);
+                    this.aiCapabilities.summarizer = newCapabilities;
+                    this.broadcastModelStatus('summarizer', newCapabilities);
+                    hasUpdates = true;
                 }
             }
             
             // Check Language Model API
-            if ('LanguageModel' in self) {
-                try {
-                    const newCapabilities = await LanguageModel.availability();
+            if ('ai' in self && 'languageModel' in self.ai) {
+                const newCapabilities = await self.ai.languageModel.capabilities();
+                
+                // Check if status changed
+                if (!this.aiCapabilities.promptApi || 
+                    this.aiCapabilities.promptApi.available !== newCapabilities.available) {
                     
-                    // Check if status changed
-                    if (!this.aiCapabilities.promptApi || 
-                        this.aiCapabilities.promptApi.available !== newCapabilities.available) {
-                        
-                        this.aiCapabilities.promptApi = newCapabilities;
-                        this.broadcastModelStatus('promptApi', newCapabilities);
-                        hasUpdates = true;
-                    }
-                } catch (error) {
-                    console.log('Language Model API check failed:', error.message);
+                    this.aiCapabilities.promptApi = newCapabilities;
+                    this.broadcastModelStatus('promptApi', newCapabilities);
+                    hasUpdates = true;
                 }
             }
             
@@ -281,7 +266,13 @@ class InboxTriageServiceWorker {
     async generateSummary(thread, sendResponse, userSettings = null) {
         try {
             const processingMode = userSettings?.processingMode || 'device-only';
+            const useApiKey = userSettings?.useApiKey || false;
             let usedFallback = false;
+            
+            // If user has configured a custom API key, use it
+            if (useApiKey && userSettings?.apiKey) {
+                return await this.generateSummaryWithExternalAPI(thread, sendResponse, userSettings);
+            }
             
             // Apply hybrid fallback decision rules as documented in SPEC.md
             const fallbackDecision = this.shouldUseCloudFallback('summarization', processingMode, thread);
@@ -334,7 +325,7 @@ class InboxTriageServiceWorker {
             this.broadcastModelStatus('summarizing', { stage: 'generating_tldr' });
             
             // Create TL;DR summarizer session
-            const tldrSummarizer = await Summarizer.create({
+            const tldrSummarizer = await self.ai.summarizer.create({
                 type: 'tl;dr',
                 format: 'plain-text',
                 length: 'short'
@@ -351,7 +342,7 @@ class InboxTriageServiceWorker {
             
             // Try to use key-points summarizer if available, fallback to manual extraction
             try {
-                const keyPointsSummarizer = await Summarizer.create({
+                const keyPointsSummarizer = await self.ai.summarizer.create({
                     type: 'key-points',
                     format: 'plain-text',
                     length: 'short'
@@ -400,7 +391,13 @@ class InboxTriageServiceWorker {
     async generateReplyDrafts(thread, tone, guidance, sendResponse, userSettings = null) {
         try {
             const processingMode = userSettings?.processingMode || 'device-only';
+            const useApiKey = userSettings?.useApiKey || false;
             let usedFallback = false;
+            
+            // If user has configured a custom API key, use it
+            if (useApiKey && userSettings?.apiKey) {
+                return await this.generateDraftsWithExternalAPI(thread, tone, guidance, sendResponse, userSettings);
+            }
             
             // Apply hybrid fallback decision rules as documented in SPEC.md  
             const fallbackDecision = this.shouldUseCloudFallback('drafting', processingMode, thread);
@@ -443,7 +440,7 @@ class InboxTriageServiceWorker {
             }
             
             // Create language model session with enhanced configuration
-            const session = await LanguageModel.create({
+            const session = await self.ai.languageModel.create({
                 systemPrompt: this.createSystemPrompt(tone),
                 temperature: 0.7,
                 topK: 3
@@ -646,7 +643,7 @@ class InboxTriageServiceWorker {
             }
             
             // Create summarizer session for attachment content
-            const summarizer = await Summarizer.create({
+            const summarizer = await self.ai.summarizer.create({
                 type: 'tl;dr',
                 format: 'plain-text',
                 length: 'short'
@@ -1228,6 +1225,258 @@ Respond with ONLY the following JSON format (no other text):
                 attachmentCount: thread.attachments?.length || 0
             }
         };
+    }
+    
+    /**
+     * Generate summary using external API (OpenAI, Anthropic, Google)
+     * @param {Object} thread - Email thread data
+     * @param {Function} sendResponse - Response callback
+     * @param {Object} userSettings - User settings including API key
+     */
+    async generateSummaryWithExternalAPI(thread, sendResponse, userSettings) {
+        try {
+            const fullText = this.combineThreadMessages(thread);
+            
+            if (!fullText || fullText.length < 50) {
+                throw new Error('Not enough content to summarize');
+            }
+            
+            const provider = userSettings.apiProvider || 'openai';
+            const apiKey = userSettings.apiKey;
+            
+            let summary = '';
+            let keyPoints = [];
+            
+            // Call appropriate API based on provider
+            switch (provider) {
+                case 'openai':
+                    const openaiResult = await this.callOpenAISummarize(fullText, apiKey);
+                    summary = openaiResult.summary;
+                    keyPoints = openaiResult.keyPoints;
+                    break;
+                    
+                case 'anthropic':
+                    const claudeResult = await this.callAnthropicSummarize(fullText, apiKey);
+                    summary = claudeResult.summary;
+                    keyPoints = claudeResult.keyPoints;
+                    break;
+                    
+                case 'google':
+                    const geminiResult = await this.callGoogleAISummarize(fullText, apiKey);
+                    summary = geminiResult.summary;
+                    keyPoints = geminiResult.keyPoints;
+                    break;
+                    
+                default:
+                    throw new Error(`Unsupported API provider: ${provider}`);
+            }
+            
+            sendResponse({
+                success: true,
+                summary: summary,
+                keyPoints: keyPoints,
+                usedFallback: true // Indicate external API was used
+            });
+            
+        } catch (error) {
+            console.error('External API summary generation error:', error);
+            const sanitizedError = this.sanitizeErrorMessage(error.message);
+            sendResponse({
+                success: false,
+                error: `External API error: ${sanitizedError}`
+            });
+        }
+    }
+    
+    /**
+     * Generate drafts using external API (OpenAI, Anthropic, Google)
+     * @param {Object} thread - Email thread data
+     * @param {string} tone - Selected tone
+     * @param {string} guidance - User guidance
+     * @param {Function} sendResponse - Response callback
+     * @param {Object} userSettings - User settings including API key
+     */
+    async generateDraftsWithExternalAPI(thread, tone, guidance, sendResponse, userSettings) {
+        try {
+            const fullText = this.combineThreadMessages(thread);
+            const subject = thread.subject || 'Re: Email Thread';
+            
+            if (!fullText || fullText.length < 20) {
+                throw new Error('Not enough content to generate meaningful replies');
+            }
+            
+            const provider = userSettings.apiProvider || 'openai';
+            const apiKey = userSettings.apiKey;
+            
+            let drafts = [];
+            
+            // Call appropriate API based on provider
+            switch (provider) {
+                case 'openai':
+                    drafts = await this.callOpenAIDrafts(fullText, subject, tone, guidance, apiKey);
+                    break;
+                    
+                case 'anthropic':
+                    drafts = await this.callAnthropicDrafts(fullText, subject, tone, guidance, apiKey);
+                    break;
+                    
+                case 'google':
+                    drafts = await this.callGoogleAIDrafts(fullText, subject, tone, guidance, apiKey);
+                    break;
+                    
+                default:
+                    throw new Error(`Unsupported API provider: ${provider}`);
+            }
+            
+            // Validate and format drafts
+            const formattedDrafts = this.validateAndFormatDrafts({ drafts }, subject);
+            
+            if (formattedDrafts.length !== 3) {
+                console.warn(`Expected 3 drafts, got ${formattedDrafts.length}`);
+                const fallback = this.createFallbackDrafts('', subject, tone);
+                const fallbackFormatted = this.validateAndFormatDrafts(fallback, subject);
+                
+                sendResponse({
+                    success: true,
+                    drafts: fallbackFormatted,
+                    warning: 'External API response was incomplete, using fallback drafts',
+                    usedFallback: true
+                });
+                return;
+            }
+            
+            sendResponse({
+                success: true,
+                drafts: formattedDrafts,
+                usedFallback: true // Indicate external API was used
+            });
+            
+        } catch (error) {
+            console.error('External API draft generation error:', error);
+            const sanitizedError = this.sanitizeErrorMessage(error.message);
+            sendResponse({
+                success: false,
+                error: `External API error: ${sanitizedError}`
+            });
+        }
+    }
+    
+    /**
+     * Call OpenAI API for summarization
+     * @param {string} text - Text to summarize
+     * @param {string} apiKey - OpenAI API key
+     * @returns {Object} Summary and key points
+     */
+    async callOpenAISummarize(text, apiKey) {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4-turbo-preview',
+                messages: [
+                    {
+                        role: 'system',
+                        content: 'You are a helpful assistant that summarizes email threads. Provide a concise TL;DR summary and extract 3-5 key points.'
+                    },
+                    {
+                        role: 'user',
+                        content: `Summarize this email thread:\n\n${text}\n\nProvide:\n1. A TL;DR summary (under 100 words)\n2. 3-5 key points as a bullet list`
+                    }
+                ],
+                temperature: 0.7,
+                max_tokens: 500
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        const content = data.choices[0].message.content;
+        
+        // Parse the response to extract summary and key points
+        const parts = content.split(/Key [Pp]oints?:|Summary:/);
+        const summary = parts[0].replace(/TL;DR:?/i, '').trim();
+        const keyPointsText = parts[parts.length - 1].trim();
+        const keyPoints = keyPointsText.split(/\n/).filter(line => line.trim().match(/^[\-\•\*\d]/)).map(line => line.replace(/^[\-\•\*\d\.\)]\s*/, '').trim()).slice(0, 5);
+        
+        return { summary, keyPoints };
+    }
+    
+    /**
+     * Call OpenAI API for draft generation
+     * @param {string} text - Thread text
+     * @param {string} subject - Email subject
+     * @param {string} tone - Selected tone
+     * @param {string} guidance - User guidance
+     * @param {string} apiKey - OpenAI API key
+     * @returns {Array} Draft objects
+     */
+    async callOpenAIDrafts(text, subject, tone, guidance, apiKey) {
+        const prompt = this.createReplyPrompt(text, subject, tone, guidance);
+        
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4-turbo-preview',
+                messages: [
+                    {
+                        role: 'system',
+                        content: this.createSystemPrompt(tone)
+                    },
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ],
+                temperature: 0.7,
+                max_tokens: 1500,
+                response_format: { type: 'json_object' }
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        const content = data.choices[0].message.content;
+        
+        // Parse JSON response
+        const parsed = JSON.parse(content);
+        return parsed.drafts || [];
+    }
+    
+    /**
+     * Placeholder for Anthropic API calls (Claude)
+     * TODO: Implement when Anthropic API key is provided
+     */
+    async callAnthropicSummarize(text, apiKey) {
+        throw new Error('Anthropic API integration coming soon. Please use OpenAI or Google AI for now.');
+    }
+    
+    async callAnthropicDrafts(text, subject, tone, guidance, apiKey) {
+        throw new Error('Anthropic API integration coming soon. Please use OpenAI or Google AI for now.');
+    }
+    
+    /**
+     * Placeholder for Google AI API calls (Gemini)
+     * TODO: Implement when Google AI API key is provided
+     */
+    async callGoogleAISummarize(text, apiKey) {
+        throw new Error('Google AI API integration coming soon. Please use OpenAI for now.');
+    }
+    
+    async callGoogleAIDrafts(text, subject, tone, guidance, apiKey) {
+        throw new Error('Google AI API integration coming soon. Please use OpenAI for now.');
     }
     
     async openSidePanel(tab) {

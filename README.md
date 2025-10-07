@@ -22,53 +22,94 @@ Start here to understand the project and contribute effectively:
 - **[TODO.md](TODO.md)** - Project tasks and progress tracking
 - **[.github/copilot-instructions.md](.github/copilot-instructions.md)** - GitHub Copilot configuration and rules
 
-## Quickstart
+## 🚀 Quick Start (5 Minutes)
 
 ### Prerequisites
-- **Chrome 120+** with Manifest V3 support
-- **Gmail or Outlook** account access in Chrome
-- **Chrome AI features enabled** (flags configuration required)
+- **Chrome 128+** (Check: `chrome://version`)
+- **22GB free storage** (for AI models)
+- **4GB+ GPU VRAM** (or use custom API key option)
+- **Operating System:** Windows 10+, macOS 13+, or Linux
 
-### Install
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/mitchellfyi/inbox-triage-extension.git
-   cd inbox-triage-extension
-   ```
+### Install in 3 Steps
 
-2. Enable Chrome AI features:
-   - Navigate to `chrome://flags/`
-   - Enable these flags:
-     - `#optimization-guide-on-device-model` → Enabled BypassPerfRequirement
-     - `#prompt-api-for-gemini-nano` → Enabled
-     - `#summarization-api-for-gemini-nano` → Enabled
-   - Restart Chrome
+#### Step 1: Enable Chrome AI (2 minutes)
+```bash
+1. Open chrome://flags
+2. Enable these 3 flags:
+   • #optimization-guide-on-device-model → "Enabled BypassPerfRequirement"
+   • #prompt-api-for-gemini-nano → "Enabled"
+   • #summarization-api-for-gemini-nano → "Enabled"
+3. Click "Relaunch" button
+```
 
-3. Load the extension:
-   - Open `chrome://extensions/`
-   - Enable "Developer mode"
-   - Click "Load unpacked" and select the project directory
+#### Step 2: Install Extension (1 minute)
+```bash
+1. Open chrome://extensions/
+2. Toggle "Developer mode" (top-right)
+3. Click "Load unpacked"
+4. Select the inbox-triage-extension folder
+```
 
-### Dev Build
+#### Step 3: Wait for AI Models (2-5 minutes)
+- Models download automatically (~1.5GB)
+- Status shows "AI models downloading..."
+- Ready when you see "AI models ready" ✨
+
+### First Use
+
+1. **Go to Gmail** (`mail.google.com`) **or Outlook** (`outlook.live.com`)
+2. **Open any email thread**
+3. **Click extension icon** in toolbar
+4. **Click "Extract Current Thread"**
+5. **Watch the magic happen!** ✨
+
+---
+
+### 📖 Need Help?
+
+**Detailed Setup Guide:** See **[SETUP.md](SETUP.md)** for:
+- Complete system requirements
+- Troubleshooting common issues  
+- Custom API key setup (OpenAI, Anthropic, Google)
+- Advanced configuration options
+- Feature comparison table
+
+**Quick Links:**
+- **Can't enable flags?** → [SETUP.md - Troubleshooting](SETUP.md#-troubleshooting)
+- **Models won't download?** → [SETUP.md - Model Download Issues](SETUP.md#problem-ai-model-is-downloading)
+- **Want to use OpenAI instead?** → [SETUP.md - Custom API Keys](SETUP.md#alternative-use-custom-api-keys)
+
+### Alternative: Use Custom API Keys
+
+Don't have Chrome 128+ or sufficient resources? No problem!
+
+1. Get an API key from [OpenAI](https://platform.openai.com/api-keys)
+2. Open extension → "API Settings (Optional)"
+3. Check "Use custom API key"
+4. Enter your API key and click "Save"
+
+**Note:** Custom API keys work anywhere but send data to external servers. Chrome AI is private and free but requires setup.
+
+---
+
+## Dev Build
 No build process required—this extension runs directly from source with no dependencies or compilation step.
 
-### Run
-1. Navigate to Gmail or Outlook in Chrome
-2. Open an email thread
-3. Click the extension icon to open the side panel
-4. **Optional:** Configure processing mode in "Processing Settings" (defaults to on-device only)
-5. Click "Extract Current Thread" to analyze
-6. Optionally add guidance text or use voice dictation (🎤 button) to customize reply content
-7. Select tone and "Generate Drafts" for reply options
+## Testing
 
-### Test
-Unit and integration testing framework to be established. Currently manual testing only:
-1. Test across different email formats and thread lengths
-2. Test AI model states (available, downloading, unavailable)  
-3. Test accessibility with keyboard navigation and screen readers
-4. Verify privacy compliance (no external network calls)
+### Automated Tests
+```bash
+npm install
+npm run test:e2e
+```
 
-AI models download automatically on first use (may take a few minutes).
+### Manual Testing Checklist
+1. Test on Gmail and Outlook
+2. Test context detection (should disable on non-email pages)
+3. Test AI model states (available, downloading, unavailable)  
+4. Test custom API key integration
+5. Test accessibility with keyboard navigation
+6. Verify privacy compliance (no unexpected network calls)
 
 ## Architecture at a Glance
 

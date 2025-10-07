@@ -795,6 +795,53 @@
                 </div>
             </section>
             
+            <section class="section" aria-labelledby="api-settings-heading">
+                <h2 id="api-settings-heading">API Settings (Optional)</h2>
+                <div class="settings-group">
+                    <fieldset>
+                        <legend>Custom API Key</legend>
+                        <div class="radio-option">
+                            <input type="checkbox" 
+                                   id="use-api-key" 
+                                   aria-describedby="api-key-desc">
+                            <div>
+                                <label for="use-api-key">Use custom API key instead of Chrome's built-in AI</label>
+                                <div id="api-key-desc" class="description">
+                                    Override Chrome's on-device AI with your own OpenAI, Anthropic, or Google AI API key. This will send requests to external services.
+                                </div>
+                            </div>
+                        </div>
+                        <div id="api-key-section" style="display: none; margin-top: 12px;">
+                            <label for="api-provider" style="display: block; margin-bottom: 8px; font-size: 14px; color: #555;">Provider:</label>
+                            <select id="api-provider" style="width: 100%; margin-bottom: 12px;">
+                                <option value="openai">OpenAI (GPT-4, GPT-3.5)</option>
+                                <option value="anthropic">Anthropic (Claude)</option>
+                                <option value="google">Google AI (Gemini)</option>
+                            </select>
+                            
+                            <label for="api-key-input" style="display: block; margin-bottom: 8px; font-size: 14px; color: #555;">API Key:</label>
+                            <input type="password" 
+                                   id="api-key-input" 
+                                   placeholder="Enter your API key..."
+                                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 12px; font-size: 14px;">
+                            
+                            <button id="save-api-key-btn" type="button" style="width: 100%;">
+                                Save API Key
+                            </button>
+                            
+                            <div class="privacy-notice" style="display: block; margin-top: 12px;">
+                                <span class="warning-icon">⚠️</span>
+                                <strong>Privacy Notice: Custom API Key</strong>
+                                <br><br>
+                                When using a custom API key, email content will be sent to the selected provider's servers. This is different from Chrome's on-device processing which keeps everything local.
+                                <br><br>
+                                <strong>Your API key is stored securely:</strong> It is saved only in your browser's local storage and never transmitted except when making authorized API requests.
+                            </div>
+                        </div>
+                    </fieldset>
+                </div>
+            </section>
+            
             <section class="section" aria-labelledby="reply-drafts-heading">
                 <h2 id="reply-drafts-heading">Reply Drafts</h2>
                 <div class="tone-controls">

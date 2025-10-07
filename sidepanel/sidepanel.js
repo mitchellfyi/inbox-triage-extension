@@ -9,17 +9,104 @@ class InboxTriageSidePanel {
         this.currentSummary = null;
         this.currentDrafts = [];
         this.userSettings = {
-            processingMode: 'device-only' // default to on-device only
+            processingMode: 'device-only', // default to on-device only
+            useApiKey: false,
+            apiKey: '',
+            apiProvider: 'openai' // openai, anthropic, google
+        };
+        this.currentContext = {
+            isOnEmailThread: false,
+            provider: null, // 'gmail' or 'outlook'
+            url: ''
         };
         
         this.initializeElements();
         this.bindEvents();
         this.loadUserSettings();
+        this.checkCurrentContext();
         this.checkInitialStatus();
+    }
+    
+    async checkCurrentContext() {
+        try {
+            // Check if we're in an extension context
+            if (!chrome?.tabs?.query) {
+                this.currentContext.isOnEmailThread = false;
+                this.updateContextUI();
+                return;
+            }
+            
+            // Get current active tab
+            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (!tabs[0]) {
+                this.currentContext.isOnEmailThread = false;
+                this.updateContextUI();
+                return;
+            }
+            
+            const url = tabs[0].url || '';
+            this.currentContext.url = url;
+            
+            // Check if on Gmail or Outlook
+            if (url.includes('mail.google.com')) {
+                this.currentContext.isOnEmailThread = true;
+                this.currentContext.provider = 'gmail';
+            } else if (url.includes('outlook.live.com') || url.includes('outlook.office.com') || url.includes('outlook.office365.com')) {
+                this.currentContext.isOnEmailThread = true;
+                this.currentContext.provider = 'outlook';
+            } else {
+                this.currentContext.isOnEmailThread = false;
+                this.currentContext.provider = null;
+            }
+            
+            this.updateContextUI();
+            
+        } catch (error) {
+            console.error('Error checking current context:', error);
+            this.currentContext.isOnEmailThread = false;
+            this.updateContextUI();
+        }
+    }
+    
+    updateContextUI() {
+        const extractBtn = this.elements.extractBtn;
+        const statusMessages = {
+            gmail: 'Ready to analyze Gmail threads',
+            outlook: 'Ready to analyze Outlook threads',
+            none: 'Navigate to Gmail or Outlook to use this extension'
+        };
+        
+        if (this.currentContext.isOnEmailThread) {
+            extractBtn.disabled = false;
+            const provider = this.currentContext.provider;
+            this.updatePlaceholders(`Click "Extract Current Thread" to analyze this ${provider === 'gmail' ? 'Gmail' : 'Outlook'} email.`);
+        } else {
+            extractBtn.disabled = true;
+            this.updatePlaceholders(`This extension works with Gmail and Outlook email threads. Please navigate to:\n\n• Gmail (mail.google.com)\n• Outlook (outlook.live.com or outlook.office.com)\n\nThen open an email thread to use AI-powered summarization and reply drafting.`);
+        }
+    }
+    
+    updatePlaceholders(message) {
+        // Update placeholder text in all sections
+        if (this.elements.summary.classList.contains('placeholder')) {
+            this.elements.summary.textContent = message;
+        }
+        if (this.elements.keyPoints.classList.contains('placeholder')) {
+            this.elements.keyPoints.textContent = message;
+        }
+        if (this.elements.replyDrafts.classList.contains('placeholder')) {
+            this.elements.replyDrafts.textContent = message;
+        }
     }
     
     async checkInitialStatus() {
         try {
+            // Show context-aware status message
+            if (!this.currentContext.isOnEmailThread) {
+                this.updateStatus('Navigate to Gmail or Outlook to use this extension', 'info');
+                return;
+            }
+            
             this.updateStatus('Checking AI model availability...', 'loading');
             
             // Check if we're in an extension context
@@ -100,7 +187,13 @@ class InboxTriageSidePanel {
             // Settings elements
             deviceOnlyRadio: document.getElementById('mode-device-only'),
             hybridRadio: document.getElementById('mode-hybrid'),
-            privacyNotice: document.getElementById('privacy-notice')
+            privacyNotice: document.getElementById('privacy-notice'),
+            // API key settings
+            useApiKeyCheckbox: document.getElementById('use-api-key'),
+            apiKeyInput: document.getElementById('api-key-input'),
+            apiProviderSelect: document.getElementById('api-provider'),
+            apiKeySection: document.getElementById('api-key-section'),
+            saveApiKeyBtn: document.getElementById('save-api-key-btn')
         };
         
         // Initialize voice recognition
@@ -118,6 +211,14 @@ class InboxTriageSidePanel {
         // Settings event listeners
         this.elements.deviceOnlyRadio.addEventListener('change', () => this.onProcessingModeChange());
         this.elements.hybridRadio.addEventListener('change', () => this.onProcessingModeChange());
+        
+        // API key settings
+        if (this.elements.useApiKeyCheckbox) {
+            this.elements.useApiKeyCheckbox.addEventListener('change', () => this.onApiKeyToggle());
+        }
+        if (this.elements.saveApiKeyBtn) {
+            this.elements.saveApiKeyBtn.addEventListener('click', () => this.saveApiKeySettings());
+        }
         
         // Keyboard navigation support
         this.elements.extractBtn.addEventListener('keydown', (e) => {
@@ -869,23 +970,88 @@ class InboxTriageSidePanel {
     }
     
     /**
+     * Handle API key toggle
+     */
+    onApiKeyToggle() {
+        const useApiKey = this.elements.useApiKeyCheckbox.checked;
+        this.userSettings.useApiKey = useApiKey;
+        
+        // Show/hide API key input section
+        if (this.elements.apiKeySection) {
+            this.elements.apiKeySection.style.display = useApiKey ? 'block' : 'none';
+        }
+        
+        // If disabling API key, clear it
+        if (!useApiKey) {
+            this.userSettings.apiKey = '';
+            if (this.elements.apiKeyInput) {
+                this.elements.apiKeyInput.value = '';
+            }
+        }
+        
+        this.saveUserSettings();
+    }
+    
+    /**
+     * Save API key settings
+     */
+    async saveApiKeySettings() {
+        if (!this.elements.apiKeyInput || !this.elements.apiProviderSelect) {
+            return;
+        }
+        
+        const apiKey = this.elements.apiKeyInput.value.trim();
+        const provider = this.elements.apiProviderSelect.value;
+        
+        if (this.userSettings.useApiKey && !apiKey) {
+            this.updateStatus('Please enter an API key or disable the API key option', 'error');
+            return;
+        }
+        
+        this.userSettings.apiKey = apiKey;
+        this.userSettings.apiProvider = provider;
+        
+        await this.saveUserSettings();
+        this.updateStatus('API key settings saved', 'success');
+        
+        // Clear success message after 2 seconds
+        setTimeout(() => {
+            if (this.currentContext.isOnEmailThread) {
+                this.updateStatus(`Ready to analyze ${this.currentContext.provider} threads`, 'info');
+            }
+        }, 2000);
+    }
+    
+    /**
      * Load user settings from Chrome storage
      */
     async loadUserSettings() {
         try {
             if (chrome?.storage?.sync) {
-                const result = await chrome.storage.sync.get(['processingMode']);
+                const result = await chrome.storage.sync.get(['processingMode', 'useApiKey', 'apiKey', 'apiProvider']);
+                
                 if (result.processingMode) {
                     this.userSettings.processingMode = result.processingMode;
+                }
+                if (result.useApiKey !== undefined) {
+                    this.userSettings.useApiKey = result.useApiKey;
+                }
+                if (result.apiKey) {
+                    this.userSettings.apiKey = result.apiKey;
+                }
+                if (result.apiProvider) {
+                    this.userSettings.apiProvider = result.apiProvider;
                 }
             }
             
             // Update UI to reflect loaded settings
             this.updateProcessingModeUI();
+            this.updateApiKeyUI();
         } catch (error) {
             console.error('Error loading user settings:', error);
             // Use default settings if loading fails
             this.updateProcessingModeUI();
+            this.updateApiKeyUI();
         }
     }
     
@@ -896,12 +1062,39 @@ class InboxTriageSidePanel {
         try {
             if (chrome?.storage?.sync) {
                 await chrome.storage.sync.set({
-                    processingMode: this.userSettings.processingMode
+                    processingMode: this.userSettings.processingMode,
+                    useApiKey: this.userSettings.useApiKey,
+                    apiKey: this.userSettings.apiKey,
+                    apiProvider: this.userSettings.apiProvider
                 });
-                console.log('User settings saved:', this.userSettings);
+                console.log('User settings saved (API key hidden):', {
+                    ...this.userSettings,
+                    apiKey: this.userSettings.apiKey ? '***' : ''
+                });
             }
         } catch (error) {
             console.error('Error saving user settings:', error);
+        }
+    }
+    
+    /**
+     * Update API key UI based on current settings
+     */
+    updateApiKeyUI() {
+        if (this.elements.useApiKeyCheckbox) {
+            this.elements.useApiKeyCheckbox.checked = this.userSettings.useApiKey;
+        }
+        
+        if (this.elements.apiKeySection) {
+            this.elements.apiKeySection.style.display = this.userSettings.useApiKey ? 'block' : 'none';
+        }
+        
+        if (this.elements.apiKeyInput && this.userSettings.apiKey) {
+            this.elements.apiKeyInput.value = this.userSettings.apiKey;
+        }
+        
+        if (this.elements.apiProviderSelect && this.userSettings.apiProvider) {
+            this.elements.apiProviderSelect.value = this.userSettings.apiProvider;
         }
     }
     
