@@ -25,10 +25,10 @@ Start here to understand the project and contribute effectively:
 ## 🚀 Quick Start (5 Minutes)
 
 ### Prerequisites
-- **Chrome 128+** (Check: `chrome://version`)
-- **22GB free storage** (for AI models)
-- **4GB+ GPU VRAM** (or use custom API key option)
-- **Operating System:** Windows 10+, macOS 13+, or Linux
+- **Chrome 138+** (Check: `chrome://version`) - [Built-in AI APIs Documentation](https://developer.chrome.com/docs/ai/built-in)
+- **22GB free storage** (for Gemini Nano AI models)
+- **4GB+ GPU VRAM** (recommended for optimal performance, or use custom API key option)
+- **Operating System:** Windows 10/11, macOS 13+, or Linux
 
 ### Install in 3 Steps
 

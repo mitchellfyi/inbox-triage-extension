@@ -50,34 +50,67 @@ class InboxTriageServiceWorker {
     
     async initializeAI() {
         try {
-            // Check if AI capabilities are available
-            if ('ai' in self) {
-                // Check Summarizer API
-                if ('summarizer' in self.ai) {
-                    const summarizerCapabilities = await self.ai.summarizer.capabilities();
-                    this.aiCapabilities.summarizer = summarizerCapabilities;
-                    console.log('Summarizer API available:', summarizerCapabilities);
+            // Check if AI capabilities are available using correct global constructors
+            // Reference: https://developer.chrome.com/docs/ai/summarizer-api
+            // Reference: https://developer.chrome.com/docs/ai/prompt-api
+            
+            // Check Summarizer API (available in Chrome 138+)
+            // Reference: https://developer.chrome.com/docs/ai/summarizer-api
+            // Example: const availability = await Summarizer.availability();
+            if ('Summarizer' in self) {
+                try {
+                    const summarizerAvailability = await Summarizer.availability();
+                    this.aiCapabilities.summarizer = {
+                        available: summarizerAvailability
+                    };
+                    console.log('Summarizer API available:', summarizerAvailability);
                     
                     // Broadcast initial model status to side panel if it's open
-                    this.broadcastModelStatus('summarizer', summarizerCapabilities);
+                    this.broadcastModelStatus('summarizer', this.aiCapabilities.summarizer);
+                } catch (error) {
+                    console.error('Error checking Summarizer availability:', error);
                 }
-                
-                // Check Language Model API (Prompt API)
-                if ('languageModel' in self.ai) {
-                    const languageModelCapabilities = await self.ai.languageModel.capabilities();
-                    this.aiCapabilities.promptApi = languageModelCapabilities;
-                    console.log('Language Model API available:', languageModelCapabilities);
-                    
-                    // Broadcast initial model status to side panel if it's open
-                    this.broadcastModelStatus('promptApi', languageModelCapabilities);
-                }
-                
-                this.aiCapabilities.available = !!(
-                    this.aiCapabilities.summarizer || 
-                    this.aiCapabilities.promptApi
-                );
             } else {
-                console.log('AI APIs not available in this browser');
+                console.log('Summarizer API not available');
+            }
+            
+            // Check Language Model API (Prompt API)
+            // Available in Chrome 138+ for Extensions only
+            // Reference: https://developer.chrome.com/docs/ai/prompt-api
+            // Following same pattern as Summarizer API
+            if ('LanguageModel' in self) {
+                try {
+                    const languageModelAvailability = await LanguageModel.availability();
+                    this.aiCapabilities.promptApi = {
+                        available: languageModelAvailability
+                    };
+                    console.log('Language Model API (Prompt API) available:', languageModelAvailability);
+                    
+                    // Broadcast initial model status to side panel if it's open
+                    this.broadcastModelStatus('promptApi', this.aiCapabilities.promptApi);
+                } catch (error) {
+                    console.error('Error checking LanguageModel availability:', error);
+                }
+            } else {
+                console.log('Language Model API (Prompt API) not available');
+            }
+            
+            this.aiCapabilities.available = !!(
+                this.aiCapabilities.summarizer || 
+                this.aiCapabilities.promptApi
+            );
+            
+            // Log Chrome AI status for debugging
+            if (this.aiCapabilities.available) {
+                console.log('Chrome Built-in AI initialized successfully');
+                console.log('Summarizer:', this.aiCapabilities.summarizer?.available || 'not available');
+                console.log('Prompt API:', this.aiCapabilities.promptApi?.available || 'not available');
+            } else {
+                console.warn('Chrome Built-in AI not available. Please ensure you are using Chrome 138+ with required flags enabled.');
+                console.log('Required flags:');
+                console.log('  - chrome://flags/#optimization-guide-on-device-model');
+                console.log('  - chrome://flags/#prompt-api-for-gemini-nano');
+                console.log('  - chrome://flags/#summarization-api-for-gemini-nano');
                 this.broadcastModelStatus('none', null);
             }
         } catch (error) {
@@ -132,31 +165,41 @@ class InboxTriageServiceWorker {
         try {
             let hasUpdates = false;
             
-            // Check Summarizer API
-            if ('ai' in self && 'summarizer' in self.ai) {
-                const newCapabilities = await self.ai.summarizer.capabilities();
-                
-                // Check if status changed
-                if (!this.aiCapabilities.summarizer || 
-                    this.aiCapabilities.summarizer.available !== newCapabilities.available) {
+            // Check Summarizer API using global constructor (matching docs exactly)
+            if ('Summarizer' in self) {
+                try {
+                    const newAvailability = await Summarizer.availability();
+                    const newCapabilities = { available: newAvailability };
                     
-                    this.aiCapabilities.summarizer = newCapabilities;
-                    this.broadcastModelStatus('summarizer', newCapabilities);
-                    hasUpdates = true;
+                    // Check if status changed
+                    if (!this.aiCapabilities.summarizer || 
+                        this.aiCapabilities.summarizer.available !== newAvailability) {
+                        
+                        this.aiCapabilities.summarizer = newCapabilities;
+                        this.broadcastModelStatus('summarizer', newCapabilities);
+                        hasUpdates = true;
+                    }
+                } catch (error) {
+                    console.error('Error rechecking Summarizer:', error);
                 }
             }
             
-            // Check Language Model API
-            if ('ai' in self && 'languageModel' in self.ai) {
-                const newCapabilities = await self.ai.languageModel.capabilities();
-                
-                // Check if status changed
-                if (!this.aiCapabilities.promptApi || 
-                    this.aiCapabilities.promptApi.available !== newCapabilities.available) {
+            // Check Language Model API using global constructor (matching docs pattern)
+            if ('LanguageModel' in self) {
+                try {
+                    const newAvailability = await LanguageModel.availability();
+                    const newCapabilities = { available: newAvailability };
                     
-                    this.aiCapabilities.promptApi = newCapabilities;
-                    this.broadcastModelStatus('promptApi', newCapabilities);
-                    hasUpdates = true;
+                    // Check if status changed
+                    if (!this.aiCapabilities.promptApi || 
+                        this.aiCapabilities.promptApi.available !== newAvailability) {
+                        
+                        this.aiCapabilities.promptApi = newCapabilities;
+                        this.broadcastModelStatus('promptApi', newCapabilities);
+                        hasUpdates = true;
+                    }
+                } catch (error) {
+                    console.error('Error rechecking LanguageModel:', error);
                 }
             }
             
@@ -324,11 +367,18 @@ class InboxTriageServiceWorker {
             // Broadcast progress update
             this.broadcastModelStatus('summarizing', { stage: 'generating_tldr' });
             
-            // Create TL;DR summarizer session
-            const tldrSummarizer = await self.ai.summarizer.create({
-                type: 'tl;dr',
+            // Create TL;DR summarizer session - matching docs exactly
+            // Reference: https://developer.chrome.com/docs/ai/summarizer-api
+            // Example from docs: const summarizer = await Summarizer.create({...})
+            const tldrSummarizer = await Summarizer.create({
+                type: 'tldr',
                 format: 'plain-text',
-                length: 'short'
+                length: 'short',
+                monitor(m) {
+                    m.addEventListener('downloadprogress', (e) => {
+                        console.log(`Summarizer download progress: ${e.loaded * 100}%`);
+                    });
+                }
             });
             
             // Generate TL;DR summary
@@ -342,10 +392,15 @@ class InboxTriageServiceWorker {
             
             // Try to use key-points summarizer if available, fallback to manual extraction
             try {
-                const keyPointsSummarizer = await self.ai.summarizer.create({
+                const keyPointsSummarizer = await Summarizer.create({
                     type: 'key-points',
                     format: 'plain-text',
-                    length: 'short'
+                    length: 'short',
+                    monitor(m) {
+                        m.addEventListener('downloadprogress', (e) => {
+                            console.log(`Key-points summarizer download: ${e.loaded * 100}%`);
+                        });
+                    }
                 });
                 
                 const keyPointsText = await keyPointsSummarizer.summarize(fullText);
@@ -439,8 +494,11 @@ class InboxTriageServiceWorker {
                 throw new Error('Not enough content to generate meaningful replies');
             }
             
-            // Create language model session with enhanced configuration
-            const session = await self.ai.languageModel.create({
+            // Create language model session - matching docs pattern exactly
+            // Following same pattern as Summarizer API
+            // Reference: https://developer.chrome.com/docs/ai/prompt-api
+            // Example: const session = await LanguageModel.create({...})
+            const session = await LanguageModel.create({
                 systemPrompt: this.createSystemPrompt(tone),
                 temperature: 0.7,
                 topK: 3
