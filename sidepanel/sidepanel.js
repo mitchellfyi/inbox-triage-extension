@@ -529,7 +529,8 @@ class InboxTriageSidePanel {
                 throw new Error('Chrome extension API not available. Please load this as a Chrome extension.');
             }
             
-            const isUsingCloud = this.userSettings.processingMode === 'hybrid';
+            const userSettings = this.settingsManager.getSettings();
+            const isUsingCloud = userSettings.processingMode === 'hybrid';
             const processingType = isUsingCloud ? 'on-device/cloud' : 'on-device';
             
             this.updateStatus(`Generating summary (${processingType} AI)...`, 'loading');
@@ -538,7 +539,7 @@ class InboxTriageSidePanel {
             const response = await chrome.runtime.sendMessage({
                 action: 'generateSummary',
                 thread: this.currentThread,
-                userSettings: this.settingsManager.getSettings()
+                userSettings
             });
             
             if (response && response.success) {
@@ -974,7 +975,8 @@ class InboxTriageSidePanel {
             const tone = this.elements.toneSelector.value;
             const guidance = this.elements.guidanceText.value.trim();
             
-            const isUsingCloud = this.userSettings.processingMode === 'hybrid';
+            const userSettings = this.settingsManager.getSettings();
+            const isUsingCloud = userSettings.processingMode === 'hybrid';
             const processingType = isUsingCloud ? 'on-device/cloud' : 'on-device';
             
             this.updateStatus(`Composing ${tone} replies (${processingType} AI)...`, 'loading');
@@ -984,7 +986,7 @@ class InboxTriageSidePanel {
                 thread: this.currentThread,
                 tone: tone,
                 guidance: guidance,
-                userSettings: this.userSettings
+                userSettings
             });
             
             if (response && response.success) {
@@ -1521,7 +1523,8 @@ class InboxTriageSidePanel {
      */
     onApiKeyToggle() {
         const useApiKey = this.elements.useApiKeyCheckbox.checked;
-        this.userSettings.useApiKey = useApiKey;
+        const settings = this.settingsManager.getSettings();
+        settings.useApiKey = useApiKey;
         
         // Show/hide API key input section
         if (this.elements.apiKeySection) {
@@ -1530,13 +1533,14 @@ class InboxTriageSidePanel {
         
         // If disabling API key, clear it
         if (!useApiKey) {
-            this.userSettings.apiKey = '';
+            settings.apiKey = '';
             if (this.elements.apiKeyInput) {
                 this.elements.apiKeyInput.value = '';
             }
         }
         
-        this.saveUserSettings();
+        this.settingsManager.settings = settings;
+        this.settingsManager.save();
     }
     
     /**
@@ -1550,15 +1554,16 @@ class InboxTriageSidePanel {
         const apiKey = this.elements.apiKeyInput.value.trim();
         const provider = this.elements.apiProviderSelect.value;
         
-        if (this.userSettings.useApiKey && !apiKey) {
+        const settings = this.settingsManager.settings;
+        if (settings.useApiKey && !apiKey) {
             this.updateStatus('Please enter an API key or disable the API key option', 'error');
             return;
         }
         
-        this.userSettings.apiKey = apiKey;
-        this.userSettings.apiProvider = provider;
+        settings.apiKey = apiKey;
+        settings.apiProvider = provider;
         
-        await this.saveUserSettings();
+        await this.settingsManager.save();
         this.updateStatus('API key settings saved', 'success');
     }
     
@@ -1574,42 +1579,29 @@ class InboxTriageSidePanel {
      * Save user settings to Chrome storage
      */
     async saveUserSettings() {
-        try {
-            if (chrome?.storage?.sync) {
-                await chrome.storage.sync.set({
-                    processingMode: this.userSettings.processingMode,
-                    useApiKey: this.userSettings.useApiKey,
-                    apiKey: this.userSettings.apiKey,
-                    apiProvider: this.userSettings.apiProvider
-                });
-                console.log('User settings saved (API key hidden):', {
-                    ...this.userSettings,
-                    apiKey: this.userSettings.apiKey ? '***' : ''
-                });
-            }
-        } catch (error) {
-            console.error('Error saving user settings:', error);
-        }
+        await this.settingsManager.save();
     }
     
     /**
      * Update API key UI based on current settings
      */
     updateApiKeyUI() {
+        const settings = this.settingsManager.settings;
+        
         if (this.elements.useApiKeyCheckbox) {
-            this.elements.useApiKeyCheckbox.checked = this.userSettings.useApiKey;
+            this.elements.useApiKeyCheckbox.checked = settings.useApiKey;
         }
         
         if (this.elements.apiKeySection) {
-            this.elements.apiKeySection.style.display = this.userSettings.useApiKey ? 'block' : 'none';
+            this.elements.apiKeySection.style.display = settings.useApiKey ? 'block' : 'none';
         }
         
-        if (this.elements.apiKeyInput && this.userSettings.apiKey) {
-            this.elements.apiKeyInput.value = this.userSettings.apiKey;
+        if (this.elements.apiKeyInput && settings.apiKey) {
+            this.elements.apiKeyInput.value = settings.apiKey;
         }
         
-        if (this.elements.apiProviderSelect && this.userSettings.apiProvider) {
-            this.elements.apiProviderSelect.value = this.userSettings.apiProvider;
+        if (this.elements.apiProviderSelect && settings.apiProvider) {
+            this.elements.apiProviderSelect.value = settings.apiProvider;
         }
     }
     
@@ -1619,8 +1611,8 @@ class InboxTriageSidePanel {
     onProcessingModeChange() {
         const selectedMode = document.querySelector('input[name="processing-mode"]:checked')?.value;
         if (selectedMode) {
-            this.userSettings.processingMode = selectedMode;
-            this.saveUserSettings();
+            this.settingsManager.settings.processingMode = selectedMode;
+            this.settingsManager.save();
             this.updateProcessingModeUI();
             console.log('Processing mode changed to:', selectedMode);
         }
@@ -1630,8 +1622,10 @@ class InboxTriageSidePanel {
      * Update UI based on current processing mode
      */
     updateProcessingModeUI() {
+        const settings = this.settingsManager.settings;
+        
         // Set radio button selection
-        if (this.userSettings.processingMode === 'hybrid') {
+        if (settings.processingMode === 'hybrid') {
             this.elements.hybridRadio.checked = true;
             this.elements.deviceOnlyRadio.checked = false;
             this.elements.privacyNotice.classList.remove('hidden');
@@ -1648,7 +1642,8 @@ class InboxTriageSidePanel {
      * @param {boolean} usedFallback - Whether cloud fallback was used
      */
     addProcessingIndicator(operation, usedFallback = false) {
-        if (this.userSettings.processingMode === 'hybrid' && usedFallback) {
+        const settings = this.settingsManager.settings;
+        if (settings.processingMode === 'hybrid' && usedFallback) {
             // Show cloud processing indicator
             this.showCloudProcessingIndicator(operation);
             console.log(`${operation} processed using cloud fallback`);
