@@ -232,13 +232,24 @@
             outline-offset: 2px;
         }
         
+        /* Section header with action button */
+        .section-header-with-action {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        
+        .section-header-with-action .section-title {
+            margin: 0;
+        }
+        
         /* Tone selector styling */
         .tone-controls {
             display: flex;
-            align-items: center;
-            gap: 12px;
+            flex-direction: column;
+            gap: 8px;
             margin-bottom: 16px;
-            flex-wrap: wrap;
         }
         
         .tone-controls label {
@@ -247,27 +258,26 @@
             font-size: 14px;
         }
         
+        .tone-controls select {
+            width: 100%;
+        }
+        
         /* Guidance controls styling */
         .guidance-controls {
             margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
         
         .guidance-controls label {
-            display: block;
             font-weight: 500;
             color: #555;
             font-size: 14px;
-            margin-bottom: 8px;
         }
         
-        .guidance-input-group {
-            display: flex;
-            gap: 8px;
-            align-items: flex-start;
-        }
-        
-        .guidance-input-group textarea {
-            flex: 1;
+        .guidance-controls textarea {
+            width: 100%;
             padding: 12px;
             border: 1px solid #ddd;
             border-radius: 4px;
@@ -276,15 +286,16 @@
             resize: vertical;
             min-height: 72px;
             line-height: 1.4;
+            box-sizing: border-box;
         }
         
-        .guidance-input-group textarea:focus {
+        .guidance-controls textarea:focus {
             outline: 2px solid #1976d2;
             outline-offset: 2px;
             border-color: #1976d2;
         }
         
-        .guidance-input-group textarea::placeholder {
+        .guidance-controls textarea::placeholder {
             color: #999;
             font-style: italic;
         }
@@ -293,12 +304,12 @@
             background: #f5f5f5;
             color: #666;
             border: 1px solid #ddd;
-            padding: 12px;
+            padding: 8px 12px;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 16px;
-            min-width: 48px;
-            min-height: 48px;
+            font-size: 18px;
+            min-width: 44px;
+            min-height: 36px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -341,7 +352,7 @@
         .mic-status {
             font-size: 12px;
             color: #666;
-            margin-top: 8px;
+            margin-top: 4px;
             min-height: 16px;
         }
         
@@ -484,25 +495,23 @@
                 padding: 12px;
             }
             
-            .tone-controls {
-                flex-direction: column;
-                align-items: flex-start;
+            .section-header-with-action {
                 gap: 8px;
             }
             
-            .guidance-input-group {
-                flex-direction: column;
-                gap: 12px;
-            }
-            
-            .guidance-input-group textarea {
-                min-height: 60px;
+            .section-header-with-action .section-title {
+                font-size: 13px;
             }
             
             #mic-btn {
-                align-self: flex-end;
-                min-width: 44px;
-                min-height: 44px;
+                min-width: 40px;
+                min-height: 32px;
+                font-size: 16px;
+                padding: 6px 10px;
+            }
+            
+            .guidance-controls textarea {
+                min-height: 60px;
             }
             
             .draft-header h3 {
@@ -989,7 +998,17 @@
             
             <section id="reply-drafts-controls-section" class="section hidden section-with-content" aria-labelledby="reply-drafts-heading">
                 <div class="section-inner">
-                    <h2 id="reply-drafts-heading" class="section-title">Reply Drafts</h2>
+                    <div class="section-header-with-action">
+                        <h2 id="reply-drafts-heading" class="section-title">Reply Drafts</h2>
+                        <button id="mic-btn" 
+                                type="button" 
+                                aria-label="Start voice dictation" 
+                                aria-describedby="mic-help"
+                                title="Click to start voice dictation">
+                            🎤
+                        </button>
+                    </div>
+                    
                     <div class="tone-controls">
                         <label for="tone-selector">Tone:</label>
                         <select id="tone-selector" aria-describedby="tone-help">
@@ -1005,19 +1024,10 @@
                     
                     <div class="guidance-controls">
                         <label for="guidance-text">Guidance:</label>
-                        <div class="guidance-input-group">
-                            <textarea id="guidance-text" 
-                                      placeholder="Add specific instructions or context for your reply drafts..." 
-                                      rows="3"
-                                      aria-describedby="guidance-help"></textarea>
-                            <button id="mic-btn" 
-                                    type="button" 
-                                    aria-label="Start voice dictation" 
-                                    aria-describedby="mic-help"
-                                    title="Click to start voice dictation">
-                                🎤
-                            </button>
-                        </div>
+                        <textarea id="guidance-text" 
+                                  placeholder="Add specific instructions or context for your reply drafts..." 
+                                  rows="3"
+                                  aria-describedby="guidance-help"></textarea>
                         <div id="guidance-help" class="sr-only">
                             Optional guidance text that will be included when generating reply drafts. Use the microphone button for voice dictation.
                         </div>
