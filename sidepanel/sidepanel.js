@@ -1063,6 +1063,12 @@ class InboxTriageSidePanel {
     updateModelStatus(type, capabilities) {
         console.log('Model status update:', type, capabilities);
         
+        // Handle translation model download status
+        if (type === 'translator' && capabilities?.status === 'downloading') {
+            const langName = this.getLanguageName(capabilities.targetLanguage);
+            this.updateStatus(`Downloading translation model for ${langName}... This may take a moment.`, 'loading');
+        }
+        
         switch (type) {
             case 'none':
                 this.updateStatus('AI features not available. Please use Chrome 120+ with experimental AI enabled.', 'error');
@@ -1611,9 +1617,30 @@ Your privacy remains protected with minimal necessary data transmission.
             return;
         }
         
-        // If switching to a language, translate existing content
+        // If switching to a language, ensure model is downloaded and translate content
         if (newLanguage !== 'none') {
-            await this.translateExistingContent();
+            // Check if translation model is available
+            this.updateStatus(`Checking translation model for ${this.getLanguageName(newLanguage)}...`, 'loading');
+            
+            try {
+                // This will trigger download if needed
+                const response = await chrome.runtime.sendMessage({
+                    action: 'translateText',
+                    text: 'test', // Small test text to trigger model download
+                    sourceLanguage: 'en',
+                    targetLanguage: newLanguage
+                });
+                
+                if (response && response.success) {
+                    // Model is ready, translate existing content
+                    await this.translateExistingContent();
+                } else {
+                    this.updateStatus(`Translation unavailable: ${response?.error || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error initializing translation:', error);
+                this.updateStatus(`Translation error: ${error.message}`, 'error');
+            }
         }
     }
     

@@ -447,13 +447,29 @@ class InboxTriageServiceWorker {
                 throw new Error('Source and target languages are required');
             }
             
-            // Check if translation service is available
-            const isAvailable = await this.translationService.initialize();
-            if (!isAvailable) {
+            // Check if Translator API is available
+            if (!('Translator' in self)) {
                 throw new Error('Translator API not available. Please ensure Chrome 138+ with translation features enabled.');
             }
             
-            // Perform translation
+            // Check availability for this language pair
+            const availability = await Translator.availability({
+                sourceLanguage,
+                targetLanguage
+            });
+            
+            console.log(`Translation availability for ${sourceLanguage} → ${targetLanguage}:`, availability);
+            
+            // If downloadable, inform user and proceed (download will start automatically)
+            if (availability === 'downloadable' || availability === 'after-download') {
+                this.broadcastModelStatus('translator', { 
+                    status: 'downloading',
+                    sourceLanguage,
+                    targetLanguage
+                });
+            }
+            
+            // Perform translation (this will trigger download if needed)
             const translatedText = await this.translationService.translate(
                 text,
                 sourceLanguage,
