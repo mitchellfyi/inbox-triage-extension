@@ -395,6 +395,13 @@ class InboxTriageServiceWorker {
                 targetLanguage
             );
             
+            // Broadcast completion status
+            this.broadcastModelStatus('translator', { 
+                status: 'complete',
+                sourceLanguage,
+                targetLanguage
+            });
+            
             sendResponse({
                 success: true,
                 translatedText,

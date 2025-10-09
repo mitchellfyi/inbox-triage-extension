@@ -372,9 +372,14 @@ export class TranslationUI {
      * Handle model status updates
      */
     handleModelStatus(type, capabilities) {
-        if (type === 'translator' && capabilities?.status === 'downloading') {
-            const langName = this.getLanguageName(capabilities.targetLanguage);
-            this.updateStatus(`Downloading translation model for ${langName}... This may take a moment.`, 'loading');
+        if (type === 'translator') {
+            if (capabilities?.status === 'downloading') {
+                const langName = this.getLanguageName(capabilities.targetLanguage);
+                this.updateStatus(`Downloading translation model for ${langName}... This may take a moment.`, 'loading');
+            } else if (capabilities?.status === 'complete') {
+                const langName = this.getLanguageName(capabilities.targetLanguage);
+                this.updateStatus(`✓ Translation model ready for ${langName}`, 'success');
+            }
         }
     }
 }

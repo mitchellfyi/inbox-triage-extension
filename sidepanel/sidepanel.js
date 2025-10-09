@@ -1062,9 +1062,28 @@ class InboxTriageSidePanel {
     updateModelStatus(type, capabilities) {
         console.log('Model status update:', type, capabilities);
         
+        // Track model download state for button management
+        const isDownloading = capabilities?.status === 'downloading' || 
+                            capabilities?.available === 'after-download';
+        
+        if (isDownloading) {
+            // Disable extract button during model downloads
+            if (this.elements.extractBtn) {
+                this.elements.extractBtn.disabled = true;
+                this.elements.extractBtn.title = 'Please wait for model download to complete';
+            }
+        } else {
+            // Re-enable extract button after download completes
+            if (this.elements.extractBtn && this.currentContext.isOnEmailThread) {
+                this.elements.extractBtn.disabled = false;
+                this.elements.extractBtn.title = '';
+            }
+        }
+        
         // Delegate translation model status to TranslationUI module
         if (type === 'translator') {
             this.translationUI.handleModelStatus(type, capabilities);
+            return; // Early return to prevent fallthrough
         }
         
         switch (type) {
