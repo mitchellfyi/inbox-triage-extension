@@ -4,18 +4,15 @@
  */
 
 import { TranslationUI } from './translation-ui.js';
+import { VoiceInput } from './voice-input.js';
+import { SettingsManager } from './settings-manager.js';
+import { DraftRenderer } from './draft-renderer.js';
 
 class InboxTriageSidePanel {
     constructor() {
         this.currentThread = null;
         this.currentSummary = null;
         this.currentDrafts = [];
-        this.userSettings = {
-            processingMode: 'device-only', // default to on-device only
-            useApiKey: false,
-            apiKey: '',
-            apiProvider: 'google' // google, anthropic, openai
-        };
         this.currentContext = {
             isOnEmailThread: false,
             provider: null, // 'gmail' or 'outlook'
@@ -25,7 +22,7 @@ class InboxTriageSidePanel {
         
         this.initializeElements();
         
-        // Initialize Translation UI module
+        // Initialize modules
         this.translationUI = new TranslationUI(
             this.elements,
             (msg, type) => this.updateStatus(msg, type)
@@ -33,6 +30,21 @@ class InboxTriageSidePanel {
         this.translationUI.setCallbacks(
             (keyPoints) => this.displayKeyPoints(keyPoints),
             (drafts) => this.displayReplyDrafts(drafts)
+        );
+        
+        this.voiceInput = new VoiceInput(
+            this.elements,
+            (msg, type) => this.updateStatus(msg, type)
+        );
+        
+        this.settingsManager = new SettingsManager(
+            this.elements,
+            (msg, type) => this.updateStatus(msg, type)
+        );
+        
+        this.draftRenderer = new DraftRenderer(
+            this.elements,
+            (msg, type) => this.updateStatus(msg, type)
         );
         
         this.bindEvents();
@@ -330,34 +342,11 @@ class InboxTriageSidePanel {
         this.elements.extractBtn.addEventListener('click', () => this.extractCurrentThread());
         this.elements.generateDraftsBtn.addEventListener('click', () => this.generateReplyDrafts());
         this.elements.toneSelector.addEventListener('change', () => this.onToneChange());
-        this.elements.micBtn.addEventListener('click', () => this.toggleVoiceDictation());
         
-        // Settings panel toggle
-        this.elements.settingsToggleBtn.addEventListener('click', () => this.openSettings());
-        this.elements.settingsCloseBtn.addEventListener('click', () => this.closeSettings());
-        this.elements.settingsOverlay.addEventListener('click', () => this.closeSettings());
-        
-        // ESC key to close settings
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.elements.settingsPanel.classList.contains('active')) {
-                this.closeSettings();
-            }
-        });
-        
-        // Settings event listeners
-        this.elements.deviceOnlyRadio.addEventListener('change', () => this.onProcessingModeChange());
-        this.elements.hybridRadio.addEventListener('change', () => this.onProcessingModeChange());
-        
-        // API key settings
-        if (this.elements.useApiKeyCheckbox) {
-            this.elements.useApiKeyCheckbox.addEventListener('change', () => this.onApiKeyToggle());
-        }
-        if (this.elements.saveApiKeyBtn) {
-            this.elements.saveApiKeyBtn.addEventListener('click', () => this.saveApiKeySettings());
-        }
-        
-        // Initialize translation UI event handlers
+        // Initialize modules
         this.translationUI.initialize();
+        this.voiceInput.initialize();
+        this.settingsManager.initialize();
         
         // Keyboard navigation support
         this.elements.extractBtn.addEventListener('keydown', (e) => {
@@ -371,13 +360,6 @@ class InboxTriageSidePanel {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 this.generateReplyDrafts();
-            }
-        });
-        
-        this.elements.micBtn.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                this.toggleVoiceDictation();
             }
         });
         
@@ -556,7 +538,7 @@ class InboxTriageSidePanel {
             const response = await chrome.runtime.sendMessage({
                 action: 'generateSummary',
                 thread: this.currentThread,
-                userSettings: this.userSettings
+                userSettings: this.settingsManager.getSettings()
             });
             
             if (response && response.success) {
@@ -892,22 +874,11 @@ class InboxTriageSidePanel {
     }
     
     displayReplyDrafts(drafts) {
-        this.elements.replyDrafts.innerHTML = '';
+        // Update translation module with current drafts
+        this.translationUI.setCurrentDrafts(drafts);
         
-        if (drafts && drafts.length > 0) {
-            this.elements.replyDrafts.setAttribute('aria-label', `${drafts.length} reply drafts generated`);
-            
-            // Update translation module with current drafts
-            this.translationUI.setCurrentDrafts(drafts);
-            
-            drafts.forEach((draft, index) => {
-                const draftElement = this.createDraftElement(draft, index);
-                this.elements.replyDrafts.appendChild(draftElement);
-            });
-            
-            // Show the section
-            this.showSection(this.elements.replyDraftsSection);
-            
+        // Render drafts using the draft renderer module
+        this.draftRenderer.render(drafts, () => {
             // Auto-translate if a language is selected
             if (this.translationUI.translationSettings.targetLanguage !== 'none') {
                 setTimeout(() => {
@@ -917,10 +888,7 @@ class InboxTriageSidePanel {
                     });
                 }, 100);
             }
-        } else {
-            // Hide section if no drafts
-            this.hideSection(this.elements.replyDraftsSection);
-        }
+        });
     }
     
     createDraftElement(draft, index) {
@@ -1435,42 +1403,8 @@ class InboxTriageSidePanel {
      * Load user settings from Chrome storage
      */
     async loadUserSettings() {
-        try {
-            if (chrome?.storage?.sync) {
-                const result = await chrome.storage.sync.get([
-                    'processingMode', 
-                    'useApiKey', 
-                    'apiKey', 
-                    'apiProvider'
-                ]);
-                
-                if (result.processingMode) {
-                    this.userSettings.processingMode = result.processingMode;
-                }
-                if (result.useApiKey !== undefined) {
-                    this.userSettings.useApiKey = result.useApiKey;
-                }
-                if (result.apiKey) {
-                    this.userSettings.apiKey = result.apiKey;
-                }
-                if (result.apiProvider) {
-                    this.userSettings.apiProvider = result.apiProvider;
-                }
-            }
-            
-            // Update UI to reflect loaded settings
-            this.updateProcessingModeUI();
-            this.updateApiKeyUI();
-            
-            // Load translation settings via module
-            await this.translationUI.loadSettings();
-        } catch (error) {
-            console.error('Error loading user settings:', error);
-            // Use default settings if loading fails
-            this.updateProcessingModeUI();
-            this.updateApiKeyUI();
-            await this.translationUI.loadSettings();
-        }
+        await this.settingsManager.load();
+        await this.translationUI.loadSettings();
     }
     
     /**
