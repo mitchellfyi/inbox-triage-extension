@@ -11,6 +11,7 @@ This Chrome extension transforms email overwhelm into actionable insights by ins
 - **Stay Responsive**: Generate professional reply drafts in multiple tones and lengths with custom guidance
 - **Voice Input**: Use voice dictation to quickly add guidance for your reply drafts
 - **🆕 Multilingual Support**: Translate summaries and drafts to 15+ languages on-device
+- **🆕 Image Analysis**: AI-powered image understanding and OCR text extraction from attachments
 - **Protect Privacy**: All processing happens locally—no data or files leave your device, including translations
 - **Work Offline**: Fully functional once AI models are downloaded
 
@@ -20,6 +21,7 @@ This extension showcases multiple Chrome AI APIs working together:
 
 - **✅ Summarizer API** - Email thread condensation and key points extraction
 - **✅ Prompt API** - Structured draft generation with JSON schema
+- **✅ Prompt API (Multimodal)** - Image analysis and OCR text extraction
 - **✅ Translator API** - On-device multilingual translation (15+ languages)
 - **🔜 More Coming Soon** - Proofreader, Rewriter, Writer APIs for enhanced content refinement
 
