@@ -12,7 +12,7 @@ class InboxTriageSidePanel {
             processingMode: 'device-only', // default to on-device only
             useApiKey: false,
             apiKey: '',
-            apiProvider: 'openai' // openai, anthropic, google
+            apiProvider: 'google' // google, anthropic, openai
         };
         this.currentContext = {
             isOnEmailThread: false,
@@ -25,6 +25,11 @@ class InboxTriageSidePanel {
         this.loadUserSettings();
         this.checkCurrentContext();
         this.checkInitialStatus();
+        
+        // Poll for URL changes every 2 seconds
+        setInterval(() => {
+            this.checkCurrentContext();
+        }, 2000);
     }
     
     async checkCurrentContext() {
@@ -45,7 +50,11 @@ class InboxTriageSidePanel {
             }
             
             const url = tabs[0].url || '';
+            const previousUrl = this.currentContext.url;
             this.currentContext.url = url;
+            
+            // Check if URL changed (page navigation or refresh)
+            const urlChanged = previousUrl && previousUrl !== url;
             
             // Check if on Gmail or Outlook
             if (url.includes('mail.google.com')) {
@@ -59,7 +68,7 @@ class InboxTriageSidePanel {
                 this.currentContext.provider = null;
             }
             
-            this.updateContextUI();
+            this.updateContextUI(urlChanged);
             
         } catch (error) {
             console.error('Error checking current context:', error);
@@ -68,34 +77,40 @@ class InboxTriageSidePanel {
         }
     }
     
-    updateContextUI() {
+    updateContextUI(urlChanged = false) {
         const extractBtn = this.elements.extractBtn;
-        const statusMessages = {
-            gmail: 'Ready to analyze Gmail threads',
-            outlook: 'Ready to analyze Outlook threads',
-            none: 'Navigate to Gmail or Outlook to use this extension'
-        };
+        
+        // If URL changed, reset the UI state
+        if (urlChanged) {
+            this.currentThread = null;
+            this.currentDrafts = [];
+            
+            // Show extract button again
+            this.showSection(this.elements.extractSection, false);
+            
+            // Hide all result sections
+            this.hideSection(this.elements.summarySection);
+            this.hideSection(this.elements.keyPointsSection);
+            this.hideSection(this.elements.attachmentsSection);
+            this.hideSection(this.elements.replyDraftsControlsSection);
+            this.hideSection(this.elements.replyDraftsSection);
+            
+            // Disable generate drafts button
+            this.elements.generateDraftsBtn.disabled = true;
+            
+            // Clear status message
+            this.updateStatus('Ready to analyse email threads', 'info');
+        }
         
         if (this.currentContext.isOnEmailThread) {
             extractBtn.disabled = false;
-            const provider = this.currentContext.provider;
-            this.updatePlaceholders(`Click "Extract Current Thread" to analyze this ${provider === 'gmail' ? 'Gmail' : 'Outlook'} email.`);
+            // Show extract section if it was hidden due to successful extraction
+            if (this.elements.extractSection.classList.contains('hidden') && !this.currentThread) {
+                this.showSection(this.elements.extractSection, false);
+            }
         } else {
             extractBtn.disabled = true;
-            this.updatePlaceholders(`This extension works with Gmail and Outlook email threads. Please navigate to:\n\n• Gmail (mail.google.com)\n• Outlook (outlook.live.com or outlook.office.com)\n\nThen open an email thread to use AI-powered summarization and reply drafting.`);
-        }
-    }
-    
-    updatePlaceholders(message) {
-        // Update placeholder text in all sections
-        if (this.elements.summary.classList.contains('placeholder')) {
-            this.elements.summary.textContent = message;
-        }
-        if (this.elements.keyPoints.classList.contains('placeholder')) {
-            this.elements.keyPoints.textContent = message;
-        }
-        if (this.elements.replyDrafts.classList.contains('placeholder')) {
-            this.elements.replyDrafts.textContent = message;
+            this.updateStatus('Navigate to Gmail or Outlook to use this extension', 'info');
         }
     }
     
@@ -175,6 +190,7 @@ class InboxTriageSidePanel {
         this.elements = {
             status: document.getElementById('status-text'),
             extractBtn: document.getElementById('extract-btn'),
+            extractSection: document.getElementById('extract-section'),
             summary: document.getElementById('summary'),
             keyPoints: document.getElementById('key-points'),
             attachments: document.getElementById('attachments'),
@@ -184,6 +200,17 @@ class InboxTriageSidePanel {
             micStatus: document.getElementById('mic-status'),
             generateDraftsBtn: document.getElementById('generate-drafts-btn'),
             replyDrafts: document.getElementById('reply-drafts'),
+            // Section containers
+            summarySection: document.getElementById('summary-section'),
+            keyPointsSection: document.getElementById('key-points-section'),
+            attachmentsSection: document.getElementById('attachments-section'),
+            replyDraftsControlsSection: document.getElementById('reply-drafts-controls-section'),
+            replyDraftsSection: document.getElementById('reply-drafts-section'),
+            // Settings panel
+            settingsToggleBtn: document.getElementById('settings-toggle-btn'),
+            settingsPanel: document.getElementById('settings-panel'),
+            settingsOverlay: document.getElementById('settings-overlay'),
+            settingsCloseBtn: document.getElementById('settings-close-btn'),
             // Settings elements
             deviceOnlyRadio: document.getElementById('mode-device-only'),
             hybridRadio: document.getElementById('mode-hybrid'),
@@ -200,6 +227,87 @@ class InboxTriageSidePanel {
         this.speechRecognition = null;
         this.isListening = false;
         this.initializeSpeechRecognition();
+        
+        // Setup accordion functionality
+        this.setupAccordions();
+    }
+    
+    /**
+     * Setup accordion expand/collapse functionality
+     */
+    setupAccordions() {
+        const accordionHeaders = document.querySelectorAll('.section-header');
+        
+        accordionHeaders.forEach(header => {
+            header.addEventListener('click', () => this.toggleAccordion(header));
+            
+            // Add keyboard support
+            header.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    this.toggleAccordion(header);
+                }
+            });
+        });
+    }
+    
+    /**
+     * Toggle accordion section expand/collapse
+     */
+    toggleAccordion(header) {
+        const section = header.closest('.section');
+        const isExpanded = section.classList.contains('expanded');
+        
+        if (isExpanded) {
+            section.classList.remove('expanded');
+            header.setAttribute('aria-expanded', 'false');
+        } else {
+            section.classList.add('expanded');
+            header.setAttribute('aria-expanded', 'true');
+        }
+    }
+    
+    /**
+     * Show a section and optionally expand it
+     */
+    showSection(sectionElement, autoExpand = true) {
+        if (sectionElement) {
+            sectionElement.classList.remove('hidden');
+            if (autoExpand && !sectionElement.classList.contains('expanded')) {
+                sectionElement.classList.add('expanded');
+                const header = sectionElement.querySelector('.section-header');
+                if (header) {
+                    header.setAttribute('aria-expanded', 'true');
+                }
+            }
+        }
+    }
+    
+    /**
+     * Hide a section
+     */
+    hideSection(sectionElement) {
+        if (sectionElement) {
+            sectionElement.classList.add('hidden');
+        }
+    }
+    
+    /**
+     * Open the settings panel
+     */
+    openSettings() {
+        this.elements.settingsPanel.classList.add('active');
+        this.elements.settingsOverlay.classList.add('active');
+        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+    }
+    
+    /**
+     * Close the settings panel
+     */
+    closeSettings() {
+        this.elements.settingsPanel.classList.remove('active');
+        this.elements.settingsOverlay.classList.remove('active');
+        document.body.style.overflow = ''; // Restore scrolling
     }
     
     bindEvents() {
@@ -207,6 +315,18 @@ class InboxTriageSidePanel {
         this.elements.generateDraftsBtn.addEventListener('click', () => this.generateReplyDrafts());
         this.elements.toneSelector.addEventListener('change', () => this.onToneChange());
         this.elements.micBtn.addEventListener('click', () => this.toggleVoiceDictation());
+        
+        // Settings panel toggle
+        this.elements.settingsToggleBtn.addEventListener('click', () => this.openSettings());
+        this.elements.settingsCloseBtn.addEventListener('click', () => this.closeSettings());
+        this.elements.settingsOverlay.addEventListener('click', () => this.closeSettings());
+        
+        // ESC key to close settings
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.elements.settingsPanel.classList.contains('active')) {
+                this.closeSettings();
+            }
+        });
         
         // Settings event listeners
         this.elements.deviceOnlyRadio.addEventListener('change', () => this.onProcessingModeChange());
@@ -254,6 +374,16 @@ class InboxTriageSidePanel {
         this.elements.status.textContent = message;
         const statusElement = this.elements.status.parentElement;
         
+        // Hide status container if message is empty
+        if (!message || message.trim() === '') {
+            statusElement.style.display = 'none';
+            this.elements.status.setAttribute('aria-label', '');
+            return;
+        }
+        
+        // Show status container
+        statusElement.style.display = 'flex';
+        
         // Remove existing status classes
         statusElement.classList.remove('loading', 'error', 'success', 'info');
         // Add new status class
@@ -265,7 +395,7 @@ class InboxTriageSidePanel {
 
     async extractCurrentThread() {
         try {
-            this.updateStatus('Extracting thread text...', 'loading');
+            this.updateStatus('Checking page context...', 'loading');
             this.elements.extractBtn.disabled = true;
             
             // Check if we're in an extension context
@@ -273,25 +403,77 @@ class InboxTriageSidePanel {
                 throw new Error('Chrome extension API not available. Please load this as a Chrome extension.');
             }
             
+            this.updateStatus('Locating active email tab...', 'loading');
+            
             // Get current active tab
             const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
             if (!tabs[0]) {
                 throw new Error('No active tab found');
             }
             
+            const currentTab = tabs[0];
+            const currentUrl = currentTab.url || '';
+            
+            // Verify we're on a supported email provider
+            if (!currentUrl.includes('mail.google.com') && 
+                !currentUrl.includes('outlook.live.com') && 
+                !currentUrl.includes('outlook.office.com') && 
+                !currentUrl.includes('outlook.office365.com')) {
+                throw new Error('Please navigate to Gmail or Outlook to extract email threads');
+            }
+            
+            const provider = currentUrl.includes('mail.google.com') ? 'Gmail' : 'Outlook';
+            this.updateStatus(`Connecting to ${provider}...`, 'loading');
+            
+            console.log('Sending extractThread message to tab:', currentTab.id, 'URL:', currentUrl);
+            
             // Send message to content script to extract thread
-            const response = await chrome.tabs.sendMessage(tabs[0].id, { 
-                action: 'extractThread' 
-            });
+            let response;
+            try {
+                response = await chrome.tabs.sendMessage(currentTab.id, { 
+                    action: 'extractThread' 
+                });
+            } catch (sendError) {
+                console.error('Failed to send message to content script:', sendError);
+                throw new Error('Could not communicate with the page. Try refreshing the Gmail/Outlook tab and try again.');
+            }
+            
+            this.updateStatus('Reading email thread...', 'loading');
+            console.log('Received response from content script:', response);
             
             if (response && response.success) {
                 this.currentThread = response.thread;
+                
+                // Validate thread data
+                if (!this.currentThread || !this.currentThread.messages) {
+                    throw new Error('Invalid thread data received from content script');
+                }
+                
+                const messageCount = this.currentThread.messages.length;
+                const attachmentCount = this.currentThread.attachments?.length || 0;
+                
+                this.updateStatus(`Extracted ${messageCount} message${messageCount !== 1 ? 's' : ''}, ${attachmentCount} attachment${attachmentCount !== 1 ? 's' : ''}`, 'loading');
+                console.log('Thread extracted:', messageCount, 'messages');
+                
                 await this.generateSummary();
                 this.displayAttachments();
+                
+                // Show reply drafts controls now that we have a thread
+                this.showSection(this.elements.replyDraftsControlsSection, false);
                 this.elements.generateDraftsBtn.disabled = false;
-                this.updateStatus('Thread extracted successfully', 'success');
+                
+                // Hide extract button now that thread is extracted
+                this.hideSection(this.elements.extractSection);
+                
+                // Show success message and clear it after 5 seconds
+                this.updateStatus('✓ Thread analysis complete', 'success');
+                setTimeout(() => {
+                    this.updateStatus('', 'info');
+                }, 5000);
             } else {
-                throw new Error(response?.error || 'Failed to extract thread');
+                const errorMsg = response?.error || 'Failed to extract thread - no response from content script';
+                console.error('Thread extraction failed:', errorMsg, 'Full response:', response);
+                throw new Error(errorMsg);
             }
         } catch (error) {
             console.error('Error extracting thread:', error);
@@ -305,12 +487,17 @@ class InboxTriageSidePanel {
         if (!this.currentThread) return;
         
         try {
-            this.updateStatus('Generating summary...', 'loading');
+            this.updateStatus('Preparing content for AI analysis...', 'loading');
             
             // Check if we're in an extension context
             if (!chrome?.runtime?.sendMessage) {
                 throw new Error('Chrome extension API not available. Please load this as a Chrome extension.');
             }
+            
+            const isUsingCloud = this.userSettings.processingMode === 'hybrid';
+            const processingType = isUsingCloud ? 'on-device/cloud' : 'on-device';
+            
+            this.updateStatus(`Generating summary (${processingType} AI)...`, 'loading');
             
             // Request summary generation from background script
             const response = await chrome.runtime.sendMessage({
@@ -320,9 +507,13 @@ class InboxTriageSidePanel {
             });
             
             if (response && response.success) {
+                this.updateStatus('Rendering summary...', 'loading');
                 this.displaySummary(response.summary, response.keyPoints);
                 this.addProcessingIndicator('summarization', response.usedFallback || false);
-                this.updateStatus('Summary generated successfully', 'success');
+                
+                // Show final status with processing method
+                const method = response.usedFallback ? 'cloud' : 'on-device';
+                this.updateStatus(`✓ Summary generated (${method})`, 'success');
             } else {
                 // Error message is already sanitized by the service worker
                 throw new Error(response?.error || 'Failed to generate summary');
@@ -335,9 +526,11 @@ class InboxTriageSidePanel {
     }
     
     displaySummary(summary, keyPoints) {
+        // Display summary
         this.elements.summary.textContent = summary;
-        this.elements.summary.classList.remove('placeholder');
+        this.showSection(this.elements.summarySection);
         
+        // Display key points
         if (keyPoints && keyPoints.length > 0) {
             const pointsList = document.createElement('ul');
             pointsList.setAttribute('role', 'list');
@@ -351,8 +544,8 @@ class InboxTriageSidePanel {
             
             this.elements.keyPoints.innerHTML = '';
             this.elements.keyPoints.appendChild(pointsList);
-            this.elements.keyPoints.classList.remove('placeholder');
             this.elements.keyPoints.setAttribute('aria-label', `${keyPoints.length} key points extracted from email thread`);
+            this.showSection(this.elements.keyPointsSection);
         }
     }
     
@@ -362,8 +555,9 @@ class InboxTriageSidePanel {
     displayAttachments() {
         const attachments = this.currentThread?.attachments || [];
         
+        // Only show section if there are attachments
         if (attachments.length === 0) {
-            this.elements.attachments.innerHTML = '<div class="placeholder">No attachments found in current thread.</div>';
+            this.hideSection(this.elements.attachmentsSection);
             return;
         }
         
@@ -378,8 +572,10 @@ class InboxTriageSidePanel {
         
         this.elements.attachments.innerHTML = '';
         this.elements.attachments.appendChild(attachmentsContainer);
-        this.elements.attachments.classList.remove('placeholder');
         this.elements.attachments.setAttribute('aria-label', `${attachments.length} attachments found in email thread`);
+        
+        // Show the section
+        this.showSection(this.elements.attachmentsSection);
         
         // Process attachments for summaries
         this.processAttachments(attachments);
@@ -480,17 +676,24 @@ class InboxTriageSidePanel {
      * @param {Array} attachments - List of attachments to process
      */
     async processAttachments(attachments) {
+        const processableCount = attachments.filter(a => a.processable).length;
+        let processed = 0;
+        
         for (const attachment of attachments) {
             if (attachment.processable) {
                 try {
-                    // For now, just show a placeholder
-                    // TODO: Implement actual file processing and AI summarization
+                    processed++;
+                    this.updateStatus(`Analyzing attachment ${processed}/${processableCount}: ${attachment.name}...`, 'loading');
                     await this.processAttachment(attachment);
                 } catch (error) {
                     console.error('Error processing attachment:', error);
                     this.updateAttachmentSummary(attachment.index, 'Error processing attachment', true);
                 }
             }
+        }
+        
+        if (processableCount > 0) {
+            this.updateStatus(`✓ Analyzed ${processableCount} attachment${processableCount !== 1 ? 's' : ''}`, 'success');
         }
     }
     
@@ -560,7 +763,7 @@ class InboxTriageSidePanel {
         if (!this.currentThread) return;
         
         try {
-            this.updateStatus('Generating reply drafts...', 'loading');
+            this.updateStatus('Preparing draft request...', 'loading');
             this.elements.generateDraftsBtn.disabled = true;
             
             // Check if we're in an extension context
@@ -570,6 +773,12 @@ class InboxTriageSidePanel {
             
             const tone = this.elements.toneSelector.value;
             const guidance = this.elements.guidanceText.value.trim();
+            
+            const isUsingCloud = this.userSettings.processingMode === 'hybrid';
+            const processingType = isUsingCloud ? 'on-device/cloud' : 'on-device';
+            
+            this.updateStatus(`Composing ${tone} replies (${processingType} AI)...`, 'loading');
+            
             const response = await chrome.runtime.sendMessage({
                 action: 'generateDrafts',
                 thread: this.currentThread,
@@ -579,15 +788,20 @@ class InboxTriageSidePanel {
             });
             
             if (response && response.success) {
+                this.updateStatus('Validating draft quality...', 'loading');
+                
                 this.currentDrafts = response.drafts;
                 this.displayReplyDrafts(response.drafts);
                 this.addProcessingIndicator('drafting', response.usedFallback || false);
                 
-                // Check if there was a warning (fallback used)
+                // Show final status with processing method and count
+                const method = response.usedFallback ? 'cloud' : 'on-device';
+                const draftCount = response.drafts?.length || 0;
+                
                 if (response.warning) {
-                    this.updateStatus(`Reply drafts generated with fallback: ${response.warning}`, 'success');
+                    this.updateStatus(`✓ ${draftCount} draft${draftCount !== 1 ? 's' : ''} generated (${method}): ${response.warning}`, 'success');
                 } else {
-                    this.updateStatus('Reply drafts generated successfully', 'success');
+                    this.updateStatus(`✓ ${draftCount} ${tone} draft${draftCount !== 1 ? 's' : ''} ready (${method})`, 'success');
                 }
             } else {
                 // Error message is already sanitized by the service worker
@@ -605,7 +819,6 @@ class InboxTriageSidePanel {
     
     displayReplyDrafts(drafts) {
         this.elements.replyDrafts.innerHTML = '';
-        this.elements.replyDrafts.classList.remove('placeholder');
         
         if (drafts && drafts.length > 0) {
             this.elements.replyDrafts.setAttribute('aria-label', `${drafts.length} reply drafts generated`);
@@ -614,41 +827,152 @@ class InboxTriageSidePanel {
                 const draftElement = this.createDraftElement(draft, index);
                 this.elements.replyDrafts.appendChild(draftElement);
             });
+            
+            // Show the section
+            this.showSection(this.elements.replyDraftsSection);
         } else {
-            this.elements.replyDrafts.innerHTML = '<div class="placeholder">No drafts to display.</div>';
-            this.elements.replyDrafts.setAttribute('aria-label', 'No reply drafts available');
+            // Hide section if no drafts
+            this.hideSection(this.elements.replyDraftsSection);
         }
     }
     
     createDraftElement(draft, index) {
         const draftDiv = document.createElement('div');
-        draftDiv.className = 'draft';
+        // Only expand the first draft (index 0), collapse others
+        const isExpanded = index === 0;
+        draftDiv.className = `draft accordion-draft${isExpanded ? ' expanded' : ''}`;
         draftDiv.setAttribute('role', 'article');
         draftDiv.setAttribute('aria-labelledby', `draft-title-${index}`);
         
-        // Escape content to prevent XSS
-        const escapedSubject = this.escapeHtml(draft.subject || `Draft ${index + 1}`);
-        const escapedBody = this.escapeHtml(draft.body || '');
-        const escapedType = this.escapeHtml(draft.type || `Draft ${index + 1}`);
+        // Store reference to draft for copy functionality
+        draftDiv._draftData = draft;
         
-        draftDiv.innerHTML = `
-            <div class="draft-header">
-                <h3 id="draft-title-${index}">${escapedType}</h3>
-                <button type="button" 
-                        onclick="copyToClipboard('${escapedSubject}', '${escapedBody}', this)"
-                        aria-describedby="copy-help-${index}">
-                    Copy Draft
-                </button>
-                <span id="copy-help-${index}" class="sr-only">
-                    Copy this reply draft to clipboard including subject and body
-                </span>
-            </div>
-            <div class="draft-content">
-                <div class="draft-subject"><strong>Subject:</strong> ${escapedSubject}</div>
-                <div class="draft-body">${escapedBody}</div>
-            </div>
-        `;
+        // Create header element
+        const header = document.createElement('div');
+        header.className = 'draft-header';
+        header.setAttribute('tabindex', '0');
+        header.setAttribute('role', 'button');
+        header.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+        header.setAttribute('aria-controls', `draft-content-${index}`);
+        
+        // Create title
+        const title = document.createElement('h3');
+        title.id = `draft-title-${index}`;
+        title.textContent = draft.type || `Draft ${index + 1}`;
+        
+        // Create actions container
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'draft-actions';
+        
+        // Create copy button
+        const copyBtn = document.createElement('button');
+        copyBtn.type = 'button';
+        copyBtn.className = 'copy-draft-btn';
+        copyBtn.textContent = 'Copy';
+        copyBtn.setAttribute('aria-describedby', `copy-help-${index}`);
+        
+        // Create toggle indicator
+        const toggleSpan = document.createElement('span');
+        toggleSpan.className = 'draft-toggle';
+        toggleSpan.setAttribute('aria-hidden', 'true');
+        toggleSpan.textContent = '▼';
+        
+        // Create screen reader help text
+        const helpSpan = document.createElement('span');
+        helpSpan.id = `copy-help-${index}`;
+        helpSpan.className = 'sr-only';
+        helpSpan.textContent = 'Copy this reply draft to clipboard';
+        
+        // Assemble header
+        actionsDiv.appendChild(copyBtn);
+        actionsDiv.appendChild(toggleSpan);
+        header.appendChild(title);
+        header.appendChild(actionsDiv);
+        header.appendChild(helpSpan);
+        
+        // Create content section
+        const content = document.createElement('div');
+        content.id = `draft-content-${index}`;
+        content.className = 'draft-content';
+        
+        const bodyDiv = document.createElement('div');
+        bodyDiv.className = 'draft-body';
+        bodyDiv.textContent = draft.body || '';
+        
+        content.appendChild(bodyDiv);
+        
+        // Assemble draft element
+        draftDiv.appendChild(header);
+        draftDiv.appendChild(content);
+        
+        // Add click handler for accordion toggle
+        header.addEventListener('click', (e) => {
+            // Don't toggle if clicking the copy button
+            if (e.target.closest('.copy-draft-btn')) {
+                return;
+            }
+            this.toggleDraftAccordion(draftDiv);
+        });
+        
+        // Add keyboard support for accordion
+        header.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.toggleDraftAccordion(draftDiv);
+            }
+        });
+        
+        // Add copy button handler
+        copyBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const draftData = draftDiv._draftData;
+            if (draftData && draftData.body) {
+                this.copyDraftToClipboard(draftData.body, copyBtn);
+            }
+        });
+        
         return draftDiv;
+    }
+    
+    /**
+     * Toggle draft accordion expand/collapse
+     */
+    toggleDraftAccordion(draftElement) {
+        const isExpanded = draftElement.classList.contains('expanded');
+        
+        if (isExpanded) {
+            draftElement.classList.remove('expanded');
+            const header = draftElement.querySelector('.draft-header');
+            header.setAttribute('aria-expanded', 'false');
+        } else {
+            draftElement.classList.add('expanded');
+            const header = draftElement.querySelector('.draft-header');
+            header.setAttribute('aria-expanded', 'true');
+        }
+    }
+    
+    /**
+     * Copy draft to clipboard
+     */
+    async copyDraftToClipboard(body, button) {
+        try {
+            await navigator.clipboard.writeText(body);
+            
+            // Visual feedback
+            const originalText = button.textContent;
+            button.textContent = '✓ Copied';
+            button.classList.add('copy-success');
+            
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.classList.remove('copy-success');
+            }, 2000);
+            
+            this.updateStatus('Draft copied to clipboard', 'success');
+        } catch (error) {
+            console.error('Failed to copy draft:', error);
+            this.updateStatus('Failed to copy draft to clipboard', 'error');
+        }
     }
     
     escapeHtml(text) {

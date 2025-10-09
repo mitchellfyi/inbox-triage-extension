@@ -499,7 +499,9 @@ class InboxTriageServiceWorker {
             // Reference: https://developer.chrome.com/docs/ai/prompt-api
             // Example: const session = await LanguageModel.create({...})
             const session = await LanguageModel.create({
-                systemPrompt: this.createSystemPrompt(tone),
+                initialPrompts: [
+                    { role: 'system', content: this.createSystemPrompt(tone) }
+                ],
                 temperature: 0.7,
                 topK: 3
             });

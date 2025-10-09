@@ -23,12 +23,6 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 
 ## Documentation
 
-### Core Documentation
-- `[done]` README.md overhaul - Add value prop, docs map, quickstart, architecture, privacy, contributing flow
-- `[done]` AGENTS.md refinements - Agent loop, coding rules, commit patterns, "Don't" list, testing requirements, commit guidelines
-- `[done]` .github/copilot-instructions.md updates - "Always read SPEC first", guardrails section, commit/test/doc guidelines
-- `[done]` TODO.md creation - This file with project-wide checklist
-
 ### Post-Feature Documentation Updates
 - `[todo]` SPEC.md improvements - Acceptance criteria format, explicit API boundaries, browser support notes
 - `[todo]` README.md feature integration - Update overview and quickstart sections after each major feature completion

@@ -70,21 +70,21 @@ Start here to understand the project and contribute effectively:
 **Detailed Setup Guide:** See **[SETUP.md](SETUP.md)** for:
 - Complete system requirements
 - Troubleshooting common issues  
-- Custom API key setup (OpenAI, Anthropic, Google)
+- Custom API key setup (Google Gemini, Anthropic, OpenAI)
 - Advanced configuration options
 - Feature comparison table
 
 **Quick Links:**
 - **Can't enable flags?** → [SETUP.md - Troubleshooting](SETUP.md#-troubleshooting)
 - **Models won't download?** → [SETUP.md - Model Download Issues](SETUP.md#problem-ai-model-is-downloading)
-- **Want to use OpenAI instead?** → [SETUP.md - Custom API Keys](SETUP.md#alternative-use-custom-api-keys)
+- **Want to use external AI services?** → [SETUP.md - Custom API Keys](SETUP.md#alternative-use-custom-api-keys)
 
 ### Alternative: Use Custom API Keys
 
 Don't have Chrome 128+ or sufficient resources? No problem!
 
-1. Get an API key from [OpenAI](https://platform.openai.com/api-keys)
-2. Open extension → "API Settings (Optional)"
+1. Get an API key from [Google AI Studio](https://aistudio.google.com/app/apikey) (recommended), [Anthropic](https://console.anthropic.com/), or [OpenAI](https://platform.openai.com/api-keys)
+2. Open extension → Settings (⚙️ button) → "API Settings (Optional)"
 3. Check "Use custom API key"
 4. Enter your API key and click "Save"
 

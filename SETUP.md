@@ -15,7 +15,7 @@ Get up and running with AI-powered email triage in just a few minutes!
   - macOS 13+ (Ventura or later)
   - Linux (most distributions)
 
-**Note:** If you have less storage/GPU, you can still use the extension with custom API keys (OpenAI, etc.)
+**Note:** If you have less storage/GPU, you can still use the extension with custom API keys (Google Gemini, Anthropic, OpenAI)
 
 ### Step 2: Enable Chrome AI Features (2 minutes)
 
@@ -143,9 +143,9 @@ After enabling flags and restarting Chrome:
 If you can't use Chrome AI (incompatible system, insufficient resources, etc.):
 
 1. **Get an API Key:**
+   - **Google AI Studio:** https://aistudio.google.com/app/apikey (Gemini - Recommended)
+   - **Anthropic:** https://console.anthropic.com/ (Claude)
    - **OpenAI:** https://platform.openai.com/api-keys (GPT-4)
-   - **Anthropic:** https://console.anthropic.com/ (Claude) - Coming Soon
-   - **Google AI:** https://ai.google.dev/ (Gemini) - Coming Soon
 
 2. **Configure in Extension:**
    - Open the extension
@@ -249,7 +249,7 @@ If you can't use Chrome AI (incompatible system, insufficient resources, etc.):
 **Check these:**
 1. API key is valid and not expired
 2. You have API credits/billing enabled
-3. Correct provider selected (OpenAI/Anthropic/Google)
+3. Correct provider selected (Google/Anthropic/OpenAI)
 4. Internet connection is working
 5. Check browser console for specific error
 
@@ -325,7 +325,7 @@ Currently none, but you can:
 
 ### Custom API Key Mode:
 - ⚠️ **Data Sent to API Provider** - Email text transmitted
-- ⚠️ **Subject to Provider's Privacy Policy** - OpenAI/Anthropic/Google
+- ⚠️ **Subject to Provider's Privacy Policy** - Google/Anthropic/OpenAI
 - ✅ **API Keys Stored Securely** - Encrypted by Chrome
 - ✅ **No Attachments Sent** - Only extracted text
 - ⚠️ **Provider May Train on Data** - Check their policies
@@ -346,9 +346,9 @@ Currently none, but you can:
 - **Summarizer API Guide:** https://developer.chrome.com/docs/ai/summarizer-api
 
 ### API Provider Documentation:
-- **OpenAI API:** https://platform.openai.com/docs
+- **Google AI (Gemini):** https://ai.google.dev/docs
 - **Anthropic Claude:** https://docs.anthropic.com/
-- **Google AI:** https://ai.google.dev/docs
+- **OpenAI API:** https://platform.openai.com/docs
 
 ### Extension Documentation:
 - **SPEC.md** - Complete feature specifications

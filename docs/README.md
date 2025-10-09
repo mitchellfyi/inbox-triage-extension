@@ -132,9 +132,9 @@ All documentation follows these principles:
 - Extensions: https://developer.chrome.com/docs/extensions
 
 ### External APIs
-- OpenAI: https://platform.openai.com/docs
-- Anthropic: https://docs.anthropic.com/
-- Google AI: https://ai.google.dev/docs
+- Google AI (Gemini): https://ai.google.dev/docs
+- Anthropic (Claude): https://docs.anthropic.com/
+- OpenAI (GPT): https://platform.openai.com/docs
 
 ### Community
 - GitHub Issues: Report bugs

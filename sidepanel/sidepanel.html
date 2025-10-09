@@ -24,10 +24,33 @@
         }
         
         h1 {
-            margin: 0 0 16px 0;
+            margin: 0;
             font-size: 18px;
             color: #333;
             font-weight: 600;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        
+        #settings-toggle-btn {
+            background: transparent;
+            color: #666;
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            min-height: 36px;
+            font-size: 18px;
+            transition: all 0.2s ease;
+        }
+        
+        #settings-toggle-btn:hover:not(:disabled) {
+            background: #f5f5f5;
+            border-color: #ccc;
+            color: #333;
         }
         
         .status {
@@ -63,16 +86,105 @@
         }
         
         .section {
-            margin-bottom: 24px;
+            margin-bottom: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            background: white;
+            transition: all 0.2s ease;
         }
         
-        .section h2 {
+        .section.hidden {
+            display: none;
+        }
+        
+        .section:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        /* Section with content (non-accordion sections) */
+        .section-with-content {
+            overflow: visible;
+        }
+        
+        .section-inner {
+            padding: 16px;
+        }
+        
+        .section-title {
             font-size: 14px;
-            margin: 0 0 8px 0;
+            margin: 0 0 16px 0;
             color: #666;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             font-weight: 600;
+        }
+        
+        /* Extract section styling */
+        #extract-section button {
+            width: 100%;
+        }
+        
+        /* Reply Drafts controls styling */
+        #reply-drafts-controls-section #generate-drafts-btn {
+            width: 100%;
+        }
+        
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px;
+            cursor: pointer;
+            background: #fafafa;
+            border-bottom: 1px solid #e0e0e0;
+            transition: background-color 0.2s ease;
+            user-select: none;
+        }
+        
+        .section-header:hover {
+            background: #f0f0f0;
+        }
+        
+        .section-header:focus {
+            outline: 2px solid #1976d2;
+            outline-offset: -2px;
+        }
+        
+        .section-header h2 {
+            font-size: 14px;
+            margin: 0;
+            color: #333;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+            flex: 1;
+        }
+        
+        .section-toggle {
+            color: #666;
+            font-size: 18px;
+            transition: transform 0.3s ease;
+            line-height: 1;
+            padding: 4px;
+        }
+        
+        .section.expanded .section-toggle {
+            transform: rotate(180deg);
+        }
+        
+        .section-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        
+        .section.expanded .section-content {
+            max-height: 1000px;
+        }
+        
+        .section-body {
+            padding: 16px;
         }
         
         .placeholder {
@@ -263,96 +375,94 @@
             border-color: #1976d2;
         }
         
-        /* Summary and key points styling */
-        #summary {
-            padding: 16px;
-            background: #fafafa;
-            border-radius: 6px;
-            border-left: 4px solid #4caf50;
-            font-size: 14px;
-            line-height: 1.6;
-        }
         
-        #summary:not(.placeholder) {
-            background: #f1f8e9;
-            color: #2e7d32;
-        }
-        
-        #key-points {
-            padding: 16px;
-            background: #fafafa;
-            border-radius: 6px;
-            border-left: 4px solid #2196f3;
-        }
-        
-        #key-points:not(.placeholder) {
-            background: #e3f2fd;
-        }
-        
-        #key-points ul {
-            margin: 0;
-            padding-left: 20px;
-        }
-        
-        #key-points li {
-            margin-bottom: 8px;
-            color: #1976d2;
-            font-size: 14px;
-        }
-        
-        /* Draft presentation styling */
+        /* Draft presentation styling - Accordion Style */
         .draft {
-            margin-bottom: 20px;
+            margin-bottom: 12px;
             border: 1px solid #e0e0e0;
             border-radius: 8px;
             overflow: hidden;
             background: white;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+        }
+        
+        .draft:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
         
         .draft-header {
-            padding: 16px;
+            padding: 14px 16px;
             background: #f8f9fa;
             border-bottom: 1px solid #e0e0e0;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            user-select: none;
+        }
+        
+        .draft-header:hover {
+            background: #f0f0f0;
+        }
+        
+        .draft-header:focus {
+            outline: 2px solid #1976d2;
+            outline-offset: -2px;
         }
         
         .draft-header h3 {
             margin: 0;
-            font-size: 16px;
+            font-size: 15px;
             color: #333;
             font-weight: 600;
+            flex: 1;
         }
         
-        .draft-header button {
-            padding: 8px 12px;
-            font-size: 12px;
-            min-height: 32px;
+        .draft-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .copy-draft-btn {
+            padding: 6px 12px;
+            font-size: 13px;
+            min-height: 30px;
             background: #4caf50;
+            z-index: 1;
         }
         
-        .draft-header button:hover:not(:disabled) {
+        .copy-draft-btn:hover:not(:disabled) {
             background: #45a049;
             box-shadow: 0 2px 6px rgba(76, 175, 80, 0.3);
         }
         
-        .draft-content {
-            padding: 16px;
-        }
-        
-        .draft-subject {
-            margin-bottom: 12px;
-            font-size: 14px;
+        .draft-toggle {
             color: #666;
+            font-size: 16px;
+            transition: transform 0.3s ease;
+            line-height: 1;
+            padding: 4px;
         }
         
-        .draft-subject strong {
-            color: #333;
+        .draft.expanded .draft-toggle {
+            transform: rotate(180deg);
+        }
+        
+        .draft-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        
+        .draft.expanded .draft-content {
+            max-height: 1000px;
         }
         
         .draft-body {
+            padding: 16px;
             font-size: 14px;
             line-height: 1.6;
             color: #444;
@@ -362,10 +472,6 @@
         /* Copy success feedback */
         .copy-success {
             background: #4caf50 !important;
-        }
-        
-        .copy-success::after {
-            content: " ✓";
         }
         
         /* Responsive design */
@@ -399,21 +505,51 @@
                 min-height: 44px;
             }
             
-            .draft-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 12px;
+            .draft-header h3 {
+                font-size: 14px;
             }
             
-            .draft-header button {
-                align-self: flex-end;
+            .draft-actions {
+                gap: 8px;
+            }
+            
+            .copy-draft-btn {
+                font-size: 12px;
+                padding: 5px 10px;
             }
         }
         
         /* Scrollable content for long summaries/drafts */
-        #summary, #key-points {
+        #summary {
+            padding: 16px;
+            background: #f1f8e9;
+            border-radius: 6px;
+            border-left: 4px solid #4caf50;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #2e7d32;
             max-height: 300px;
             overflow-y: auto;
+        }
+        
+        #key-points {
+            padding: 16px;
+            background: #e3f2fd;
+            border-radius: 6px;
+            border-left: 4px solid #2196f3;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        #key-points ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        
+        #key-points li {
+            margin-bottom: 8px;
+            color: #1976d2;
+            font-size: 14px;
         }
 
         #attachments {
@@ -691,12 +827,114 @@
                 border-width: 2px;
             }
         }
+        
+        /* Settings Panel Overlay */
+        .settings-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .settings-overlay.active {
+            display: block;
+            opacity: 1;
+        }
+        
+        .settings-panel {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            bottom: 0;
+            width: 400px;
+            max-width: 90vw;
+            background: white;
+            box-shadow: -4px 0 16px rgba(0, 0, 0, 0.2);
+            z-index: 1001;
+            overflow-y: auto;
+            transition: right 0.3s ease;
+            padding: 0;
+        }
+        
+        .settings-panel.active {
+            right: 0;
+        }
+        
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            border-bottom: 2px solid #e0e0e0;
+            background: #fafafa;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .settings-header h2 {
+            margin: 0;
+            font-size: 18px;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .settings-close-btn {
+            background: transparent;
+            color: #666;
+            border: none;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 24px;
+            line-height: 1;
+            min-height: auto;
+        }
+        
+        .settings-close-btn:hover {
+            color: #333;
+            background: transparent;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .settings-body {
+            padding: 16px;
+        }
+        
+        .settings-body .section {
+            margin-bottom: 24px;
+            border: none;
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
+        }
+        
+        .settings-body .section h2 {
+            font-size: 14px;
+            margin: 0 0 12px 0;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>Inbox Triage</h1>
+            <button id="settings-toggle-btn" 
+                    type="button" 
+                    aria-label="Toggle settings"
+                    title="Settings">
+                ⚙️
+            </button>
         </header>
         
         <div class="status" id="status" role="status" aria-live="polite">
@@ -704,34 +942,126 @@
         </div>
         
         <main>
-            <section class="section" aria-labelledby="extraction-heading">
-                <h2 id="extraction-heading" class="sr-only">Thread Extraction</h2>
-                <button id="extract-btn" type="button" aria-describedby="status-text">
-                    Extract Current Thread
-                </button>
-            </section>
-            
-            <section class="section" aria-labelledby="summary-heading">
-                <h2 id="summary-heading">Summary</h2>
-                <div id="summary" class="placeholder" role="region" aria-label="Email thread summary">
-                    No thread analysed yet. Click "Extract Current Thread" to get started.
+            <section id="extract-section" class="section section-with-content" aria-labelledby="extraction-heading">
+                <div class="section-inner">
+                    <h2 id="extraction-heading" class="sr-only">Thread Extraction</h2>
+                    <button id="extract-btn" type="button" aria-describedby="status-text">
+                        Extract Current Thread
+                    </button>
                 </div>
             </section>
             
-            <section class="section" aria-labelledby="key-points-heading">
-                <h2 id="key-points-heading">Key Points</h2>
-                <div id="key-points" class="placeholder" role="region" aria-label="Key points from email thread">
-                    Key points will appear here after analysis.
+            <section id="summary-section" class="section hidden expanded" aria-labelledby="summary-heading">
+                <div class="section-header" tabindex="0" role="button" aria-expanded="true" aria-controls="summary-content">
+                    <h2 id="summary-heading">Summary</h2>
+                    <span class="section-toggle" aria-hidden="true">▼</span>
+                </div>
+                <div id="summary-content" class="section-content">
+                    <div class="section-body">
+                        <div id="summary" role="region" aria-label="Email thread summary"></div>
+                    </div>
                 </div>
             </section>
             
-            <section class="section" aria-labelledby="attachments-heading">
-                <h2 id="attachments-heading">Attachments</h2>
-                <div id="attachments" class="placeholder" role="region" aria-label="Email attachments and summaries">
-                    No attachments found in current thread.
+            <section id="key-points-section" class="section hidden expanded" aria-labelledby="key-points-heading">
+                <div class="section-header" tabindex="0" role="button" aria-expanded="true" aria-controls="key-points-content">
+                    <h2 id="key-points-heading">Key Points</h2>
+                    <span class="section-toggle" aria-hidden="true">▼</span>
+                </div>
+                <div id="key-points-content" class="section-content">
+                    <div class="section-body">
+                        <div id="key-points" role="region" aria-label="Key points from email thread"></div>
+                    </div>
                 </div>
             </section>
             
+            <section id="attachments-section" class="section hidden expanded" aria-labelledby="attachments-heading">
+                <div class="section-header" tabindex="0" role="button" aria-expanded="true" aria-controls="attachments-content">
+                    <h2 id="attachments-heading">Attachments</h2>
+                    <span class="section-toggle" aria-hidden="true">▼</span>
+                </div>
+                <div id="attachments-content" class="section-content">
+                    <div class="section-body">
+                        <div id="attachments" role="region" aria-label="Email attachments and summaries"></div>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="reply-drafts-controls-section" class="section hidden section-with-content" aria-labelledby="reply-drafts-heading">
+                <div class="section-inner">
+                    <h2 id="reply-drafts-heading" class="section-title">Reply Drafts</h2>
+                    <div class="tone-controls">
+                        <label for="tone-selector">Tone:</label>
+                        <select id="tone-selector" aria-describedby="tone-help">
+                            <option value="neutral">Neutral</option>
+                            <option value="friendly">Friendly</option>
+                            <option value="assertive">Assertive</option>
+                            <option value="formal">Formal</option>
+                        </select>
+                        <div id="tone-help" class="sr-only">
+                            Select the tone for generated reply drafts. Changes will automatically regenerate drafts if available.
+                        </div>
+                    </div>
+                    
+                    <div class="guidance-controls">
+                        <label for="guidance-text">Guidance:</label>
+                        <div class="guidance-input-group">
+                            <textarea id="guidance-text" 
+                                      placeholder="Add specific instructions or context for your reply drafts..." 
+                                      rows="3"
+                                      aria-describedby="guidance-help"></textarea>
+                            <button id="mic-btn" 
+                                    type="button" 
+                                    aria-label="Start voice dictation" 
+                                    aria-describedby="mic-help"
+                                    title="Click to start voice dictation">
+                                🎤
+                            </button>
+                        </div>
+                        <div id="guidance-help" class="sr-only">
+                            Optional guidance text that will be included when generating reply drafts. Use the microphone button for voice dictation.
+                        </div>
+                        <div id="mic-help" class="sr-only">
+                            Click the microphone button to start voice dictation. Speech will be transcribed on-device and added to the guidance text.
+                        </div>
+                        <div id="mic-status" class="mic-status" aria-live="polite"></div>
+                    </div>
+                    
+                    <div class="generate-section">
+                        <button id="generate-drafts-btn" type="button" disabled aria-describedby="drafts-help">
+                            Generate Drafts
+                        </button>
+                        <div id="drafts-help" class="sr-only">
+                            Generate three reply draft options with the selected tone. Available after extracting an email thread.
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="reply-drafts-section" class="section hidden expanded" aria-labelledby="generated-drafts-heading">
+                <div class="section-header" tabindex="0" role="button" aria-expanded="true" aria-controls="reply-drafts-content">
+                    <h2 id="generated-drafts-heading">Generated Drafts</h2>
+                    <span class="section-toggle" aria-hidden="true">▼</span>
+                </div>
+                <div id="reply-drafts-content" class="section-content">
+                    <div class="section-body">
+                        <div id="reply-drafts" role="region" aria-label="Generated reply drafts"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <!-- Settings Panel Overlay -->
+    <div class="settings-overlay" id="settings-overlay"></div>
+    
+    <!-- Settings Panel -->
+    <div class="settings-panel" id="settings-panel">
+        <div class="settings-header">
+            <h2>Settings</h2>
+            <button class="settings-close-btn" id="settings-close-btn" type="button" aria-label="Close settings">×</button>
+        </div>
+        <div class="settings-body">
             <section class="section" aria-labelledby="settings-heading">
                 <h2 id="settings-heading">Processing Settings</h2>
                 <div class="settings-group">
@@ -807,16 +1137,16 @@
                             <div>
                                 <label for="use-api-key">Use custom API key instead of Chrome's built-in AI</label>
                                 <div id="api-key-desc" class="description">
-                                    Override Chrome's on-device AI with your own OpenAI, Anthropic, or Google AI API key. This will send requests to external services.
+                                    Override Chrome's on-device AI with your own Google Gemini, Anthropic, or OpenAI API key. This will send requests to external services.
                                 </div>
                             </div>
                         </div>
                         <div id="api-key-section" style="display: none; margin-top: 12px;">
                             <label for="api-provider" style="display: block; margin-bottom: 8px; font-size: 14px; color: #555;">Provider:</label>
                             <select id="api-provider" style="width: 100%; margin-bottom: 12px;">
-                                <option value="openai">OpenAI (GPT-4, GPT-3.5)</option>
-                                <option value="anthropic">Anthropic (Claude)</option>
                                 <option value="google">Google AI (Gemini)</option>
+                                <option value="anthropic">Anthropic (Claude)</option>
+                                <option value="openai">OpenAI (GPT-4, GPT-3.5)</option>
                             </select>
                             
                             <label for="api-key-input" style="display: block; margin-bottom: 8px; font-size: 14px; color: #555;">API Key:</label>
@@ -841,59 +1171,7 @@
                     </fieldset>
                 </div>
             </section>
-            
-            <section class="section" aria-labelledby="reply-drafts-heading">
-                <h2 id="reply-drafts-heading">Reply Drafts</h2>
-                <div class="tone-controls">
-                    <label for="tone-selector">Tone:</label>
-                    <select id="tone-selector" aria-describedby="tone-help">
-                        <option value="neutral">Neutral</option>
-                        <option value="friendly">Friendly</option>
-                        <option value="assertive">Assertive</option>
-                        <option value="formal">Formal</option>
-                    </select>
-                    <div id="tone-help" class="sr-only">
-                        Select the tone for generated reply drafts. Changes will automatically regenerate drafts if available.
-                    </div>
-                </div>
-                
-                <div class="guidance-controls">
-                    <label for="guidance-text">Guidance:</label>
-                    <div class="guidance-input-group">
-                        <textarea id="guidance-text" 
-                                  placeholder="Add specific instructions or context for your reply drafts..." 
-                                  rows="3"
-                                  aria-describedby="guidance-help"></textarea>
-                        <button id="mic-btn" 
-                                type="button" 
-                                aria-label="Start voice dictation" 
-                                aria-describedby="mic-help"
-                                title="Click to start voice dictation">
-                            🎤
-                        </button>
-                    </div>
-                    <div id="guidance-help" class="sr-only">
-                        Optional guidance text that will be included when generating reply drafts. Use the microphone button for voice dictation.
-                    </div>
-                    <div id="mic-help" class="sr-only">
-                        Click the microphone button to start voice dictation. Speech will be transcribed on-device and added to the guidance text.
-                    </div>
-                    <div id="mic-status" class="mic-status" aria-live="polite"></div>
-                </div>
-                
-                <div class="generate-section">
-                    <button id="generate-drafts-btn" type="button" disabled aria-describedby="drafts-help">
-                        Generate Drafts
-                    </button>
-                    <div id="drafts-help" class="sr-only">
-                        Generate three reply draft options with the selected tone. Available after extracting an email thread.
-                    </div>
-                </div>
-                <div id="reply-drafts" class="placeholder" role="region" aria-label="Generated reply drafts">
-                    Reply drafts will appear here after generating.
-                </div>
-            </section>
-        </main>
+        </div>
     </div>
     
     <script src="sidepanel.js"></script>

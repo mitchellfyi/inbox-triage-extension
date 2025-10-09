@@ -12,30 +12,42 @@ class EmailThreadExtractor {
     
     init() {
         if (!this.siteConfig) {
-            console.log('Inbox Triage: Unsupported email provider');
+            console.log('Inbox Triage: Unsupported email provider on', window.location.hostname);
             return;
         }
         
-        console.log(`Inbox Triage: Initialized for ${this.siteConfig.provider}`);
+        console.log(`Inbox Triage: Content script initialized for ${this.siteConfig.provider} on ${window.location.href}`);
         this.isInitialized = true;
         
         // Listen for messages from side panel
         chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             this.handleMessage(message, sender, sendResponse);
+            return true; // Keep message channel open for async responses
         });
     }
     
     handleMessage(message, sender, sendResponse) {
+        console.log('Content script received message:', message.action);
+        
         if (!this.isInitialized) {
-            sendResponse({ success: false, error: 'Extractor not initialized' });
-            return;
+            const error = `Content script not initialized for ${window.location.hostname}. Please refresh the page.`;
+            console.error('Inbox Triage:', error);
+            sendResponse({ success: false, error });
+            return true;
         }
         
         switch (message.action) {
             case 'extractThread':
+                console.log('Starting thread extraction...');
                 this.extractCurrentThread()
-                    .then(thread => sendResponse({ success: true, thread }))
-                    .catch(error => sendResponse({ success: false, error: error.message }));
+                    .then(thread => {
+                        console.log('Thread extraction successful:', thread);
+                        sendResponse({ success: true, thread });
+                    })
+                    .catch(error => {
+                        console.error('Thread extraction failed:', error);
+                        sendResponse({ success: false, error: error.message });
+                    });
                 return true; // Keep message channel open for async response
                 
             case 'checkPageReady':
@@ -43,7 +55,9 @@ class EmailThreadExtractor {
                 return true;
                 
             default:
-                sendResponse({ success: false, error: 'Unknown action' });
+                console.warn('Unknown action received:', message.action);
+                sendResponse({ success: false, error: `Unknown action: ${message.action}` });
+                return true;
         }
     }
     
