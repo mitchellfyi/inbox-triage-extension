@@ -50,7 +50,7 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 - `[todo]` PDF text extraction - Integrate PDF.js or equivalent for local PDF parsing
 - `[todo]` DOCX text extraction - Integrate mammoth.js or equivalent for Word document parsing
 - `[todo]` XLSX data extraction - Integrate SheetJS or equivalent for spreadsheet parsing
-- `[todo]` Image analysis - Use Prompt API multimodal capabilities for image description (see hackathon tasks)
+- `[done]` ✅ Image analysis - Multimodal Prompt API for image description, OCR, and chart analysis
 - `[todo]` Content validation - Ensure extracted content is suitable for AI processing
 
 ### Advanced Features
@@ -109,7 +109,7 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 - `[todo]` [Task 010: System Status Dashboard](/todo/010_system_status_dashboard.md) - Health indicators (2-3h)
 
 **Total Effort**: 30-43 hours for complete implementation  
-**Minimum Viable**: Tasks 000, 001, 005, 006, 007 = 15-20 hours  
+**Minimum Viable**: Tasks 000, 006, 007 = 7-11 hours (Tasks 001 ✅ and 005 ✅ completed)  
 **See**: [`/todo/README.md`](/todo/README.md) for detailed timeline and prioritization
 
 ---
