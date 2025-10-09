@@ -429,11 +429,17 @@ class InboxTriageSidePanel {
     }
 
     async extractCurrentThread() {
+        // Prevent multiple simultaneous extractions
+        if (this.elements.extractBtn.disabled) {
+            return;
+        }
+        
         let extractionSucceeded = false;
         
         try {
-            this.updateStatus('Checking page context...', 'loading');
+            // Disable button immediately
             this.elements.extractBtn.disabled = true;
+            this.updateStatus('Checking page context...', 'loading');
             
             // Check if we're in an extension context
             if (!chrome?.tabs?.sendMessage) {
@@ -515,11 +521,17 @@ class InboxTriageSidePanel {
         } catch (error) {
             console.error('Error extracting thread:', error);
             this.updateStatus(`Error: ${error.message}`, 'error');
+            // Ensure button is re-enabled on error
+            extractionSucceeded = false;
         } finally {
-            // Only re-enable button if extraction failed
-            // If succeeded, section is hidden so button state doesn't matter
+            // Button state management:
+            // - If extraction succeeded: button stays disabled and section is hidden
+            // - If extraction failed: re-enable button so user can try again
             if (!extractionSucceeded) {
                 this.elements.extractBtn.disabled = false;
+                console.log('Extract button re-enabled after error');
+            } else {
+                console.log('Extract button remains disabled after successful extraction');
             }
         }
     }
