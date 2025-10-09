@@ -11,29 +11,46 @@ export class TranslationService {
     async initialize() {
         if ('Translator' in self) {
             try {
-                // Check if translation is available for a common language pair
-                const availability = await Translator.availability({
-                    sourceLanguage: 'en',
-                    targetLanguage: 'es'
-                });
-                this.isAvailable = availability === 'readily' || availability === 'available';
-                console.log('Translator API availability:', availability);
-                return this.isAvailable;
+                // Check if translation API exists and is functional
+                // We'll check specific language pairs when translate() is called
+                this.isAvailable = true;
+                console.log('Translator API detected in browser');
+                return true;
             } catch (error) {
                 console.error('Error checking Translator availability:', error);
+                this.isAvailable = false;
                 return false;
             }
         }
         console.log('Translator API not available in this browser');
+        this.isAvailable = false;
         return false;
     }
 
     async translate(text, sourceLanguage, targetLanguage) {
+        // Initialize if not already done
         if (!this.isAvailable) {
             const isAvailable = await this.initialize();
             if (!isAvailable) {
-                throw new Error('Translator API not available');
+                throw new Error('Translator API not available in this browser');
             }
+        }
+
+        // Check availability for this specific language pair
+        try {
+            const availability = await Translator.availability({
+                sourceLanguage,
+                targetLanguage
+            });
+            
+            console.log(`Translation availability for ${sourceLanguage}→${targetLanguage}: ${availability}`);
+            
+            if (availability === 'no') {
+                throw new Error(`Translation not available for ${sourceLanguage}→${targetLanguage}`);
+            }
+        } catch (error) {
+            console.error('Error checking translation availability:', error);
+            throw new Error(`Cannot check translation availability: ${error.message}`);
         }
 
         const sessionKey = `${sourceLanguage}-${targetLanguage}`;
@@ -41,15 +58,17 @@ export class TranslationService {
         // Create or reuse translation session
         if (!this.sessions.has(sessionKey)) {
             try {
+                console.log(`Creating translator for ${sourceLanguage}→${targetLanguage}...`);
                 const translator = await Translator.create({
                     sourceLanguage,
                     targetLanguage,
                     monitor(m) {
                         m.addEventListener('downloadprogress', (e) => {
-                            console.log(`Translation model download: ${e.loaded * 100}%`);
+                            console.log(`Translation model download progress: ${Math.round(e.loaded * 100)}%`);
                         });
                     }
                 });
+                console.log(`Translator created successfully for ${sourceLanguage}→${targetLanguage}`);
                 this.sessions.set(sessionKey, translator);
             } catch (error) {
                 console.error('Error creating translator:', error);
@@ -59,7 +78,9 @@ export class TranslationService {
 
         const translator = this.sessions.get(sessionKey);
         try {
-            return await translator.translate(text);
+            const result = await translator.translate(text);
+            console.log(`Translation successful (${text.length} chars → ${result.length} chars)`);
+            return result;
         } catch (error) {
             console.error('Translation error:', error);
             // Remove failed session
