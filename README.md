@@ -10,8 +10,20 @@ This Chrome extension transforms email overwhelm into actionable insights by ins
 - **Understand Attachments**: Automatically analyze PDFs, documents, spreadsheets, and images locally
 - **Stay Responsive**: Generate professional reply drafts in multiple tones and lengths with custom guidance
 - **Voice Input**: Use voice dictation to quickly add guidance for your reply drafts
-- **Protect Privacy**: All processing happens locally—no data or files leave your device, including voice transcription
+- **🆕 Multilingual Support**: Translate summaries and drafts to 15+ languages on-device
+- **Protect Privacy**: All processing happens locally—no data or files leave your device, including translations
 - **Work Offline**: Fully functional once AI models are downloaded
+
+## 🤖 Chrome Built-in AI APIs Used
+
+This extension showcases multiple Chrome AI APIs working together:
+
+- **✅ Summarizer API** - Email thread condensation and key points extraction
+- **✅ Prompt API** - Structured draft generation with JSON schema
+- **✅ Translator API** - On-device multilingual translation (15+ languages)
+- **🔜 More Coming Soon** - Proofreader, Rewriter, Writer APIs for enhanced content refinement
+
+All processing happens locally on your device for complete privacy.
 
 ## Documentation Map
 
@@ -60,8 +72,9 @@ Start here to understand the project and contribute effectively:
 1. **Go to Gmail** (`mail.google.com`) **or Outlook** (`outlook.live.com`)
 2. **Open any email thread**
 3. **Click extension icon** in toolbar
-4. **Click "Extract Current Thread"**
-5. **Watch the magic happen!** ✨
+4. **🆕 (Optional) Select your preferred translation language** in Settings (⚙️)
+5. **Click "Extract Current Thread"**
+6. **Watch the magic happen!** ✨
 
 ---
 

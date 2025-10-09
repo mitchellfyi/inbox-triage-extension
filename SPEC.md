@@ -140,6 +140,17 @@ This project builds a Chrome extension for inbox triage that summarises email th
 **And** their selection should be persisted across browser sessions  
 **And** all AI operations should continue using on-device processing only
 
+### Multilingual Translation
+**Given** a user has extracted and summarized an email thread  
+**When** they select a target language from the language settings dropdown  
+**Then** the Translator API should translate the summary to the selected language  
+**And** the Translator API should translate the key points to the selected language  
+**And** all generated drafts should be translatable to the selected language  
+**And** the user can return to original language by selecting "No Translation (Original)"  
+**And** language preference should persist across browser sessions  
+**And** translations should happen entirely on-device for privacy  
+**And** translation should work offline once AI models are downloaded
+
 ### Hybrid Fallback Decision Rules
 **Given** hybrid mode is enabled and on-device models are unavailable  
 **When** AI processing is requested  

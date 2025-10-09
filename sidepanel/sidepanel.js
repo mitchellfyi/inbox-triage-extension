@@ -19,6 +19,12 @@ class InboxTriageSidePanel {
             provider: null, // 'gmail' or 'outlook'
             url: ''
         };
+        this.translationSettings = {
+            targetLanguage: 'none',
+            originalSummary: null,
+            originalKeyPoints: null,
+            originalDrafts: new Map() // Map<draftIndex, originalBody>
+        };
         
         this.initializeElements();
         this.bindEvents();
@@ -220,7 +226,9 @@ class InboxTriageSidePanel {
             apiKeyInput: document.getElementById('api-key-input'),
             apiProviderSelect: document.getElementById('api-provider'),
             apiKeySection: document.getElementById('api-key-section'),
-            saveApiKeyBtn: document.getElementById('save-api-key-btn')
+            saveApiKeyBtn: document.getElementById('save-api-key-btn'),
+            // Translation settings
+            targetLanguageSelect: document.getElementById('target-language')
         };
         
         // Initialize voice recognition
@@ -338,6 +346,11 @@ class InboxTriageSidePanel {
         }
         if (this.elements.saveApiKeyBtn) {
             this.elements.saveApiKeyBtn.addEventListener('click', () => this.saveApiKeySettings());
+        }
+        
+        // Translation settings
+        if (this.elements.targetLanguageSelect) {
+            this.elements.targetLanguageSelect.addEventListener('change', () => this.onLanguageChange());
         }
         
         // Keyboard navigation support
@@ -530,23 +543,43 @@ class InboxTriageSidePanel {
         this.elements.summary.textContent = summary;
         this.showSection(this.elements.summarySection);
         
+        // Store original summary for translation
+        if (!this.translationSettings.originalSummary) {
+            this.translationSettings.originalSummary = summary;
+        }
+        
         // Display key points
         if (keyPoints && keyPoints.length > 0) {
-            const pointsList = document.createElement('ul');
-            pointsList.setAttribute('role', 'list');
+            // Store original key points for translation
+            if (!this.translationSettings.originalKeyPoints) {
+                this.translationSettings.originalKeyPoints = [...keyPoints];
+            }
             
-            keyPoints.forEach((point, index) => {
-                const li = document.createElement('li');
-                li.textContent = point;
-                li.setAttribute('role', 'listitem');
-                pointsList.appendChild(li);
-            });
-            
-            this.elements.keyPoints.innerHTML = '';
-            this.elements.keyPoints.appendChild(pointsList);
-            this.elements.keyPoints.setAttribute('aria-label', `${keyPoints.length} key points extracted from email thread`);
-            this.showSection(this.elements.keyPointsSection);
+            this.displayKeyPoints(keyPoints);
         }
+    }
+    
+    /**
+     * Display key points in the UI
+     * @param {Array<string>} keyPoints - Array of key point strings
+     */
+    displayKeyPoints(keyPoints) {
+        if (!keyPoints || keyPoints.length === 0) return;
+        
+        const pointsList = document.createElement('ul');
+        pointsList.setAttribute('role', 'list');
+        
+        keyPoints.forEach((point, index) => {
+            const li = document.createElement('li');
+            li.textContent = point;
+            li.setAttribute('role', 'listitem');
+            pointsList.appendChild(li);
+        });
+        
+        this.elements.keyPoints.innerHTML = '';
+        this.elements.keyPoints.appendChild(pointsList);
+        this.elements.keyPoints.setAttribute('aria-label', `${keyPoints.length} key points extracted from email thread`);
+        this.showSection(this.elements.keyPointsSection);
     }
     
     /**
@@ -1352,7 +1385,13 @@ class InboxTriageSidePanel {
     async loadUserSettings() {
         try {
             if (chrome?.storage?.sync) {
-                const result = await chrome.storage.sync.get(['processingMode', 'useApiKey', 'apiKey', 'apiProvider']);
+                const result = await chrome.storage.sync.get([
+                    'processingMode', 
+                    'useApiKey', 
+                    'apiKey', 
+                    'apiProvider',
+                    'translationLanguage'
+                ]);
                 
                 if (result.processingMode) {
                     this.userSettings.processingMode = result.processingMode;
@@ -1366,16 +1405,21 @@ class InboxTriageSidePanel {
                 if (result.apiProvider) {
                     this.userSettings.apiProvider = result.apiProvider;
                 }
+                if (result.translationLanguage) {
+                    this.translationSettings.targetLanguage = result.translationLanguage;
+                }
             }
             
             // Update UI to reflect loaded settings
             this.updateProcessingModeUI();
             this.updateApiKeyUI();
+            this.updateTranslationUI();
         } catch (error) {
             console.error('Error loading user settings:', error);
             // Use default settings if loading fails
             this.updateProcessingModeUI();
             this.updateApiKeyUI();
+            this.updateTranslationUI();
         }
     }
     
@@ -1389,7 +1433,8 @@ class InboxTriageSidePanel {
                     processingMode: this.userSettings.processingMode,
                     useApiKey: this.userSettings.useApiKey,
                     apiKey: this.userSettings.apiKey,
-                    apiProvider: this.userSettings.apiProvider
+                    apiProvider: this.userSettings.apiProvider,
+                    translationLanguage: this.translationSettings.targetLanguage
                 });
                 console.log('User settings saved (API key hidden):', {
                     ...this.userSettings,
@@ -1522,6 +1567,266 @@ Cloud Processing Information:
 Your privacy remains protected with minimal necessary data transmission.
         `;
         alert(message);
+    }
+    
+    /**
+     * Update translation UI with current language setting
+     */
+    updateTranslationUI() {
+        if (this.elements.targetLanguageSelect) {
+            this.elements.targetLanguageSelect.value = this.translationSettings.targetLanguage || 'none';
+        }
+    }
+    
+    /**
+     * Handle language selection change
+     */
+    async onLanguageChange() {
+        const newLanguage = this.elements.targetLanguageSelect.value;
+        const oldLanguage = this.translationSettings.targetLanguage;
+        
+        this.translationSettings.targetLanguage = newLanguage;
+        await this.saveUserSettings();
+        
+        // If switching from a language to "none", restore originals
+        if (newLanguage === 'none' && oldLanguage !== 'none') {
+            this.restoreOriginalContent();
+            this.updateStatus('Translation disabled, showing original content', 'info');
+            setTimeout(() => this.updateStatus('', 'info'), 3000);
+            return;
+        }
+        
+        // If switching to a language, translate existing content
+        if (newLanguage !== 'none') {
+            await this.translateExistingContent();
+        }
+    }
+    
+    /**
+     * Restore original (untranslated) content
+     */
+    restoreOriginalContent() {
+        // Restore summary
+        if (this.translationSettings.originalSummary && this.elements.summary) {
+            this.elements.summary.textContent = this.translationSettings.originalSummary;
+        }
+        
+        // Restore key points
+        if (this.translationSettings.originalKeyPoints && this.elements.keyPoints) {
+            this.displayKeyPoints(this.translationSettings.originalKeyPoints);
+        }
+        
+        // Restore drafts
+        if (this.currentDrafts.length > 0 && this.translationSettings.originalDrafts.size > 0) {
+            this.currentDrafts.forEach((draft, index) => {
+                if (this.translationSettings.originalDrafts.has(index)) {
+                    draft.body = this.translationSettings.originalDrafts.get(index);
+                }
+            });
+            this.displayReplyDrafts(this.currentDrafts);
+        }
+    }
+    
+    /**
+     * Translate all existing content when language changes
+     */
+    async translateExistingContent() {
+        const language = this.translationSettings.targetLanguage;
+        if (language === 'none') return;
+        
+        let translatedCount = 0;
+        
+        // Translate summary if exists
+        if (this.elements.summary && this.elements.summary.textContent.trim()) {
+            try {
+                await this.translateSummary();
+                translatedCount++;
+            } catch (error) {
+                console.error('Error translating summary:', error);
+            }
+        }
+        
+        // Translate key points if exist
+        if (this.translationSettings.originalKeyPoints && this.translationSettings.originalKeyPoints.length > 0) {
+            try {
+                await this.translateKeyPoints();
+                translatedCount++;
+            } catch (error) {
+                console.error('Error translating key points:', error);
+            }
+        }
+        
+        // Translate drafts if exist
+        if (this.currentDrafts.length > 0) {
+            try {
+                await this.translateAllDrafts();
+                translatedCount += this.currentDrafts.length;
+            } catch (error) {
+                console.error('Error translating drafts:', error);
+            }
+        }
+        
+        if (translatedCount > 0) {
+            const langName = this.getLanguageName(language);
+            this.updateStatus(`✓ Content translated to ${langName}`, 'success');
+            setTimeout(() => this.updateStatus('', 'info'), 5000);
+        }
+    }
+    
+    /**
+     * Translate summary text
+     */
+    async translateSummary() {
+        if (!this.elements.summary) return;
+        
+        const originalText = this.translationSettings.originalSummary || this.elements.summary.textContent;
+        if (!originalText || !originalText.trim()) return;
+        
+        // Store original if not stored yet
+        if (!this.translationSettings.originalSummary) {
+            this.translationSettings.originalSummary = originalText;
+        }
+        
+        const targetLanguage = this.translationSettings.targetLanguage;
+        if (targetLanguage === 'none') return;
+        
+        try {
+            this.updateStatus(`Translating summary to ${this.getLanguageName(targetLanguage)}...`, 'loading');
+            
+            const response = await chrome.runtime.sendMessage({
+                action: 'translateText',
+                text: originalText,
+                sourceLanguage: 'en',
+                targetLanguage: targetLanguage
+            });
+            
+            if (response && response.success) {
+                this.elements.summary.textContent = response.translatedText;
+            } else {
+                console.error('Translation failed:', response?.error);
+                this.updateStatus(`Translation failed: ${response?.error || 'Unknown error'}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error translating summary:', error);
+            this.updateStatus(`Translation error: ${error.message}`, 'error');
+        }
+    }
+    
+    /**
+     * Translate key points
+     */
+    async translateKeyPoints() {
+        const originalKeyPoints = this.translationSettings.originalKeyPoints;
+        if (!originalKeyPoints || originalKeyPoints.length === 0) return;
+        
+        const targetLanguage = this.translationSettings.targetLanguage;
+        if (targetLanguage === 'none') return;
+        
+        try {
+            const translatedPoints = [];
+            
+            for (const point of originalKeyPoints) {
+                const response = await chrome.runtime.sendMessage({
+                    action: 'translateText',
+                    text: point,
+                    sourceLanguage: 'en',
+                    targetLanguage: targetLanguage
+                });
+                
+                if (response && response.success) {
+                    translatedPoints.push(response.translatedText);
+                } else {
+                    // If translation fails, keep original
+                    translatedPoints.push(point);
+                }
+            }
+            
+            // Display translated key points
+            this.displayKeyPoints(translatedPoints);
+        } catch (error) {
+            console.error('Error translating key points:', error);
+        }
+    }
+    
+    /**
+     * Translate all drafts
+     */
+    async translateAllDrafts() {
+        if (this.currentDrafts.length === 0) return;
+        
+        const targetLanguage = this.translationSettings.targetLanguage;
+        if (targetLanguage === 'none') return;
+        
+        try {
+            for (let i = 0; i < this.currentDrafts.length; i++) {
+                await this.translateDraft(i);
+            }
+            
+            // Refresh draft display
+            this.displayReplyDrafts(this.currentDrafts);
+        } catch (error) {
+            console.error('Error translating drafts:', error);
+        }
+    }
+    
+    /**
+     * Translate a single draft
+     * @param {number} index - Draft index
+     */
+    async translateDraft(index) {
+        if (index < 0 || index >= this.currentDrafts.length) return;
+        
+        const draft = this.currentDrafts[index];
+        const originalBody = this.translationSettings.originalDrafts.get(index) || draft.body;
+        
+        // Store original if not stored yet
+        if (!this.translationSettings.originalDrafts.has(index)) {
+            this.translationSettings.originalDrafts.set(index, draft.body);
+        }
+        
+        const targetLanguage = this.translationSettings.targetLanguage;
+        if (targetLanguage === 'none') return;
+        
+        try {
+            const response = await chrome.runtime.sendMessage({
+                action: 'translateText',
+                text: originalBody,
+                sourceLanguage: 'en',
+                targetLanguage: targetLanguage
+            });
+            
+            if (response && response.success) {
+                draft.body = response.translatedText;
+            }
+        } catch (error) {
+            console.error(`Error translating draft ${index}:`, error);
+        }
+    }
+    
+    /**
+     * Get human-readable language name
+     * @param {string} code - Language code
+     * @returns {string} Language name
+     */
+    getLanguageName(code) {
+        const languages = {
+            'en': 'English',
+            'es': 'Spanish',
+            'fr': 'French',
+            'de': 'German',
+            'zh': 'Chinese',
+            'ja': 'Japanese',
+            'ko': 'Korean',
+            'pt': 'Portuguese',
+            'ru': 'Russian',
+            'ar': 'Arabic',
+            'hi': 'Hindi',
+            'it': 'Italian',
+            'nl': 'Dutch',
+            'pl': 'Polish',
+            'tr': 'Turkish'
+        };
+        return languages[code] || code;
     }
 }
 

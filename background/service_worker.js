@@ -3,13 +3,100 @@
  * Handles AI processing, side panel management, and background tasks
  */
 
+/**
+ * TranslationService - Handles multilingual translation using Chrome's Translator API
+ * Reference: https://developer.chrome.com/docs/ai/translator-api
+ */
+class TranslationService {
+    constructor() {
+        this.sessions = new Map();
+        this.isAvailable = false;
+    }
+
+    async initialize() {
+        if ('Translator' in self) {
+            try {
+                // Check if translation is available for a common language pair
+                const availability = await Translator.availability({
+                    sourceLanguage: 'en',
+                    targetLanguage: 'es'
+                });
+                this.isAvailable = availability === 'readily' || availability === 'available';
+                console.log('Translator API availability:', availability);
+                return this.isAvailable;
+            } catch (error) {
+                console.error('Error checking Translator availability:', error);
+                return false;
+            }
+        }
+        console.log('Translator API not available in this browser');
+        return false;
+    }
+
+    async translate(text, sourceLanguage, targetLanguage) {
+        if (!this.isAvailable) {
+            const isAvailable = await this.initialize();
+            if (!isAvailable) {
+                throw new Error('Translator API not available');
+            }
+        }
+
+        const sessionKey = `${sourceLanguage}-${targetLanguage}`;
+        
+        // Create or reuse translation session
+        if (!this.sessions.has(sessionKey)) {
+            try {
+                const translator = await Translator.create({
+                    sourceLanguage,
+                    targetLanguage,
+                    monitor(m) {
+                        m.addEventListener('downloadprogress', (e) => {
+                            console.log(`Translation model download: ${e.loaded * 100}%`);
+                        });
+                    }
+                });
+                this.sessions.set(sessionKey, translator);
+            } catch (error) {
+                console.error('Error creating translator:', error);
+                throw new Error(`Failed to create translator: ${error.message}`);
+            }
+        }
+
+        const translator = this.sessions.get(sessionKey);
+        try {
+            return await translator.translate(text);
+        } catch (error) {
+            console.error('Translation error:', error);
+            // Remove failed session
+            this.sessions.delete(sessionKey);
+            throw new Error(`Translation failed: ${error.message}`);
+        }
+    }
+
+    cleanup() {
+        for (const [key, translator] of this.sessions.entries()) {
+            try {
+                // Translators don't have a destroy method, just clear the map
+                console.log(`Cleaning up translator session: ${key}`);
+            } catch (error) {
+                console.error(`Error cleaning up session ${key}:`, error);
+            }
+        }
+        this.sessions.clear();
+    }
+}
+
 class InboxTriageServiceWorker {
     constructor() {
         this.aiCapabilities = {
             summarizer: null,
             promptApi: null,
+            translator: null,
             available: false
         };
+        
+        // Initialize translation service
+        this.translationService = new TranslationService();
         
         // Periodic check interval (30 seconds)
         this.modelCheckInterval = null;
@@ -95,9 +182,39 @@ class InboxTriageServiceWorker {
                 console.log('Language Model API (Prompt API) not available');
             }
             
+            // Check Translator API
+            // Available in Chrome 138+ for Extensions
+            // Reference: https://developer.chrome.com/docs/ai/translator-api
+            if ('Translator' in self) {
+                try {
+                    // Check availability for a common language pair (en -> es)
+                    const translatorAvailability = await Translator.availability({
+                        sourceLanguage: 'en',
+                        targetLanguage: 'es'
+                    });
+                    this.aiCapabilities.translator = {
+                        available: translatorAvailability
+                    };
+                    console.log('Translator API available:', translatorAvailability);
+                    
+                    // Initialize translation service
+                    if (translatorAvailability === 'readily' || translatorAvailability === 'available') {
+                        await this.translationService.initialize();
+                    }
+                    
+                    // Broadcast initial model status to side panel if it's open
+                    this.broadcastModelStatus('translator', this.aiCapabilities.translator);
+                } catch (error) {
+                    console.error('Error checking Translator availability:', error);
+                }
+            } else {
+                console.log('Translator API not available');
+            }
+            
             this.aiCapabilities.available = !!(
                 this.aiCapabilities.summarizer || 
-                this.aiCapabilities.promptApi
+                this.aiCapabilities.promptApi ||
+                this.aiCapabilities.translator
             );
             
             // Log Chrome AI status for debugging
@@ -105,12 +222,14 @@ class InboxTriageServiceWorker {
                 console.log('Chrome Built-in AI initialized successfully');
                 console.log('Summarizer:', this.aiCapabilities.summarizer?.available || 'not available');
                 console.log('Prompt API:', this.aiCapabilities.promptApi?.available || 'not available');
+                console.log('Translator API:', this.aiCapabilities.translator?.available || 'not available');
             } else {
                 console.warn('Chrome Built-in AI not available. Please ensure you are using Chrome 138+ with required flags enabled.');
                 console.log('Required flags:');
                 console.log('  - chrome://flags/#optimization-guide-on-device-model');
                 console.log('  - chrome://flags/#prompt-api-for-gemini-nano');
                 console.log('  - chrome://flags/#summarization-api-for-gemini-nano');
+                console.log('  - chrome://flags/#translation-api');
                 this.broadcastModelStatus('none', null);
             }
         } catch (error) {
@@ -279,6 +398,10 @@ class InboxTriageServiceWorker {
                     await this.processAttachment(message.attachment, sendResponse);
                     break;
                     
+                case 'translateText':
+                    await this.handleTranslation(message, sendResponse);
+                    break;
+                    
                 case 'checkAIStatus':
                     sendResponse({ 
                         success: true, 
@@ -302,6 +425,54 @@ class InboxTriageServiceWorker {
             sendResponse({ 
                 success: false, 
                 error: this.sanitizeErrorMessage(error.message)
+            });
+        }
+    }
+    
+    /**
+     * Handle translation requests from side panel
+     * @param {Object} message - Translation request message
+     * @param {Function} sendResponse - Response callback
+     */
+    async handleTranslation(message, sendResponse) {
+        try {
+            const { text, sourceLanguage, targetLanguage } = message;
+            
+            // Validate input
+            if (!text || typeof text !== 'string') {
+                throw new Error('Invalid text for translation');
+            }
+            
+            if (!sourceLanguage || !targetLanguage) {
+                throw new Error('Source and target languages are required');
+            }
+            
+            // Check if translation service is available
+            const isAvailable = await this.translationService.initialize();
+            if (!isAvailable) {
+                throw new Error('Translator API not available. Please ensure Chrome 138+ with translation features enabled.');
+            }
+            
+            // Perform translation
+            const translatedText = await this.translationService.translate(
+                text,
+                sourceLanguage,
+                targetLanguage
+            );
+            
+            sendResponse({
+                success: true,
+                translatedText,
+                sourceLanguage,
+                targetLanguage
+            });
+            
+        } catch (error) {
+            console.error('Translation error:', error);
+            const sanitizedError = this.sanitizeErrorMessage(error.message);
+            sendResponse({
+                success: false,
+                error: sanitizedError
             });
         }
     }
