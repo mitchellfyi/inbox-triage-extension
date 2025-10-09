@@ -25,6 +25,7 @@ class InboxTriageSidePanel {
             originalKeyPoints: null,
             originalDrafts: new Map() // Map<draftIndex, originalBody>
         };
+        this.statusHideTimeout = null;
         
         this.initializeElements();
         this.bindEvents();
@@ -384,18 +385,24 @@ class InboxTriageSidePanel {
     }
     
     updateStatus(message, type = 'info') {
+        // Clear any existing hide timeout
+        if (this.statusHideTimeout) {
+            clearTimeout(this.statusHideTimeout);
+            this.statusHideTimeout = null;
+        }
+        
         this.elements.status.textContent = message;
         const statusElement = this.elements.status.parentElement;
         
         // Hide status container if message is empty
         if (!message || message.trim() === '') {
-            statusElement.style.display = 'none';
+            statusElement.classList.add('hidden');
             this.elements.status.setAttribute('aria-label', '');
             return;
         }
         
         // Show status container
-        statusElement.style.display = 'flex';
+        statusElement.classList.remove('hidden');
         
         // Remove existing status classes
         statusElement.classList.remove('loading', 'error', 'success', 'info');
@@ -404,6 +411,16 @@ class InboxTriageSidePanel {
         
         // Update ARIA live region for screen readers
         this.elements.status.setAttribute('aria-label', `Status: ${message}`);
+        
+        // Auto-hide after timeout based on type
+        // Don't auto-hide loading states (they'll be updated with completion)
+        if (type !== 'loading') {
+            const hideDelay = type === 'error' ? 10000 : 5000; // Errors stay longer
+            this.statusHideTimeout = setTimeout(() => {
+                statusElement.classList.add('hidden');
+                this.elements.status.setAttribute('aria-label', '');
+            }, hideDelay);
+        }
     }
 
     async extractCurrentThread() {
@@ -483,11 +500,8 @@ class InboxTriageSidePanel {
                 // Mark extraction as successful
                 extractionSucceeded = true;
                 
-                // Show success message and clear it after 5 seconds
+                // Show success message (will auto-hide)
                 this.updateStatus('✓ Thread analysis complete', 'success');
-                setTimeout(() => {
-                    this.updateStatus('', 'info');
-                }, 5000);
             } else {
                 const errorMsg = response?.error || 'Failed to extract thread - no response from content script';
                 console.error('Thread extraction failed:', errorMsg, 'Full response:', response);
@@ -1379,13 +1393,6 @@ class InboxTriageSidePanel {
         
         await this.saveUserSettings();
         this.updateStatus('API key settings saved', 'success');
-        
-        // Clear success message after 2 seconds
-        setTimeout(() => {
-            if (this.currentContext.isOnEmailThread) {
-                this.updateStatus(`Ready to analyze ${this.currentContext.provider} threads`, 'info');
-            }
-        }, 2000);
     }
     
     /**
@@ -1601,7 +1608,6 @@ Your privacy remains protected with minimal necessary data transmission.
         if (newLanguage === 'none' && oldLanguage !== 'none') {
             this.restoreOriginalContent();
             this.updateStatus('Translation disabled, showing original content', 'info');
-            setTimeout(() => this.updateStatus('', 'info'), 3000);
             return;
         }
         
@@ -1678,7 +1684,6 @@ Your privacy remains protected with minimal necessary data transmission.
         if (translatedCount > 0) {
             const langName = this.getLanguageName(language);
             this.updateStatus(`✓ Content translated to ${langName}`, 'success');
-            setTimeout(() => this.updateStatus('', 'info'), 5000);
         }
     }
     

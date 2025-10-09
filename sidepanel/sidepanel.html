@@ -54,17 +54,25 @@
         }
         
         .status {
+            position: sticky;
+            top: 0;
+            z-index: 100;
             padding: 12px;
-            border-radius: 4px;
-            margin-bottom: 16px;
             background: #e3f2fd;
             color: #1976d2;
             border-left: 4px solid #2196f3;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
             font-size: 14px;
             min-height: 20px;
             display: flex;
             align-items: center;
-            transition: background-color 0.3s ease;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 0;
+        }
+        
+        .status.hidden {
+            display: none;
         }
         
         .status.loading {
