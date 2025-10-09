@@ -1069,18 +1069,18 @@ class InboxTriageSidePanel {
         }
     }
     
-    displayReplyDrafts(drafts) {
+    displayReplyDrafts(drafts, skipTranslation = false) {
         // Update translation module with current drafts
         this.translationUI.setCurrentDrafts(drafts);
         
         // Render drafts using the draft renderer module
         this.draftRenderer.render(drafts, () => {
-            // Auto-translate if a language is selected
-            if (this.translationUI.translationSettings.targetLanguage !== 'none') {
+            // Auto-translate if a language is selected (but only on initial render)
+            if (!skipTranslation && this.translationUI.translationSettings.targetLanguage !== 'none') {
                 setTimeout(() => {
                     this.translationUI.translateAllDrafts().then(() => {
-                        // Re-render with translated content
-                        this.displayReplyDrafts(drafts);
+                        // Re-render with translated content, but skip further translation
+                        this.displayReplyDrafts(drafts, true);
                     });
                 }, 100);
             }

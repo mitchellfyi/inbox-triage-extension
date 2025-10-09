@@ -131,7 +131,8 @@ export class TranslationUI {
                 }
             });
             if (this.displayReplyDraftsCallback) {
-                this.displayReplyDraftsCallback(this.currentDrafts);
+                // Skip translation when restoring - already in original language
+                this.displayReplyDraftsCallback(this.currentDrafts, true);
             }
         }
     }
@@ -272,9 +273,9 @@ export class TranslationUI {
                 await this.translateDraft(i);
             }
             
-            // Refresh draft display
+            // Refresh draft display (skip translation since we just translated)
             if (this.displayReplyDraftsCallback) {
-                this.displayReplyDraftsCallback(this.currentDrafts);
+                this.displayReplyDraftsCallback(this.currentDrafts, true);
             }
         } catch (error) {
             console.error('Error translating drafts:', error);
