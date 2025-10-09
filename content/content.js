@@ -362,12 +362,39 @@ class EmailThreadExtractor {
             // Determine file type from extension
             const fileType = this.getAttachmentType(name);
             
+            // For images, try to extract the actual image URL for preview/analysis
+            let imageUrl = null;
+            if (fileType === 'image') {
+                // Try to find embedded image in attachment card
+                const imgEl = attachmentElement.querySelector('img');
+                if (imgEl && imgEl.src) {
+                    imageUrl = imgEl.src;
+                }
+                
+                // Alternative: check for background image
+                if (!imageUrl) {
+                    const bgImage = window.getComputedStyle(attachmentElement).backgroundImage;
+                    if (bgImage && bgImage !== 'none') {
+                        const match = bgImage.match(/url\(['"]?([^'"]+)['"]?\)/);
+                        if (match) {
+                            imageUrl = match[1];
+                        }
+                    }
+                }
+                
+                // Fallback: use download URL if it's a direct image link
+                if (!imageUrl && downloadUrl) {
+                    imageUrl = downloadUrl;
+                }
+            }
+            
             return {
                 index,
                 name: name || `Attachment ${index + 1}`,
                 size,
                 type: fileType,
                 downloadUrl,
+                imageUrl, // Image URL for preview and analysis
                 processable: this.isProcessableAttachment(fileType),
                 summary: null, // Will be populated during processing
                 extractedContent: null // Will be populated during processing

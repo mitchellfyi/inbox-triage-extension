@@ -662,6 +662,88 @@
             color: #d32f2f;
             font-style: italic;
         }
+        
+        .attachment-info {
+            color: #666;
+            font-style: italic;
+        }
+        
+        /* Image preview and analysis styles */
+        .attachment-image-preview {
+            padding: 12px 16px;
+            background: #f9f9f9;
+            border-top: 1px solid #f5f5f5;
+            text-align: center;
+        }
+        
+        .attachment-image-preview img {
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .image-analysis-buttons {
+            padding: 12px 16px;
+            display: flex;
+            gap: 8px;
+            background: #f9f9f9;
+            flex-wrap: wrap;
+        }
+        
+        .analyze-image-btn {
+            flex: 1;
+            min-width: 140px;
+            padding: 8px 12px;
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: background 0.2s ease;
+        }
+        
+        .analyze-image-btn:hover {
+            background: #1565c0;
+        }
+        
+        .analyze-image-btn:active {
+            background: #0d47a1;
+        }
+        
+        .analysis-result {
+            background: #e3f2fd;
+        }
+        
+        .analysis-header {
+            font-weight: 600;
+            color: #1976d2;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .analysis-description {
+            color: #333;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            margin-bottom: 12px;
+        }
+        
+        .copy-text-btn {
+            padding: 6px 12px;
+            background: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: background 0.2s ease;
+        }
+        
+        .copy-text-btn:hover {
+            background: #45a049;
+        }
 
         #reply-drafts {
             /* No max-height or overflow - let the entire panel scroll */

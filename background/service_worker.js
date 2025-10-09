@@ -4,6 +4,7 @@
  */
 
 import { TranslationService } from './translation-service.js';
+import { MultimodalAnalysisService } from './multimodal-service.js';
 
 class InboxTriageServiceWorker {
     constructor() {
@@ -11,11 +12,13 @@ class InboxTriageServiceWorker {
             summarizer: null,
             promptApi: null,
             translator: null,
+            multimodal: null,
             available: false
         };
         
-        // Initialize translation service
+        // Initialize services
         this.translationService = new TranslationService();
+        this.multimodalService = new MultimodalAnalysisService();
         
         // Periodic check interval (30 seconds)
         this.modelCheckInterval = null;
@@ -321,6 +324,10 @@ class InboxTriageServiceWorker {
                     await this.handleTranslation(message, sendResponse);
                     break;
                     
+                case 'analyzeImage':
+                    await this.handleImageAnalysis(message, sendResponse);
+                    break;
+                    
                 case 'checkAIStatus':
                     sendResponse({ 
                         success: true, 
@@ -412,6 +419,84 @@ class InboxTriageServiceWorker {
         } catch (error) {
             console.error('Translation error:', error);
             const sanitizedError = this.sanitizeErrorMessage(error.message);
+            sendResponse({
+                success: false,
+                error: sanitizedError
+            });
+        }
+    }
+    
+    /**
+     * Handle image analysis requests from side panel
+     * @param {Object} message - Image analysis request message
+     * @param {Function} sendResponse - Response callback
+     */
+    async handleImageAnalysis(message, sendResponse) {
+        try {
+            const { imageUrl, analysisType = 'general', context = '' } = message;
+            
+            // Validate input
+            if (!imageUrl || typeof imageUrl !== 'string') {
+                throw new Error('Invalid image URL for analysis');
+            }
+            
+            // Check if multimodal service is available
+            const isAvailable = await this.multimodalService.initialize();
+            if (!isAvailable) {
+                throw new Error('Multimodal image analysis not available. Please ensure you are using a compatible Chrome version with AI features enabled.');
+            }
+            
+            // Broadcast analysis starting
+            this.broadcastModelStatus('multimodal', { 
+                status: 'analyzing',
+                analysisType
+            });
+            
+            // Fetch image data
+            let imageData;
+            try {
+                const response = await fetch(imageUrl);
+                const blob = await response.blob();
+                
+                // Convert to base64 for Prompt API
+                imageData = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                });
+            } catch (fetchError) {
+                throw new Error(`Failed to fetch image: ${fetchError.message}`);
+            }
+            
+            // Perform analysis
+            const result = await this.multimodalService.analyzeImage(
+                imageData,
+                analysisType,
+                context
+            );
+            
+            // Broadcast completion status
+            this.broadcastModelStatus('multimodal', { 
+                status: 'complete',
+                analysisType
+            });
+            
+            sendResponse({
+                success: true,
+                analysis: result
+            });
+            
+        } catch (error) {
+            console.error('Image analysis error:', error);
+            const sanitizedError = this.sanitizeErrorMessage(error.message);
+            
+            // Broadcast error status
+            this.broadcastModelStatus('multimodal', { 
+                status: 'error',
+                error: sanitizedError
+            });
+            
             sendResponse({
                 success: false,
                 error: sanitizedError

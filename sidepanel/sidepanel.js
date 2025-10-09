@@ -688,11 +688,59 @@ class InboxTriageSidePanel {
         
         card.appendChild(header);
         
-        // Create summary section (initially with placeholder)
+        // Add image preview for image attachments
+        if (attachment.type === 'image' && attachment.imageUrl) {
+            const imagePreview = document.createElement('div');
+            imagePreview.className = 'attachment-image-preview';
+            
+            const img = document.createElement('img');
+            img.src = attachment.imageUrl;
+            img.alt = attachment.name;
+            img.loading = 'lazy';
+            img.style.maxWidth = '100%';
+            img.style.maxHeight = '200px';
+            img.style.objectFit = 'contain';
+            
+            imagePreview.appendChild(img);
+            card.appendChild(imagePreview);
+            
+            // Add image analysis buttons
+            const analysisButtons = document.createElement('div');
+            analysisButtons.className = 'image-analysis-buttons';
+            
+            const analyzeBtn = document.createElement('button');
+            analyzeBtn.type = 'button';
+            analyzeBtn.className = 'analyze-image-btn';
+            analyzeBtn.textContent = '🔍 Analyze Image';
+            analyzeBtn.title = 'Analyze this image with AI';
+            analyzeBtn.onclick = (e) => {
+                e.stopPropagation();
+                this.analyzeImage(attachment, 'general', index);
+            };
+            
+            const ocrBtn = document.createElement('button');
+            ocrBtn.type = 'button';
+            ocrBtn.className = 'analyze-image-btn';
+            ocrBtn.textContent = '📄 Extract Text';
+            ocrBtn.title = 'Extract text from this image (OCR)';
+            ocrBtn.onclick = (e) => {
+                e.stopPropagation();
+                this.analyzeImage(attachment, 'ocr', index);
+            };
+            
+            analysisButtons.appendChild(analyzeBtn);
+            analysisButtons.appendChild(ocrBtn);
+            card.appendChild(analysisButtons);
+        }
+        
+        // Create summary/analysis section
         const summary = document.createElement('div');
         summary.className = 'attachment-summary';
+        summary.id = `attachment-analysis-${index}`;
         
-        if (attachment.processable) {
+        if (attachment.type === 'image') {
+            summary.innerHTML = '<span class="attachment-info">Click analyze to get AI insights</span>';
+        } else if (attachment.processable) {
             summary.innerHTML = '<span class="attachment-loading">Analyzing attachment...</span>';
         } else {
             summary.innerHTML = '<span class="attachment-error">File type not supported for analysis</span>';
@@ -813,6 +861,102 @@ class InboxTriageSidePanel {
         // TODO: Implement modal or expanded view
         console.log('Showing details for attachment:', attachment);
         alert(`Detailed view for ${attachment.name}\n\nThis feature will show full extracted content and detailed analysis.`);
+    }
+    
+    /**
+     * Analyze an image attachment using multimodal AI
+     * @param {Object} attachment - Attachment object
+     * @param {string} analysisType - Type of analysis ('general', 'ocr', 'chart', 'context')
+     * @param {number} index - Attachment index
+     */
+    async analyzeImage(attachment, analysisType = 'general', index) {
+        if (!attachment.imageUrl) {
+            this.updateStatus('Image URL not available for analysis', 'error');
+            return;
+        }
+        
+        const summaryElement = document.getElementById(`attachment-analysis-${index}`);
+        if (!summaryElement) return;
+        
+        try {
+            // Show loading state
+            summaryElement.innerHTML = '<span class="attachment-loading">🤖 Analyzing image with AI...</span>';
+            this.updateStatus('Analyzing image...', 'loading');
+            
+            // Get context from email for contextual analysis
+            const context = analysisType === 'context' ? this.currentThread.subject : '';
+            
+            // Send analysis request to background
+            const response = await chrome.runtime.sendMessage({
+                action: 'analyzeImage',
+                imageUrl: attachment.imageUrl,
+                analysisType,
+                context
+            });
+            
+            if (response && response.success) {
+                const analysis = response.analysis;
+                
+                // Display results
+                summaryElement.innerHTML = '';
+                summaryElement.className = 'attachment-summary analysis-result';
+                
+                const header = document.createElement('div');
+                header.className = 'analysis-header';
+                header.textContent = this.getAnalysisTypeLabel(analysisType);
+                
+                const description = document.createElement('div');
+                description.className = 'analysis-description';
+                description.textContent = analysis.description;
+                
+                summaryElement.appendChild(header);
+                summaryElement.appendChild(description);
+                
+                // For OCR, add copy button
+                if (analysisType === 'ocr' && analysis.description !== 'No text detected') {
+                    const copyBtn = document.createElement('button');
+                    copyBtn.type = 'button';
+                    copyBtn.className = 'copy-text-btn';
+                    copyBtn.textContent = '📋 Copy Text';
+                    copyBtn.onclick = async () => {
+                        try {
+                            await navigator.clipboard.writeText(analysis.description);
+                            copyBtn.textContent = '✓ Copied!';
+                            setTimeout(() => {
+                                copyBtn.textContent = '📋 Copy Text';
+                            }, 2000);
+                        } catch (error) {
+                            console.error('Failed to copy:', error);
+                        }
+                    };
+                    summaryElement.appendChild(copyBtn);
+                }
+                
+                this.updateStatus(`✓ Image analyzed successfully`, 'success');
+            } else {
+                throw new Error(response?.error || 'Image analysis failed');
+            }
+            
+        } catch (error) {
+            console.error('Image analysis error:', error);
+            summaryElement.innerHTML = `<span class="attachment-error">Analysis failed: ${error.message}</span>`;
+            this.updateStatus(`Image analysis error: ${error.message}`, 'error');
+        }
+    }
+    
+    /**
+     * Get human-readable label for analysis type
+     * @param {string} type - Analysis type
+     * @returns {string} Label
+     */
+    getAnalysisTypeLabel(type) {
+        const labels = {
+            general: '🔍 AI Analysis',
+            ocr: '📄 Extracted Text',
+            chart: '📊 Chart Analysis',
+            context: '🎯 Contextual Analysis'
+        };
+        return labels[type] || '🔍 Analysis';
     }
     
     async generateReplyDrafts() {
