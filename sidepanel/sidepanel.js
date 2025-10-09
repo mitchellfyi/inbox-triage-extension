@@ -3,6 +3,8 @@
  * Handles UI interactions and communication with content scripts
  */
 
+import { TranslationUI } from './translation-ui.js';
+
 class InboxTriageSidePanel {
     constructor() {
         this.currentThread = null;
@@ -19,15 +21,20 @@ class InboxTriageSidePanel {
             provider: null, // 'gmail' or 'outlook'
             url: ''
         };
-        this.translationSettings = {
-            targetLanguage: 'none',
-            originalSummary: null,
-            originalKeyPoints: null,
-            originalDrafts: new Map() // Map<draftIndex, originalBody>
-        };
         this.statusHideTimeout = null;
         
         this.initializeElements();
+        
+        // Initialize Translation UI module
+        this.translationUI = new TranslationUI(
+            this.elements,
+            (msg, type) => this.updateStatus(msg, type)
+        );
+        this.translationUI.setCallbacks(
+            (keyPoints) => this.displayKeyPoints(keyPoints),
+            (drafts) => this.displayReplyDrafts(drafts)
+        );
+        
         this.bindEvents();
         this.loadUserSettings();
         this.checkCurrentContext();
@@ -1411,8 +1418,7 @@ class InboxTriageSidePanel {
                     'processingMode', 
                     'useApiKey', 
                     'apiKey', 
-                    'apiProvider',
-                    'translationLanguage'
+                    'apiProvider'
                 ]);
                 
                 if (result.processingMode) {
@@ -1427,21 +1433,20 @@ class InboxTriageSidePanel {
                 if (result.apiProvider) {
                     this.userSettings.apiProvider = result.apiProvider;
                 }
-                if (result.translationLanguage) {
-                    this.translationSettings.targetLanguage = result.translationLanguage;
-                }
             }
             
             // Update UI to reflect loaded settings
             this.updateProcessingModeUI();
             this.updateApiKeyUI();
-            this.updateTranslationUI();
+            
+            // Load translation settings via module
+            await this.translationUI.loadSettings();
         } catch (error) {
             console.error('Error loading user settings:', error);
             // Use default settings if loading fails
             this.updateProcessingModeUI();
             this.updateApiKeyUI();
-            this.updateTranslationUI();
+            await this.translationUI.loadSettings();
         }
     }
     

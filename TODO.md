@@ -36,29 +36,6 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 
 ## Extension Core
 
-### Architecture & Configuration
-- `[done]` Manifest V3 validation - All permissions minimal and necessary
-- `[done]` Error handling strategy - Standardized error messages and fallback behaviors with comprehensive sanitization
-- `[done]` Model availability detection - Robust checking for AI API readiness with periodic monitoring and state management
-- `[done]` Message passing architecture - Clean communication between components
-- `[done]` Processing mode configuration - On-device and hybrid mode settings with privacy controls
-- `[done]` API key configuration - Custom API key support for OpenAI, Anthropic, Google
-
-### AI Integration
-- `[done]` Summarizer API integration - Validate across different thread lengths
-- `[done]` Prompt API JSON schema enforcement - Ensure reliable structured output
-- `[done]` Tone parameter validation - Test all tone options (neutral, friendly, assertive, formal)
-- `[done]` Fallback draft generation - Handle AI failures gracefully
-- `[done]` Hybrid fallback decision rules - Implemented decision logic per SPEC.md
-
-## Email Extraction
-
-### Current Status
-- `[done]` Basic Gmail extraction - Thread container, messages, subject, senders
-- `[done]` Basic Outlook extraction - Thread container, messages, subject, senders
-- `[done]` Content cleaning - Remove signatures, quoted text, formatting artifacts
-- `[done]` Attachment detection - Identify and list attachments with metadata
-
 ### Enhancement Opportunities
 - `[todo]` Nested thread handling - Improve handling of complex reply chains
 - `[todo]` Draft message filtering - Exclude unsent drafts from analysis
@@ -68,12 +45,6 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 - `[todo]` Timestamp parsing improvements - More consistent date/time extraction
 
 ## Attachment Processing
-
-### Core Functionality (Complete)
-- `[done]` Attachment detection - DOM parsing for Gmail and Outlook attachment elements
-- `[done]` Metadata extraction - File names, sizes, types, and processability detection  
-- `[done]` UI integration - Card-based display with file type icons and processing status
-- `[done]` Service worker integration - Message passing for attachment processing
 
 ### File Processing (Not Yet Implemented)
 - `[todo]` PDF text extraction - Integrate PDF.js or equivalent for local PDF parsing
@@ -87,25 +58,6 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 - `[todo]` Large file handling - Size limits and progressive processing
 
 ## Reply Drafting
-
-### Content Generation (Complete)
-- `[done]` Three-draft structure - Short, medium, detailed responses
-- `[done]` Subject line generation - Context-aware reply subjects
-- `[done]` Tone application - Consistent tone across all draft types (neutral, friendly, assertive, formal)
-- `[done]` Word limit enforcement - Appropriate length for each draft type
-- `[done]` User guidance integration - Custom guidance text appended to prompts for personalized drafts
-
-### User Input Features (Complete)
-- `[done]` Guidance text area - Allow users to provide custom instructions for draft generation
-- `[done]` Voice dictation - Web Speech API integration for hands-free guidance input
-- `[done]` Microphone UI feedback - Visual indicators for listening/idle/error states
-- `[done]` Permission handling - Graceful handling of microphone permission denials
-- `[done]` Guidance persistence - Maintain guidance text when changing tones or regenerating
-
-### Output Quality (Complete)
-- `[done]` JSON schema validation - Ensure parseable structured output
-- `[done]` Content sanitization - Remove potentially harmful content
-- `[done]` Professional language - Business-appropriate responses
 
 ### Enhancement Opportunities
 - `[todo]` Context preservation - Better reference to key points from original thread
