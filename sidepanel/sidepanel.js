@@ -56,6 +56,44 @@ class InboxTriageSidePanel {
         setInterval(() => {
             this.checkCurrentContext();
         }, 2000);
+        
+        // Set up global error handlers
+        this.setupGlobalErrorHandlers();
+    }
+    
+    /**
+     * Setup global error handlers to catch unhandled exceptions
+     */
+    setupGlobalErrorHandlers() {
+        // Catch unhandled promise rejections
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('Unhandled promise rejection:', event.reason);
+            this.updateStatus(`Unexpected error: ${event.reason?.message || event.reason || 'Unknown error'}`, 'error');
+            
+            // Re-enable extract button if it's disabled
+            if (this.elements.extractBtn && this.elements.extractBtn.disabled) {
+                this.elements.extractBtn.disabled = false;
+                console.log('Extract button re-enabled after unhandled error');
+            }
+            
+            // Prevent default error handling
+            event.preventDefault();
+        });
+        
+        // Catch synchronous errors
+        window.addEventListener('error', (event) => {
+            console.error('Uncaught error:', event.error);
+            this.updateStatus(`System error: ${event.error?.message || event.message || 'Unknown error'}`, 'error');
+            
+            // Re-enable extract button if it's disabled
+            if (this.elements.extractBtn && this.elements.extractBtn.disabled) {
+                this.elements.extractBtn.disabled = false;
+                console.log('Extract button re-enabled after uncaught error');
+            }
+            
+            // Prevent default error handling
+            event.preventDefault();
+        });
     }
     
     async checkCurrentContext() {
@@ -480,7 +518,15 @@ class InboxTriageSidePanel {
                 this.updateStatus(`Extracted ${messageCount} message${messageCount !== 1 ? 's' : ''}, ${attachmentCount} attachment${attachmentCount !== 1 ? 's' : ''}`, 'loading');
                 console.log('Thread extracted:', messageCount, 'messages');
                 
-                await this.generateSummary();
+                // Try to generate summary - catch errors to avoid leaving button disabled
+                try {
+                    await this.generateSummary();
+                } catch (summaryError) {
+                    console.error('Summary generation failed:', summaryError);
+                    this.updateStatus(`Thread extracted, but summary failed: ${summaryError.message}`, 'error');
+                    // Don't mark extraction as failed - thread was successfully extracted
+                }
+                
                 this.displayAttachments();
                 
                 // Show reply drafts controls now that we have a thread
@@ -494,7 +540,7 @@ class InboxTriageSidePanel {
                 extractionSucceeded = true;
                 
                 // Show success message (will auto-hide)
-                this.updateStatus('✓ Thread analysis complete', 'success');
+                this.updateStatus('✓ Thread extraction complete', 'success');
             } else {
                 const errorMsg = response?.error || 'Failed to extract thread - no response from content script';
                 console.error('Thread extraction failed:', errorMsg, 'Full response:', response);
@@ -511,6 +557,10 @@ class InboxTriageSidePanel {
             // - If extraction failed: re-enable button so user can try again
             if (!extractionSucceeded) {
                 this.elements.extractBtn.disabled = false;
+                // Make sure section is visible for retry
+                if (this.elements.extractSection.classList.contains('hidden')) {
+                    this.showSection(this.elements.extractSection, false);
+                }
                 console.log('Extract button re-enabled after error');
             } else {
                 console.log('Extract button remains disabled after successful extraction');
