@@ -1762,10 +1762,11 @@ Your privacy remains protected with minimal necessary data transmission.
 }
 
 // Global function to copy drafts to clipboard with visual feedback
+// Note: subject parameter kept for backwards compatibility but not used
 window.copyToClipboard = async (subject, body, buttonElement) => {
     try {
-        const fullText = `Subject: ${subject}\n\n${body}`;
-        await navigator.clipboard.writeText(fullText);
+        // Only copy the body text (subject removed)
+        await navigator.clipboard.writeText(body);
         
         if (buttonElement) {
             // Show visual feedback

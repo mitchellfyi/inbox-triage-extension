@@ -129,21 +129,7 @@ export class DraftRenderer {
         const bodyDiv = document.createElement('div');
         bodyDiv.className = 'draft-body';
 
-        // Subject line
-        if (draft.subject) {
-            const subjectLabel = document.createElement('strong');
-            subjectLabel.textContent = 'Subject: ';
-            const subjectText = document.createElement('span');
-            subjectText.textContent = draft.subject;
-
-            const subjectP = document.createElement('p');
-            subjectP.className = 'draft-subject';
-            subjectP.appendChild(subjectLabel);
-            subjectP.appendChild(subjectText);
-            bodyDiv.appendChild(subjectP);
-        }
-
-        // Body
+        // Body (subject removed - only show body text)
         const bodyP = document.createElement('p');
         bodyP.className = 'draft-text';
         bodyP.textContent = draft.body;
@@ -202,8 +188,8 @@ export class DraftRenderer {
      */
     async copyDraftToClipboard(draft, buttonElement) {
         try {
-            const fullText = `Subject: ${draft.subject}\n\n${draft.body}`;
-            await navigator.clipboard.writeText(fullText);
+            // Only copy the body text (subject removed)
+            await navigator.clipboard.writeText(draft.body);
 
             if (buttonElement) {
                 const originalText = buttonElement.textContent;
