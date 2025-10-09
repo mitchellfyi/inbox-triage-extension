@@ -407,6 +407,8 @@ class InboxTriageSidePanel {
     }
 
     async extractCurrentThread() {
+        let extractionSucceeded = false;
+        
         try {
             this.updateStatus('Checking page context...', 'loading');
             this.elements.extractBtn.disabled = true;
@@ -478,6 +480,9 @@ class InboxTriageSidePanel {
                 // Hide extract button now that thread is extracted
                 this.hideSection(this.elements.extractSection);
                 
+                // Mark extraction as successful
+                extractionSucceeded = true;
+                
                 // Show success message and clear it after 5 seconds
                 this.updateStatus('✓ Thread analysis complete', 'success');
                 setTimeout(() => {
@@ -492,7 +497,11 @@ class InboxTriageSidePanel {
             console.error('Error extracting thread:', error);
             this.updateStatus(`Error: ${error.message}`, 'error');
         } finally {
-            this.elements.extractBtn.disabled = false;
+            // Only re-enable button if extraction failed
+            // If succeeded, section is hidden so button state doesn't matter
+            if (!extractionSucceeded) {
+                this.elements.extractBtn.disabled = false;
+            }
         }
     }
     
