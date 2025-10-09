@@ -65,42 +65,10 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 
 ## Side Panel UI (Complete)
 
-### Core Interface
-- `[done]` Summary display - Clean presentation of TL;DR and key points with color-coded sections
-- `[done]` Draft presentation - Professional format for three reply options with proper visual hierarchy
-- `[done]` Tone selector - Enhanced dropdown with proper labeling and responsive layout
-- `[done]` Copy functionality - Clipboard integration with visual feedback for draft text
-- `[done]` Status indicators - Loading states, error messages, success feedback with color coding
-- `[done]` Progress feedback - AI model download progress
-- `[done]` Attachment display - Card-based layout with file type icons, metadata, and processing status
-- `[done]` Processing mode settings - On-device vs hybrid configuration UI
-- `[done]` API key settings - Custom API configuration interface
-
-### Accessibility (Complete)
-- `[done]` Keyboard navigation - Full keyboard accessibility with proper tab order
-- `[done]` ARIA labels - Screen reader support with semantic HTML structure
-- `[done]` Focus management - Logical tab order with visible focus indicators
-- `[done]` High contrast support - Enhanced visibility in accessibility modes
-- `[done]` Font size scaling - Responsive design respects browser zoom settings
-
-### Responsive Design (Complete)
-- `[done]` Panel width adaptation - Handle different side panel sizes with CSS media queries
-- `[done]` Content overflow - Scrolling for long summaries/drafts with max-height constraints
-- `[done]` Button sizing - Touch-friendly interaction areas with proper hover states
-- `[done]` Text wrapping - Readable text at all sizes with proper line spacing
-
 ### Enhancement Opportunities
 - `[todo]` Screen reader testing - Validate with actual assistive technologies (NVDA, JAWS, VoiceOver)
 
 ## Quality Assurance
-
-### Testing Infrastructure (Complete)
-- `[done]` Test framework setup - Playwright infrastructure for unit and integration tests
-- `[done]` E2E extension testing - Playwright fixtures for loading unpacked extension in Chromium
-- `[done]` Side panel tests - Test UI components, user interactions, and accessibility
-- `[done]` Service worker tests - Test AI API integration, message passing, and error handling
-- `[done]` Deep-link URL generation tests - Test thread metadata URL generation with proper encoding
-- `[done]` Testing guide creation - docs/testing.md with manual dev and automated testing instructions
 
 ### Testing Gaps
 - `[todo]` Content script tests - Test email extraction logic for Gmail and Outlook

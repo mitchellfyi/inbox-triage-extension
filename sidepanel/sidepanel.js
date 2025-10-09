@@ -356,10 +356,8 @@ class InboxTriageSidePanel {
             this.elements.saveApiKeyBtn.addEventListener('click', () => this.saveApiKeySettings());
         }
         
-        // Translation settings
-        if (this.elements.targetLanguageSelect) {
-            this.elements.targetLanguageSelect.addEventListener('change', () => this.onLanguageChange());
-        }
+        // Initialize translation UI event handlers
+        this.translationUI.initialize();
         
         // Keyboard navigation support
         this.elements.extractBtn.addEventListener('keydown', (e) => {
@@ -573,19 +571,20 @@ class InboxTriageSidePanel {
         this.elements.summary.textContent = summary;
         this.showSection(this.elements.summarySection);
         
-        // Store original summary for translation
-        if (!this.translationSettings.originalSummary) {
-            this.translationSettings.originalSummary = summary;
-        }
+        // Store originals for translation (via TranslationUI module)
+        this.translationUI.storeOriginals(summary, keyPoints || []);
         
         // Display key points
         if (keyPoints && keyPoints.length > 0) {
-            // Store original key points for translation
-            if (!this.translationSettings.originalKeyPoints) {
-                this.translationSettings.originalKeyPoints = [...keyPoints];
-            }
-            
             this.displayKeyPoints(keyPoints);
+        }
+        
+        // Auto-translate if a language is selected
+        if (this.translationUI.translationSettings.targetLanguage !== 'none') {
+            setTimeout(() => {
+                this.translationUI.translateSummary();
+                this.translationUI.translateKeyPoints();
+            }, 100);
         }
     }
     
@@ -886,6 +885,9 @@ class InboxTriageSidePanel {
         if (drafts && drafts.length > 0) {
             this.elements.replyDrafts.setAttribute('aria-label', `${drafts.length} reply drafts generated`);
             
+            // Update translation module with current drafts
+            this.translationUI.setCurrentDrafts(drafts);
+            
             drafts.forEach((draft, index) => {
                 const draftElement = this.createDraftElement(draft, index);
                 this.elements.replyDrafts.appendChild(draftElement);
@@ -893,6 +895,16 @@ class InboxTriageSidePanel {
             
             // Show the section
             this.showSection(this.elements.replyDraftsSection);
+            
+            // Auto-translate if a language is selected
+            if (this.translationUI.translationSettings.targetLanguage !== 'none') {
+                setTimeout(() => {
+                    this.translationUI.translateAllDrafts().then(() => {
+                        // Re-render with translated content
+                        this.displayReplyDrafts(drafts);
+                    });
+                }, 100);
+            }
         } else {
             // Hide section if no drafts
             this.hideSection(this.elements.replyDraftsSection);
@@ -1070,10 +1082,9 @@ class InboxTriageSidePanel {
     updateModelStatus(type, capabilities) {
         console.log('Model status update:', type, capabilities);
         
-        // Handle translation model download status
-        if (type === 'translator' && capabilities?.status === 'downloading') {
-            const langName = this.getLanguageName(capabilities.targetLanguage);
-            this.updateStatus(`Downloading translation model for ${langName}... This may take a moment.`, 'loading');
+        // Delegate translation model status to TranslationUI module
+        if (type === 'translator') {
+            this.translationUI.handleModelStatus(type, capabilities);
         }
         
         switch (type) {
@@ -1460,8 +1471,7 @@ class InboxTriageSidePanel {
                     processingMode: this.userSettings.processingMode,
                     useApiKey: this.userSettings.useApiKey,
                     apiKey: this.userSettings.apiKey,
-                    apiProvider: this.userSettings.apiProvider,
-                    translationLanguage: this.translationSettings.targetLanguage
+                    apiProvider: this.userSettings.apiProvider
                 });
                 console.log('User settings saved (API key hidden):', {
                     ...this.userSettings,
@@ -1594,285 +1604,6 @@ Cloud Processing Information:
 Your privacy remains protected with minimal necessary data transmission.
         `;
         alert(message);
-    }
-    
-    /**
-     * Update translation UI with current language setting
-     */
-    updateTranslationUI() {
-        if (this.elements.targetLanguageSelect) {
-            this.elements.targetLanguageSelect.value = this.translationSettings.targetLanguage || 'none';
-        }
-    }
-    
-    /**
-     * Handle language selection change
-     */
-    async onLanguageChange() {
-        const newLanguage = this.elements.targetLanguageSelect.value;
-        const oldLanguage = this.translationSettings.targetLanguage;
-        
-        this.translationSettings.targetLanguage = newLanguage;
-        await this.saveUserSettings();
-        
-        // If switching from a language to "none", restore originals
-        if (newLanguage === 'none' && oldLanguage !== 'none') {
-            this.restoreOriginalContent();
-            this.updateStatus('Translation disabled, showing original content', 'info');
-            return;
-        }
-        
-        // If switching to a language, ensure model is downloaded and translate content
-        if (newLanguage !== 'none') {
-            // Check if translation model is available
-            this.updateStatus(`Checking translation model for ${this.getLanguageName(newLanguage)}...`, 'loading');
-            
-            try {
-                // This will trigger download if needed
-                const response = await chrome.runtime.sendMessage({
-                    action: 'translateText',
-                    text: 'test', // Small test text to trigger model download
-                    sourceLanguage: 'en',
-                    targetLanguage: newLanguage
-                });
-                
-                if (response && response.success) {
-                    // Model is ready, translate existing content
-                    await this.translateExistingContent();
-                } else {
-                    this.updateStatus(`Translation unavailable: ${response?.error || 'Unknown error'}`, 'error');
-                }
-            } catch (error) {
-                console.error('Error initializing translation:', error);
-                this.updateStatus(`Translation error: ${error.message}`, 'error');
-            }
-        }
-    }
-    
-    /**
-     * Restore original (untranslated) content
-     */
-    restoreOriginalContent() {
-        // Restore summary
-        if (this.translationSettings.originalSummary && this.elements.summary) {
-            this.elements.summary.textContent = this.translationSettings.originalSummary;
-        }
-        
-        // Restore key points
-        if (this.translationSettings.originalKeyPoints && this.elements.keyPoints) {
-            this.displayKeyPoints(this.translationSettings.originalKeyPoints);
-        }
-        
-        // Restore drafts
-        if (this.currentDrafts.length > 0 && this.translationSettings.originalDrafts.size > 0) {
-            this.currentDrafts.forEach((draft, index) => {
-                if (this.translationSettings.originalDrafts.has(index)) {
-                    draft.body = this.translationSettings.originalDrafts.get(index);
-                }
-            });
-            this.displayReplyDrafts(this.currentDrafts);
-        }
-    }
-    
-    /**
-     * Translate all existing content when language changes
-     */
-    async translateExistingContent() {
-        const language = this.translationSettings.targetLanguage;
-        if (language === 'none') return;
-        
-        let translatedCount = 0;
-        
-        // Translate summary if exists
-        if (this.elements.summary && this.elements.summary.textContent.trim()) {
-            try {
-                await this.translateSummary();
-                translatedCount++;
-            } catch (error) {
-                console.error('Error translating summary:', error);
-            }
-        }
-        
-        // Translate key points if exist
-        if (this.translationSettings.originalKeyPoints && this.translationSettings.originalKeyPoints.length > 0) {
-            try {
-                await this.translateKeyPoints();
-                translatedCount++;
-            } catch (error) {
-                console.error('Error translating key points:', error);
-            }
-        }
-        
-        // Translate drafts if exist
-        if (this.currentDrafts.length > 0) {
-            try {
-                await this.translateAllDrafts();
-                translatedCount += this.currentDrafts.length;
-            } catch (error) {
-                console.error('Error translating drafts:', error);
-            }
-        }
-        
-        if (translatedCount > 0) {
-            const langName = this.getLanguageName(language);
-            this.updateStatus(`✓ Content translated to ${langName}`, 'success');
-        }
-    }
-    
-    /**
-     * Translate summary text
-     */
-    async translateSummary() {
-        if (!this.elements.summary) return;
-        
-        const originalText = this.translationSettings.originalSummary || this.elements.summary.textContent;
-        if (!originalText || !originalText.trim()) return;
-        
-        // Store original if not stored yet
-        if (!this.translationSettings.originalSummary) {
-            this.translationSettings.originalSummary = originalText;
-        }
-        
-        const targetLanguage = this.translationSettings.targetLanguage;
-        if (targetLanguage === 'none') return;
-        
-        try {
-            this.updateStatus(`Translating summary to ${this.getLanguageName(targetLanguage)}...`, 'loading');
-            
-            const response = await chrome.runtime.sendMessage({
-                action: 'translateText',
-                text: originalText,
-                sourceLanguage: 'en',
-                targetLanguage: targetLanguage
-            });
-            
-            if (response && response.success) {
-                this.elements.summary.textContent = response.translatedText;
-            } else {
-                console.error('Translation failed:', response?.error);
-                this.updateStatus(`Translation failed: ${response?.error || 'Unknown error'}`, 'error');
-            }
-        } catch (error) {
-            console.error('Error translating summary:', error);
-            this.updateStatus(`Translation error: ${error.message}`, 'error');
-        }
-    }
-    
-    /**
-     * Translate key points
-     */
-    async translateKeyPoints() {
-        const originalKeyPoints = this.translationSettings.originalKeyPoints;
-        if (!originalKeyPoints || originalKeyPoints.length === 0) return;
-        
-        const targetLanguage = this.translationSettings.targetLanguage;
-        if (targetLanguage === 'none') return;
-        
-        try {
-            const translatedPoints = [];
-            
-            for (const point of originalKeyPoints) {
-                const response = await chrome.runtime.sendMessage({
-                    action: 'translateText',
-                    text: point,
-                    sourceLanguage: 'en',
-                    targetLanguage: targetLanguage
-                });
-                
-                if (response && response.success) {
-                    translatedPoints.push(response.translatedText);
-                } else {
-                    // If translation fails, keep original
-                    translatedPoints.push(point);
-                }
-            }
-            
-            // Display translated key points
-            this.displayKeyPoints(translatedPoints);
-        } catch (error) {
-            console.error('Error translating key points:', error);
-        }
-    }
-    
-    /**
-     * Translate all drafts
-     */
-    async translateAllDrafts() {
-        if (this.currentDrafts.length === 0) return;
-        
-        const targetLanguage = this.translationSettings.targetLanguage;
-        if (targetLanguage === 'none') return;
-        
-        try {
-            for (let i = 0; i < this.currentDrafts.length; i++) {
-                await this.translateDraft(i);
-            }
-            
-            // Refresh draft display
-            this.displayReplyDrafts(this.currentDrafts);
-        } catch (error) {
-            console.error('Error translating drafts:', error);
-        }
-    }
-    
-    /**
-     * Translate a single draft
-     * @param {number} index - Draft index
-     */
-    async translateDraft(index) {
-        if (index < 0 || index >= this.currentDrafts.length) return;
-        
-        const draft = this.currentDrafts[index];
-        const originalBody = this.translationSettings.originalDrafts.get(index) || draft.body;
-        
-        // Store original if not stored yet
-        if (!this.translationSettings.originalDrafts.has(index)) {
-            this.translationSettings.originalDrafts.set(index, draft.body);
-        }
-        
-        const targetLanguage = this.translationSettings.targetLanguage;
-        if (targetLanguage === 'none') return;
-        
-        try {
-            const response = await chrome.runtime.sendMessage({
-                action: 'translateText',
-                text: originalBody,
-                sourceLanguage: 'en',
-                targetLanguage: targetLanguage
-            });
-            
-            if (response && response.success) {
-                draft.body = response.translatedText;
-            }
-        } catch (error) {
-            console.error(`Error translating draft ${index}:`, error);
-        }
-    }
-    
-    /**
-     * Get human-readable language name
-     * @param {string} code - Language code
-     * @returns {string} Language name
-     */
-    getLanguageName(code) {
-        const languages = {
-            'en': 'English',
-            'es': 'Spanish',
-            'fr': 'French',
-            'de': 'German',
-            'zh': 'Chinese',
-            'ja': 'Japanese',
-            'ko': 'Korean',
-            'pt': 'Portuguese',
-            'ru': 'Russian',
-            'ar': 'Arabic',
-            'hi': 'Hindi',
-            'it': 'Italian',
-            'nl': 'Dutch',
-            'pl': 'Polish',
-            'tr': 'Turkish'
-        };
-        return languages[code] || code;
     }
 }
 
