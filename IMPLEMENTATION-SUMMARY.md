@@ -132,7 +132,7 @@ Based on [developer.chrome.com/docs/ai/built-in](https://developer.chrome.com/do
 #### Language Model API (Prompt API)
 ```javascript
 ✅ Capabilities check: await self.ai.languageModel.capabilities() - CORRECT
-✅ Create session: await self.ai.languageModel.create({ systemPrompt, temperature, topK }) - CORRECT
+✅ Create session: await self.ai.languageModel.create({ initialPrompts: [{ role: 'system', content: ... }], temperature, topK }) - CORRECT
 ✅ Prompt: await session.prompt(text) - CORRECT
 ✅ Cleanup: session.destroy() - CORRECT
 ```

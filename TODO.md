@@ -25,16 +25,13 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 
 ### Core Documentation
 - `[done]` README.md overhaul - Add value prop, docs map, quickstart, architecture, privacy, contributing flow
-- `[todo]` SPEC.md improvements - Acceptance criteria format, explicit API boundaries, browser support notes
 - `[done]` AGENTS.md refinements - Agent loop, coding rules, commit patterns, "Don't" list, testing requirements, commit guidelines
 - `[done]` .github/copilot-instructions.md updates - "Always read SPEC first", guardrails section, commit/test/doc guidelines
 - `[done]` TODO.md creation - This file with project-wide checklist
 
 ### Post-Feature Documentation Updates
+- `[todo]` SPEC.md improvements - Acceptance criteria format, explicit API boundaries, browser support notes
 - `[todo]` README.md feature integration - Update overview and quickstart sections after each major feature completion
-- `[todo]` AGENTS.md pattern updates - Add new coding patterns and examples discovered during development
-- `[todo]` SPEC.md requirement validation - Ensure acceptance criteria match implemented behavior
-- `[todo]` TODO.md maintenance - Archive completed sections, reorganize tasks, add follow-up work
 - `[todo]` Link validation sweep - Verify all internal documentation links work correctly
 - `[todo]` Code example updates - Ensure all documentation code snippets reflect current implementation
 
@@ -46,96 +43,81 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 ## Extension Core
 
 ### Architecture & Configuration
-- `[todo]` Manifest V3 validation - Ensure all permissions are minimal and necessary
-- `[done]` Error handling strategy - Standardize error messages and fallback behaviors with comprehensive sanitization
+- `[done]` Manifest V3 validation - All permissions minimal and necessary
+- `[done]` Error handling strategy - Standardized error messages and fallback behaviors with comprehensive sanitization
 - `[done]` Model availability detection - Robust checking for AI API readiness with periodic monitoring and state management
-- `[todo]` Message passing architecture - Clean communication between components
-- `[done]` Attachment processing pipeline - Basic structure for file analysis and AI summarization
+- `[done]` Message passing architecture - Clean communication between components
+- `[done]` Processing mode configuration - On-device and hybrid mode settings with privacy controls
+- `[done]` API key configuration - Custom API key support for OpenAI, Anthropic, Google
 
 ### AI Integration
-- `[done]` Summarizer API integration testing - Validate across different thread lengths
+- `[done]` Summarizer API integration - Validate across different thread lengths
 - `[done]` Prompt API JSON schema enforcement - Ensure reliable structured output
 - `[done]` Tone parameter validation - Test all tone options (neutral, friendly, assertive, formal)
 - `[done]` Fallback draft generation - Handle AI failures gracefully
+- `[done]` Hybrid fallback decision rules - Implemented decision logic per SPEC.md
+
+## Email Extraction
+
+### Current Status
+- `[done]` Basic Gmail extraction - Thread container, messages, subject, senders
+- `[done]` Basic Outlook extraction - Thread container, messages, subject, senders
+- `[done]` Content cleaning - Remove signatures, quoted text, formatting artifacts
+- `[done]` Attachment detection - Identify and list attachments with metadata
+
+### Enhancement Opportunities
+- `[todo]` Nested thread handling - Improve handling of complex reply chains
+- `[todo]` Draft message filtering - Exclude unsent drafts from analysis
+- `[todo]` Dynamic content handling - MutationObserver for SPA updates
+- `[todo]` Multiple conversation views - Different Gmail layouts and themes (dark mode, compact view)
+- `[todo]` Outlook version variations - Office 365, Outlook.com differences
+- `[todo]` Timestamp parsing improvements - More consistent date/time extraction
 
 ## Attachment Processing
 
-### Core Functionality
+### Core Functionality (Complete)
 - `[done]` Attachment detection - DOM parsing for Gmail and Outlook attachment elements
 - `[done]` Metadata extraction - File names, sizes, types, and processability detection  
 - `[done]` UI integration - Card-based display with file type icons and processing status
 - `[done]` Service worker integration - Message passing for attachment processing
-- `[done]` AI summarization structure - Framework for using Summarizer API on extracted content
 
-### File Processing
+### File Processing (Not Yet Implemented)
 - `[todo]` PDF text extraction - Integrate PDF.js or equivalent for local PDF parsing
 - `[todo]` DOCX text extraction - Integrate mammoth.js or equivalent for Word document parsing
 - `[todo]` XLSX data extraction - Integrate SheetJS or equivalent for spreadsheet parsing
-- `[todo]` Image analysis - Use Prompt API multimodal capabilities for image description
+- `[todo]` Image analysis - Use Prompt API multimodal capabilities for image description (see hackathon tasks)
 - `[todo]` Content validation - Ensure extracted content is suitable for AI processing
 
 ### Advanced Features
 - `[todo]` Detailed view modal - Full content display and comprehensive analysis
 - `[todo]` Large file handling - Size limits and progressive processing
-- `[done]` Cloud processing fallback - Hybrid mode configuration with comprehensive privacy notices and decision rules implemented
-- `[done]` Privacy controls - User configuration for processing preferences with persistent storage and cloud processing indicators
-
-## Gmail Extraction
-
-### DOM Parsing
-- `[todo]` Thread container detection - Reliable identification of email threads
-- `[todo]` Message boundary detection - Separate individual emails in threads
-- `[todo]` Sender extraction - Names and email addresses
-- `[todo]` Content cleaning - Remove signatures, quoted text, formatting artifacts
-- `[todo]` Subject line extraction - Original and reply subjects
-- `[todo]` Timestamp parsing - Message dates and times
-
-### Edge Cases
-- `[todo]` Nested thread handling - Complex reply chains
-- `[todo]` Draft message filtering - Exclude unsent drafts from analysis
-- `[todo]` Dynamic content handling - MutationObserver for SPA updates
-- `[todo]` Multiple conversation views - Different Gmail layouts and themes
-
-## Outlook Extraction
-
-### DOM Parsing
-- `[todo]` Thread container detection - Outlook-specific selectors
-- `[todo]` Message boundary detection - Different DOM structure than Gmail
-- `[todo]` Sender extraction - Outlook name/email format
-- `[todo]` Content cleaning - Outlook-specific signatures and formatting
-- `[todo]` Subject line extraction - Handle Outlook subject formatting
-- `[todo]` Timestamp parsing - Outlook date formats
-
-### Edge Cases  
-- `[todo]` Multiple Outlook versions - Office 365, Outlook.com variations
-- `[todo]` Theme compatibility - Dark mode, high contrast themes
-- `[todo]` Accessibility mode handling - Screen reader optimized views
-- `[todo]` Mobile view detection - Responsive layout handling
 
 ## Reply Drafting
 
-### Content Generation
+### Content Generation (Complete)
 - `[done]` Three-draft structure - Short, medium, detailed responses
 - `[done]` Subject line generation - Context-aware reply subjects
-- `[done]` Tone application - Consistent tone across all draft types
+- `[done]` Tone application - Consistent tone across all draft types (neutral, friendly, assertive, formal)
 - `[done]` Word limit enforcement - Appropriate length for each draft type
 - `[done]` User guidance integration - Custom guidance text appended to prompts for personalized drafts
-- `[todo]` Context preservation - Reference key points from original thread
 
-### User Input Features
+### User Input Features (Complete)
 - `[done]` Guidance text area - Allow users to provide custom instructions for draft generation
 - `[done]` Voice dictation - Web Speech API integration for hands-free guidance input
 - `[done]` Microphone UI feedback - Visual indicators for listening/idle/error states
 - `[done]` Permission handling - Graceful handling of microphone permission denials
 - `[done]` Guidance persistence - Maintain guidance text when changing tones or regenerating
 
-### Output Quality
+### Output Quality (Complete)
 - `[done]` JSON schema validation - Ensure parseable structured output
 - `[done]` Content sanitization - Remove potentially harmful content
 - `[done]` Professional language - Business-appropriate responses
+
+### Enhancement Opportunities
+- `[todo]` Context preservation - Better reference to key points from original thread
 - `[todo]` Customizable signatures - User signature integration options
 
-## Side Panel UI
+## Side Panel UI (Complete)
 
 ### Core Interface
 - `[done]` Summary display - Clean presentation of TL;DR and key points with color-coded sections
@@ -145,53 +127,78 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 - `[done]` Status indicators - Loading states, error messages, success feedback with color coding
 - `[done]` Progress feedback - AI model download progress
 - `[done]` Attachment display - Card-based layout with file type icons, metadata, and processing status
+- `[done]` Processing mode settings - On-device vs hybrid configuration UI
+- `[done]` API key settings - Custom API configuration interface
 
-### Accessibility
+### Accessibility (Complete)
 - `[done]` Keyboard navigation - Full keyboard accessibility with proper tab order
 - `[done]` ARIA labels - Screen reader support with semantic HTML structure
 - `[done]` Focus management - Logical tab order with visible focus indicators
 - `[done]` High contrast support - Enhanced visibility in accessibility modes
 - `[done]` Font size scaling - Responsive design respects browser zoom settings
-- `[todo]` Screen reader testing - Validate with assistive technologies
 
-### Responsive Design
+### Responsive Design (Complete)
 - `[done]` Panel width adaptation - Handle different side panel sizes with CSS media queries
 - `[done]` Content overflow - Scrolling for long summaries/drafts with max-height constraints
 - `[done]` Button sizing - Touch-friendly interaction areas with proper hover states
 - `[done]` Text wrapping - Readable text at all sizes with proper line spacing
 
+### Enhancement Opportunities
+- `[todo]` Screen reader testing - Validate with actual assistive technologies (NVDA, JAWS, VoiceOver)
+
 ## Quality Assurance
 
-### Unit and Integration Testing
-- `[done]` Test framework setup - Establish testing infrastructure for unit and integration tests with Playwright
+### Testing Infrastructure (Complete)
+- `[done]` Test framework setup - Playwright infrastructure for unit and integration tests
 - `[done]` E2E extension testing - Playwright fixtures for loading unpacked extension in Chromium
-- `[done]` Side panel tests - Test UI components, user interactions, and accessibility with Playwright
-- `[done]` Service worker tests - Test AI API integration, message passing, and error handling with Playwright
+- `[done]` Side panel tests - Test UI components, user interactions, and accessibility
+- `[done]` Service worker tests - Test AI API integration, message passing, and error handling
 - `[done]` Deep-link URL generation tests - Test thread metadata URL generation with proper encoding
+- `[done]` Testing guide creation - docs/testing.md with manual dev and automated testing instructions
+
+### Testing Gaps
 - `[todo]` Content script tests - Test email extraction logic for Gmail and Outlook
 - `[todo]` Cross-component tests - Test message passing and integration between extension parts
-
-### Testing Strategy
 - `[todo]` Manual test plan - Comprehensive testing checklist
 - `[todo]` Email format testing - Various email types and lengths
 - `[todo]` AI model state testing - Available, downloading, unavailable scenarios
 - `[todo]` Cross-browser compatibility - Chrome versions and variants
 - `[todo]` Performance testing - Memory usage, response times
-- `[todo]` Privacy audit - Verify no external network calls
+- `[todo]` Privacy audit - Verify no external network calls (except when using custom API keys)
 
 ### Documentation Testing
-- `[done]` Testing guide creation - docs/testing.md with manual dev and automated testing instructions
-- `[done]` AGENTS.md testing updates - Add Playwright guidelines and testing best practices 
-- `[done]` Copilot instructions testing updates - Add test:e2e and Playwright locator guidelines
-- `[todo]` Installation instructions - Verify setup process works
+- `[todo]` Installation instructions verification - Test setup process works from scratch
 - `[todo]` Link validation - All internal documentation links work
-- `[todo]` Code examples - Ensure code snippets are accurate and current
+- `[todo]` Code examples validation - Ensure code snippets are accurate and current
 
-### Release Preparation
-- `[todo]` Demo video creation - 3-minute demonstration video
-- `[todo]` Public repository preparation - Clean commit history, proper README
-- `[todo]` Chrome Web Store submission - Prepare extension for distribution
-- `[todo]` Problem-solution narrative - Clear explanation of value proposition
+---
+
+## Hackathon Submission Tasks (Chrome Built-in AI Challenge 2025)
+
+**📁 Detailed task files**: See [`/todo`](/todo) directory for comprehensive implementation guides
+
+### Priority Tasks for Submission
+
+#### 🔴 CRITICAL (Must Complete for Competitive Submission)
+- `[todo]` [Task 000: Hackathon Submission Checklist](/todo/000_hackathon_submission_checklist.md) - Master checklist (1-2h)
+- `[todo]` [Task 001: Translator API Integration](/todo/001_translator_api_integration.md) - Multi-language support (4-6h)
+- `[todo]` [Task 005: Multimodal Prompt API](/todo/005_multimodal_prompt_api_images.md) - Image analysis (4-5h) 🌟 **KEY DIFFERENTIATOR**
+- `[todo]` [Task 006: Demo Video Creation](/todo/006_demo_video_creation.md) - Required deliverable (4-6h)
+- `[todo]` [Task 007: README API Showcase](/todo/007_readme_api_showcase.md) - Documentation enhancement (2-3h)
+
+#### 🟡 HIGH PRIORITY (Strong Differentiators)
+- `[todo]` [Task 002: Proofreader API Integration](/todo/002_proofreader_api_integration.md) - Grammar checking (2-3h)
+- `[todo]` [Task 003: Rewriter API Integration](/todo/003_rewriter_api_integration.md) - Alternative phrasings (3-4h)
+- `[todo]` [Task 009: Accessibility Excellence](/todo/009_accessibility_excellence.md) - WCAG 2.1 AA compliance (3-4h)
+
+#### 🟢 MEDIUM PRIORITY (Nice to Have)
+- `[todo]` [Task 004: Writer API Integration](/todo/004_writer_api_integration.md) - Content generation (3-4h)
+- `[todo]` [Task 008: Performance Metrics Display](/todo/008_performance_metrics_display.md) - Monitoring dashboard (2-3h)
+- `[todo]` [Task 010: System Status Dashboard](/todo/010_system_status_dashboard.md) - Health indicators (2-3h)
+
+**Total Effort**: 30-43 hours for complete implementation  
+**Minimum Viable**: Tasks 000, 001, 005, 006, 007 = 15-20 hours  
+**See**: [`/todo/README.md`](/todo/README.md) for detailed timeline and prioritization
 
 ---
 
@@ -202,3 +209,27 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 - Link to related GitHub issues and PRs when available
 - Add estimated effort or priority labels if helpful
 - Archive completed sections to keep the file manageable
+- **For hackathon tasks**: Follow detailed implementation guides in `/todo` directory
+
+---
+
+## Recently Completed
+
+### Latest Milestones
+- ✅ Complete side panel UI with accessibility features
+- ✅ Voice dictation for guidance input
+- ✅ Hybrid processing mode with privacy controls
+- ✅ Custom API key configuration (OpenAI, Anthropic, Google)
+- ✅ Comprehensive error handling and sanitization
+- ✅ Model availability detection with periodic monitoring
+- ✅ Attachment detection and basic UI
+- ✅ Playwright test infrastructure
+- ✅ Processing mode settings with privacy notices
+- ✅ Deep-link URL generation with proper encoding
+
+### Next Focus Areas
+1. **Hackathon Preparation** - Implement critical tasks (Translator, Multimodal, Demo Video)
+2. **File Processing** - Complete attachment analysis (PDF, DOCX, XLSX, images)
+3. **Testing Coverage** - Add content script tests and cross-component integration tests
+4. **Documentation** - Create demo video, enhance README with API showcase
+5. **Release Preparation** - Prepare for Chrome Web Store submission after hackathon

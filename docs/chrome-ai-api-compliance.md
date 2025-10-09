@@ -68,7 +68,9 @@ if ('LanguageModel' in self) {
 
 // Create session with configuration
 const session = await LanguageModel.create({
-    systemPrompt: this.createSystemPrompt(tone),
+    initialPrompts: [
+        { role: 'system', content: this.createSystemPrompt(tone) }
+    ],
     temperature: 0.7,
     topK: 3
 });
@@ -83,7 +85,7 @@ session.destroy();
 **Compliance Notes**:
 - ✅ Uses global constructor exactly as documented: `LanguageModel` (following same pattern as `Summarizer`)
 - ✅ Calls `.availability()` before creating sessions
-- ✅ Properly configures session with `systemPrompt`, `temperature`, and `topK`
+- ✅ Properly configures session with `initialPrompts`, `temperature`, and `topK`
 - ✅ Uses `.prompt()` method for text generation
 - ✅ Destroys sessions after use
 - ✅ Only available in Chrome Extensions (not web pages) - we're an extension ✓
