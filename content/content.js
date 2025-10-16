@@ -29,6 +29,12 @@ class EmailThreadExtractor {
     handleMessage(message, sender, sendResponse) {
         console.log('Content script received message:', message.action);
         
+        // Handle ping immediately, even if not fully initialized
+        if (message.action === 'ping') {
+            sendResponse({ success: true, ready: true });
+            return true;
+        }
+        
         if (!this.isInitialized) {
             const error = `Content script not initialized for ${window.location.hostname}. Please refresh the page.`;
             console.error('Inbox Triage:', error);

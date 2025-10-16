@@ -383,5 +383,17 @@ export class TranslationUI {
             }
         }
     }
+
+    /**
+     * Reset translation state (clear stored originals)
+     * Called when extraction state is reset
+     */
+    resetState() {
+        this.translationSettings.originalSummary = null;
+        this.translationSettings.originalKeyPoints = null;
+        this.translationSettings.originalDrafts.clear();
+        this.currentDrafts = null;
+        // Keep targetLanguage setting - user's preference should persist
+    }
 }
 

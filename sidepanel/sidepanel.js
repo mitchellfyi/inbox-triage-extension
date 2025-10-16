@@ -19,6 +19,7 @@ class InboxTriageSidePanel {
             url: ''
         };
         this.statusHideTimeout = null;
+        this.isVisible = document.visibilityState === 'visible';
         
         this.initializeElements();
         
@@ -57,8 +58,29 @@ class InboxTriageSidePanel {
             this.checkCurrentContext();
         }, 2000);
         
+        // Set up visibility change detection to reset state when panel reopens
+        this.setupVisibilityTracking();
+        
         // Set up global error handlers
         this.setupGlobalErrorHandlers();
+    }
+    
+    /**
+     * Setup visibility tracking to detect when side panel is reopened
+     * This allows us to reset state when the extension is closed and reopened
+     */
+    setupVisibilityTracking() {
+        document.addEventListener('visibilitychange', () => {
+            const wasHidden = !this.isVisible;
+            this.isVisible = document.visibilityState === 'visible';
+            
+            // If the panel was hidden and is now visible (reopened)
+            if (wasHidden && this.isVisible) {
+                console.log('Side panel reopened - resetting extraction state');
+                this.resetExtractionState();
+                this.checkCurrentContext();
+            }
+        });
     }
     
     /**
@@ -146,24 +168,7 @@ class InboxTriageSidePanel {
         
         // If URL changed, reset the UI state
         if (urlChanged) {
-            this.currentThread = null;
-            this.currentDrafts = [];
-            
-            // Show extract button again
-            this.showSection(this.elements.extractSection, false);
-            
-            // Hide all result sections
-            this.hideSection(this.elements.summarySection);
-            this.hideSection(this.elements.keyPointsSection);
-            this.hideSection(this.elements.attachmentsSection);
-            this.hideSection(this.elements.replyDraftsControlsSection);
-            this.hideSection(this.elements.replyDraftsSection);
-            
-            // Disable generate drafts button
-            this.elements.generateDraftsBtn.disabled = true;
-            
-            // Clear status message
-            this.updateStatus('Ready to analyse email threads', 'info');
+            this.resetExtractionState();
         }
         
         if (this.currentContext.isOnEmailThread) {
@@ -175,6 +180,45 @@ class InboxTriageSidePanel {
         } else {
             extractBtn.disabled = true;
             this.updateStatus('Navigate to Gmail or Outlook to use this extension', 'info');
+        }
+    }
+    
+    /**
+     * Reset extraction state and UI to initial state
+     * Called when URL changes or panel is reopened
+     */
+    resetExtractionState() {
+        // Reset state variables
+        this.currentThread = null;
+        this.currentDrafts = [];
+        this.currentSummary = null;
+        
+        // Show extract button again
+        this.showSection(this.elements.extractSection, false);
+        this.elements.extractBtn.disabled = false;
+        
+        // Hide all result sections
+        this.hideSection(this.elements.summarySection);
+        this.hideSection(this.elements.keyPointsSection);
+        this.hideSection(this.elements.attachmentsSection);
+        this.hideSection(this.elements.replyDraftsControlsSection);
+        this.hideSection(this.elements.replyDraftsSection);
+        
+        // Clear content
+        if (this.elements.summary) this.elements.summary.textContent = '';
+        if (this.elements.keyPoints) this.elements.keyPoints.innerHTML = '';
+        if (this.elements.attachments) this.elements.attachments.innerHTML = '';
+        if (this.elements.replyDrafts) this.elements.replyDrafts.innerHTML = '';
+        
+        // Disable generate drafts button
+        this.elements.generateDraftsBtn.disabled = true;
+        
+        // Clear status message
+        this.updateStatus('Ready to analyse email threads', 'info');
+        
+        // Reset translation state
+        if (this.translationUI) {
+            this.translationUI.resetState();
         }
     }
     
@@ -448,6 +492,51 @@ class InboxTriageSidePanel {
         }
     }
 
+    /**
+     * Ensure content script is loaded in the target tab
+     * Injects content script programmatically if not already loaded
+     * @param {number} tabId - The tab ID to check
+     */
+    async ensureContentScriptLoaded(tabId) {
+        try {
+            // Try to ping the content script to see if it's loaded
+            const pingResponse = await Promise.race([
+                chrome.tabs.sendMessage(tabId, { action: 'ping' }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1000))
+            ]);
+            
+            // If we get a response, content script is loaded
+            if (pingResponse) {
+                console.log('Content script already loaded');
+                return;
+            }
+        } catch (error) {
+            // Content script not loaded or not responding, inject it
+            console.log('Content script not responding, injecting...', error.message);
+            
+            try {
+                // Inject the content scripts in order
+                await chrome.scripting.executeScript({
+                    target: { tabId: tabId },
+                    files: ['content/selectors.js']
+                });
+                
+                await chrome.scripting.executeScript({
+                    target: { tabId: tabId },
+                    files: ['content/content.js']
+                });
+                
+                // Wait a bit for initialization
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                console.log('Content script injected successfully');
+            } catch (injectError) {
+                console.error('Failed to inject content script:', injectError);
+                throw new Error('Could not initialize page connection. Please try refreshing the page.');
+            }
+        }
+    }
+    
     async extractCurrentThread() {
         // Prevent multiple simultaneous extractions
         if (this.elements.extractBtn.disabled) {
@@ -489,6 +578,9 @@ class InboxTriageSidePanel {
             this.updateStatus(`Connecting to ${provider}...`, 'loading');
             
             console.log('Sending extractThread message to tab:', currentTab.id, 'URL:', currentUrl);
+            
+            // Ensure content script is loaded before trying to communicate
+            await this.ensureContentScriptLoaded(currentTab.id);
             
             // Send message to content script to extract thread
             let response;

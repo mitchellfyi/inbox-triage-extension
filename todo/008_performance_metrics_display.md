@@ -20,7 +20,7 @@ Add a performance metrics display that shows processing times, memory usage, and
 ### Functional Requirements
 - [ ] Display real-time processing times for each operation
 - [ ] Show memory usage statistics
-- [ ] Display API availability status for all 6+ APIs
+- [ ] Display API availability status for all APIs
 - [ ] Show model download progress (when applicable)
 - [ ] Calculate and display time saved
 - [ ] Provide performance comparison vs. cloud solutions
