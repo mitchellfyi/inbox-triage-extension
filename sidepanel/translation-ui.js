@@ -31,13 +31,45 @@ export class TranslationUI {
         try {
             if (chrome?.storage?.sync) {
                 const result = await chrome.storage.sync.get(['translationLanguage']);
-                if (result.translationLanguage) {
-                    this.translationSettings.targetLanguage = result.translationLanguage;
+                if (result.translationLanguage && result.translationLanguage !== 'none') {
+                    // Verify translation is still available before enabling
+                    const isAvailable = await this.checkTranslationAvailability('en', result.translationLanguage);
+                    if (isAvailable) {
+                        this.translationSettings.targetLanguage = result.translationLanguage;
+                    } else {
+                        // Reset to 'none' if no longer available
+                        console.log('Saved translation language no longer available, resetting to none');
+                        this.translationSettings.targetLanguage = 'none';
+                        await this.saveSettings();
+                    }
+                } else {
+                    this.translationSettings.targetLanguage = result.translationLanguage || 'none';
                 }
             }
             this.updateUI();
         } catch (error) {
             console.error('Error loading translation settings:', error);
+        }
+    }
+    
+    /**
+     * Check if translation is available for a language pair
+     * @param {string} sourceLanguage - Source language code
+     * @param {string} targetLanguage - Target language code
+     * @returns {Promise<boolean>} True if translation is available
+     */
+    async checkTranslationAvailability(sourceLanguage, targetLanguage) {
+        try {
+            const response = await chrome.runtime.sendMessage({
+                action: 'checkTranslationAvailability',
+                sourceLanguage,
+                targetLanguage
+            });
+            
+            return response && response.available;
+        } catch (error) {
+            console.warn('Error checking translation availability:', error);
+            return false;
         }
     }
 

@@ -324,6 +324,10 @@ class InboxTriageServiceWorker {
                     await this.handleTranslation(message, sendResponse);
                     break;
                     
+                case 'checkTranslationAvailability':
+                    await this.handleTranslationAvailabilityCheck(message, sendResponse);
+                    break;
+                    
                 case 'analyzeImage':
                     await this.handleImageAnalysis(message, sendResponse);
                     break;
@@ -350,6 +354,43 @@ class InboxTriageServiceWorker {
             console.error('Error handling message:', error);
             sendResponse({ 
                 success: false, 
+                error: this.sanitizeErrorMessage(error.message)
+            });
+        }
+    }
+    
+    /**
+     * Handle translation availability check requests
+     * @param {Object} message - Availability check request message
+     * @param {Function} sendResponse - Response callback
+     */
+    async handleTranslationAvailabilityCheck(message, sendResponse) {
+        try {
+            const { sourceLanguage, targetLanguage } = message;
+            
+            if (!sourceLanguage || !targetLanguage) {
+                throw new Error('Source and target languages are required');
+            }
+            
+            // Check availability using translation service
+            const availabilityCheck = await this.translationService.checkAvailability(
+                sourceLanguage,
+                targetLanguage
+            );
+            
+            sendResponse({
+                success: true,
+                available: availabilityCheck.available,
+                state: availabilityCheck.state,
+                needsDownload: availabilityCheck.needsDownload,
+                reason: availabilityCheck.reason
+            });
+            
+        } catch (error) {
+            console.error('Error checking translation availability:', error);
+            sendResponse({
+                success: false,
+                available: false,
                 error: this.sanitizeErrorMessage(error.message)
             });
         }

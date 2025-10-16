@@ -27,16 +27,25 @@ export class TranslationService {
         return false;
     }
 
-    async translate(text, sourceLanguage, targetLanguage) {
-        // Initialize if not already done
+    /**
+     * Check if translation is available for a language pair
+     * @param {string} sourceLanguage - Source language code
+     * @param {string} targetLanguage - Target language code
+     * @returns {Promise<Object>} Availability status with details
+     */
+    async checkAvailability(sourceLanguage, targetLanguage) {
         if (!this.isAvailable) {
-            const isAvailable = await this.initialize();
-            if (!isAvailable) {
-                throw new Error('Translator API not available in this browser');
-            }
+            await this.initialize();
         }
-
-        // Check availability for this specific language pair
+        
+        if (!this.isAvailable) {
+            return {
+                available: false,
+                state: 'no',
+                reason: 'Translator API not available in this browser'
+            };
+        }
+        
         try {
             const availability = await Translator.availability({
                 sourceLanguage,
@@ -45,12 +54,33 @@ export class TranslationService {
             
             console.log(`Translation availability for ${sourceLanguage}→${targetLanguage}: ${availability}`);
             
-            if (availability === 'no') {
-                throw new Error(`Translation not available for ${sourceLanguage}→${targetLanguage}`);
-            }
+            return {
+                available: availability === 'readily' || availability === 'after-download',
+                state: availability,
+                needsDownload: availability === 'after-download'
+            };
         } catch (error) {
             console.error('Error checking translation availability:', error);
-            throw new Error(`Cannot check translation availability: ${error.message}`);
+            return {
+                available: false,
+                state: 'error',
+                reason: error.message
+            };
+        }
+    }
+
+    async translate(text, sourceLanguage, targetLanguage) {
+        // Check availability first
+        const availabilityCheck = await this.checkAvailability(sourceLanguage, targetLanguage);
+        
+        if (!availabilityCheck.available) {
+            const reason = availabilityCheck.reason || `Translation not supported for ${sourceLanguage}→${targetLanguage}`;
+            throw new Error(reason);
+        }
+        
+        // Warn if download is needed
+        if (availabilityCheck.needsDownload) {
+            console.log(`Translation model for ${sourceLanguage}→${targetLanguage} needs download. This may take a moment...`);
         }
 
         const sessionKey = `${sourceLanguage}-${targetLanguage}`;
