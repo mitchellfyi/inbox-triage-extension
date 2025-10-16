@@ -716,11 +716,16 @@ class InboxTriageSidePanel {
             this.displayKeyPoints(keyPoints);
         }
         
-        // Auto-translate if a language is selected
+        // Auto-translate if a language is selected (with error handling)
         if (this.translationUI.translationSettings.targetLanguage !== 'none') {
-            setTimeout(() => {
-                this.translationUI.translateSummary();
-                this.translationUI.translateKeyPoints();
+            setTimeout(async () => {
+                try {
+                    await this.translationUI.translateSummary();
+                    await this.translationUI.translateKeyPoints();
+                } catch (error) {
+                    console.error('Auto-translation failed:', error);
+                    // Don't show error to user - just log it
+                }
             }, 100);
         }
     }
@@ -1169,11 +1174,15 @@ class InboxTriageSidePanel {
         this.draftRenderer.render(drafts, () => {
             // Auto-translate if a language is selected (but only on initial render)
             if (!skipTranslation && this.translationUI.translationSettings.targetLanguage !== 'none') {
-                setTimeout(() => {
-                    this.translationUI.translateAllDrafts().then(() => {
+                setTimeout(async () => {
+                    try {
+                        await this.translationUI.translateAllDrafts();
                         // Re-render with translated content, but skip further translation
                         this.displayReplyDrafts(drafts, true);
-                    });
+                    } catch (error) {
+                        console.error('Auto-translation of drafts failed:', error);
+                        // Don't show error to user - just log it
+                    }
                 }, 100);
             }
         });

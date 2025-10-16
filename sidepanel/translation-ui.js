@@ -84,9 +84,6 @@ export class TranslationUI {
         
         // If switching to a language, ensure model is downloaded and translate content
         if (newLanguage !== 'none') {
-            // Check if translation model is available
-            this.updateStatus(`Checking translation model for ${this.getLanguageName(newLanguage)}...`, 'loading');
-            
             try {
                 // This will trigger download if needed
                 const response = await chrome.runtime.sendMessage({
@@ -100,11 +97,22 @@ export class TranslationUI {
                     // Model is ready, translate existing content
                     await this.translateExistingContent();
                 } else {
-                    this.updateStatus(`Translation unavailable: ${response?.error || 'Unknown error'}`, 'error');
+                    // Translation not available - show helpful message
+                    const langName = this.getLanguageName(newLanguage);
+                    this.updateStatus(`Translation to ${langName} is not available. Please check Chrome AI settings.`, 'info');
+                    // Reset to 'none' since translation isn't working
+                    this.translationSettings.targetLanguage = 'none';
+                    this.elements.targetLanguageSelect.value = 'none';
+                    await this.saveSettings();
                 }
             } catch (error) {
                 console.error('Error initializing translation:', error);
-                this.updateStatus(`Translation error: ${error.message}`, 'error');
+                const langName = this.getLanguageName(newLanguage);
+                this.updateStatus(`Translation to ${langName} is not available.`, 'info');
+                // Reset to 'none' since translation isn't working
+                this.translationSettings.targetLanguage = 'none';
+                this.elements.targetLanguageSelect.value = 'none';
+                await this.saveSettings();
             }
         }
     }
@@ -200,8 +208,6 @@ export class TranslationUI {
         if (targetLanguage === 'none') return;
         
         try {
-            this.updateStatus(`Translating summary to ${this.getLanguageName(targetLanguage)}...`, 'loading');
-            
             const response = await chrome.runtime.sendMessage({
                 action: 'translateText',
                 text: originalText,
@@ -212,12 +218,12 @@ export class TranslationUI {
             if (response && response.success) {
                 this.elements.summary.textContent = response.translatedText;
             } else {
-                console.error('Translation failed:', response?.error);
-                this.updateStatus(`Translation failed: ${response?.error || 'Unknown error'}`, 'error');
+                console.warn('Translation unavailable:', response?.error);
+                // Silently fail - translation is optional
             }
         } catch (error) {
-            console.error('Error translating summary:', error);
-            this.updateStatus(`Translation error: ${error.message}`, 'error');
+            console.warn('Translation error:', error.message);
+            // Silently fail - translation is optional
         }
     }
 
