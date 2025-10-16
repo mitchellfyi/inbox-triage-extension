@@ -672,10 +672,8 @@ class InboxTriageSidePanel {
             }
             
             const userSettings = this.settingsManager.getSettings();
-            const isUsingCloud = userSettings.processingMode === 'hybrid';
-            const processingType = isUsingCloud ? 'on-device/cloud' : 'on-device';
             
-            this.updateStatus(`Generating summary (${processingType} AI)...`, 'loading');
+            this.updateStatus('Generating summary...', 'loading');
             
             // Request summary generation from background script
             const response = await chrome.runtime.sendMessage({
@@ -689,9 +687,8 @@ class InboxTriageSidePanel {
                 this.displaySummary(response.summary, response.keyPoints);
                 this.addProcessingIndicator('summarization', response.usedFallback || false);
                 
-                // Show final status with processing method
-                const method = response.usedFallback ? 'cloud' : 'on-device';
-                this.updateStatus(`✓ Summary generated (${method})`, 'success');
+                // Show final status
+                this.updateStatus('✓ Summary generated', 'success');
             } else {
                 // Error message is already sanitized by the service worker
                 throw new Error(response?.error || 'Failed to generate summary');
@@ -1123,10 +1120,8 @@ class InboxTriageSidePanel {
             const guidance = this.elements.guidanceText.value.trim();
             
             const userSettings = this.settingsManager.getSettings();
-            const isUsingCloud = userSettings.processingMode === 'hybrid';
-            const processingType = isUsingCloud ? 'on-device/cloud' : 'on-device';
             
-            this.updateStatus(`Composing ${tone} replies (${processingType} AI)...`, 'loading');
+            this.updateStatus(`Composing ${tone} replies...`, 'loading');
             
             const response = await chrome.runtime.sendMessage({
                 action: 'generateDrafts',
@@ -1143,14 +1138,13 @@ class InboxTriageSidePanel {
                 this.displayReplyDrafts(response.drafts);
                 this.addProcessingIndicator('drafting', response.usedFallback || false);
                 
-                // Show final status with processing method and count
-                const method = response.usedFallback ? 'cloud' : 'on-device';
+                // Show final status with count
                 const draftCount = response.drafts?.length || 0;
                 
                 if (response.warning) {
-                    this.updateStatus(`✓ ${draftCount} draft${draftCount !== 1 ? 's' : ''} generated (${method}): ${response.warning}`, 'success');
+                    this.updateStatus(`✓ ${draftCount} draft${draftCount !== 1 ? 's' : ''} generated: ${response.warning}`, 'success');
                 } else {
-                    this.updateStatus(`✓ ${draftCount} ${tone} draft${draftCount !== 1 ? 's' : ''} ready (${method})`, 'success');
+                    this.updateStatus(`✓ ${draftCount} ${tone} draft${draftCount !== 1 ? 's' : ''} ready`, 'success');
                 }
             } else {
                 // Error message is already sanitized by the service worker
