@@ -96,8 +96,9 @@ This project builds a Chrome extension for inbox triage that summarises email th
 ### Draft Copy Functionality
 **Given** reply drafts are displayed in the side panel  
 **When** the user clicks the copy button for any draft  
-**Then** the full draft text (subject + body) should be copied to the clipboard  
+**Then** the draft body text should be copied to the clipboard  
 **And** the user should receive visual confirmation of the successful copy  
+**Note:** Subject line is not copied as it follows standard "Re: [original subject]" format
 
 ### Attachment Detection and Analysis
 **Given** a user is viewing an email thread containing attachments in Gmail or Outlook  
@@ -109,16 +110,17 @@ This project builds a Chrome extension for inbox triage that summarises email th
 ### Attachment Content Processing  
 **Given** processable attachments have been detected  
 **When** the system begins attachment analysis  
-**Then** files should be processed entirely on-device using local parsing libraries  
+**Then** image attachments should be analyzed using the Prompt API's multimodal capabilities (via user-triggered UI button)  
+**And** PDF, DOCX, XLSX files should be processed entirely on-device using local parsing libraries (planned - see TODO.md)  
 **And** extracted content should be summarised using the built-in Summarizer API  
-**And** image attachments should be analysed using the Prompt API's multimodal capabilities  
 **And** no attachment content should be transmitted to external servers  
 
 ### Attachment Summary Display
 **Given** attachments have been successfully processed  
 **When** the analysis is complete  
-**Then** each attachment card should display a concise summary of the content  
-**And** users should be able to click cards to view detailed extracted content  
+**Then** image attachments should display analysis results when user clicks "Analyze Image" button  
+**And** document attachments (PDF, DOCX, XLSX) should show placeholder messages until parsing libraries are integrated  
+**And** users should be able to click cards to view detailed extracted content (modal implementation planned)  
 **And** processing errors should be clearly indicated with helpful messages  
 
 ### AI Model Availability Handling
@@ -170,7 +172,7 @@ This project builds a Chrome extension for inbox triage that summarises email th
 - Manifest V3 Chrome extension using the Side Panel API.
 - Content scripts to extract thread text and attachment metadata from Gmail and Outlook.
 - Use built-in on-device AI tasks (Summarizer, Prompt API) exclusively for summarisation, drafting, and attachment analysis; avoid external calls.
-- Local file processing libraries (PDF.js, mammoth.js, SheetJS) for attachment content extraction.
+- Local file processing libraries (PDF.js, mammoth.js, SheetJS) for attachment content extraction (planned - see TODO.md).
 - JSON schema enforcement to ensure predictable and parseable reply drafts.
 - Basic styling and accessible UI; do not rely on third-party UI frameworks; keep file size minimal.
 - Code must be well-structured with separate modules for extraction, summarisation, drafting, attachment processing, and UI logic.

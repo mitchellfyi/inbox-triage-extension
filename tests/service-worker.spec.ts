@@ -43,11 +43,11 @@ test.describe('Service Worker', () => {
     // Test AI capability detection functionality
     // This tests the service worker's ability to check AI model availability
     
-    // Send a capability check message
+    // Send a capability check message (using actual action name)
     const capabilityResponse = await sidePanelPage.evaluate(async () => {
       return new Promise((resolve) => {
         chrome.runtime.sendMessage({ 
-          action: 'checkCapabilities' 
+          action: 'checkAIStatus' 
         }, (response) => {
           resolve(response);
         });
@@ -57,6 +57,8 @@ test.describe('Service Worker', () => {
     // The response should include capability information (even if AI is not available)
     expect(capabilityResponse).toBeDefined();
     expect(typeof capabilityResponse).toBe('object');
+    expect(capabilityResponse.success).toBe(true);
+    expect(capabilityResponse.capabilities).toBeDefined();
   });
 
   test('handles side panel opening', async ({ context, extensionId }) => {
@@ -70,7 +72,7 @@ test.describe('Service Worker', () => {
     const sidePanelPage = await context.newPage();
     await sidePanelPage.goto(sidePanelUrl);
     
-    await expect(sidePanelPage).toHaveTitle('Inbox Triage Extension');
+    await expect(sidePanelPage).toHaveTitle('Inbox Triage');
     
     await testPage.close();
     await sidePanelPage.close();

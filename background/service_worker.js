@@ -5,6 +5,8 @@
 
 import { TranslationService } from './translation-service.js';
 import { MultimodalAnalysisService } from './multimodal-service.js';
+import { sanitizeErrorMessage } from '../utils/error-handler.js';
+import { validateDraftsSchema, validateAndFormatDrafts } from '../utils/validation.js';
 
 class InboxTriageServiceWorker {
     constructor() {
@@ -57,6 +59,15 @@ class InboxTriageServiceWorker {
         });
     }
     
+    /**
+     * Initialize AI capabilities and check model availability
+     * 
+     * Reference: SPEC.md - AI Model Availability Handling requirements
+     * Reference: https://developer.chrome.com/docs/ai/built-in
+     * 
+     * Checks availability of Summarizer, Prompt API, and Translator APIs.
+     * Starts periodic monitoring to detect when models finish downloading.
+     */
     async initializeAI() {
         try {
             // Check if AI capabilities are available using correct global constructors
@@ -156,7 +167,7 @@ class InboxTriageServiceWorker {
             }
         } catch (error) {
             console.error('Error initializing AI capabilities:', error);
-            this.broadcastModelStatus('error', { error: this.sanitizeErrorMessage(error.message) });
+            this.broadcastModelStatus('error', { error: sanitizeErrorMessage(error.message) });
         }
         
         // Start periodic checks for model availability
@@ -354,7 +365,7 @@ class InboxTriageServiceWorker {
             console.error('Error handling message:', error);
             sendResponse({ 
                 success: false, 
-                error: this.sanitizeErrorMessage(error.message)
+                error: sanitizeErrorMessage(error.message)
             });
         }
     }
@@ -391,7 +402,7 @@ class InboxTriageServiceWorker {
             sendResponse({
                 success: false,
                 available: false,
-                error: this.sanitizeErrorMessage(error.message)
+                error: sanitizeErrorMessage(error.message)
             });
         }
     }
@@ -459,7 +470,7 @@ class InboxTriageServiceWorker {
             
         } catch (error) {
             console.error('Translation error:', error);
-            const sanitizedError = this.sanitizeErrorMessage(error.message);
+            const sanitizedError = sanitizeErrorMessage(error.message);
             sendResponse({
                 success: false,
                 error: sanitizedError
@@ -530,7 +541,7 @@ class InboxTriageServiceWorker {
             
         } catch (error) {
             console.error('Image analysis error:', error);
-            const sanitizedError = this.sanitizeErrorMessage(error.message);
+            const sanitizedError = sanitizeErrorMessage(error.message);
             
             // Broadcast error status
             this.broadcastModelStatus('multimodal', { 
@@ -545,6 +556,19 @@ class InboxTriageServiceWorker {
         }
     }
     
+    /**
+     * Generate summary of email thread using Summarizer API
+     * 
+     * Reference: SPEC.md - AI-Powered Summarization requirements
+     * Reference: https://developer.chrome.com/docs/ai/summarizer-api
+     * 
+     * Generates TL;DR summary (under 100 words) and up to 5 key points.
+     * Handles model availability checks, content size limits, and fallback logic.
+     * 
+     * @param {Object} thread - Email thread data
+     * @param {Function} sendResponse - Response callback
+     * @param {Object} userSettings - User settings (processing mode, API key)
+     */
     async generateSummary(thread, sendResponse, userSettings = null) {
         try {
             const processingMode = userSettings?.processingMode || 'device-only';
@@ -668,7 +692,7 @@ class InboxTriageServiceWorker {
             console.error('Summary generation error:', error);
             
             // Sanitize error message for user display
-            const sanitizedError = this.sanitizeErrorMessage(error.message);
+            const sanitizedError = sanitizeErrorMessage(error.message);
             
             this.broadcastModelStatus('summarizing', { 
                 stage: 'error', 
@@ -682,6 +706,23 @@ class InboxTriageServiceWorker {
         }
     }
     
+    /**
+     * Generate reply drafts using Prompt API with JSON schema
+     * 
+     * Reference: SPEC.md - Reply Draft Generation requirements
+     * Reference: https://developer.chrome.com/docs/ai/prompt-api
+     * 
+     * Generates exactly 3 reply drafts in selected tone:
+     * 1. Short answer (quick acknowledgment)
+     * 2. Medium with clarifications (detailed response)
+     * 3. Polite with next steps (comprehensive response)
+     * 
+     * @param {Object} thread - Email thread data
+     * @param {string} tone - Selected tone (neutral, friendly, assertive, formal)
+     * @param {string} guidance - User-provided guidance for drafts
+     * @param {Function} sendResponse - Response callback
+     * @param {Object} userSettings - User settings (processing mode, API key)
+     */
     async generateReplyDrafts(thread, tone, guidance, sendResponse, userSettings = null) {
         try {
             const processingMode = userSettings?.processingMode || 'device-only';
@@ -760,7 +801,7 @@ class InboxTriageServiceWorker {
                 drafts = JSON.parse(cleanedResponse);
                 
                 // Validate against schema
-                const validation = this.validateDraftsSchema(drafts);
+                const validation = validateDraftsSchema(drafts);
                 if (!validation.isValid) {
                     console.warn('Schema validation failed:', validation.errors);
                     throw new Error(`Invalid response format: ${validation.errors.join(', ')}`);
@@ -773,13 +814,13 @@ class InboxTriageServiceWorker {
             }
             
             // Validate and format drafts
-            const formattedDrafts = this.validateAndFormatDrafts(drafts, subject);
+            const formattedDrafts = validateAndFormatDrafts(drafts, subject);
             
             // Ensure we always have exactly 3 drafts
             if (formattedDrafts.length !== 3) {
                 console.warn(`Expected 3 drafts, got ${formattedDrafts.length}, using fallback`);
                 const fallback = this.createFallbackDrafts('', subject, tone);
-                const fallbackFormatted = this.validateAndFormatDrafts(fallback, subject);
+                const fallbackFormatted = validateAndFormatDrafts(fallback, subject);
                 
                 sendResponse({
                     success: true,
@@ -800,7 +841,7 @@ class InboxTriageServiceWorker {
             console.error('Draft generation error:', error);
             
             // Sanitize error message for user display
-            const sanitizedError = this.sanitizeErrorMessage(error.message);
+            const sanitizedError = sanitizeErrorMessage(error.message);
             
             sendResponse({
                 success: false,
@@ -811,6 +852,13 @@ class InboxTriageServiceWorker {
     
     /**
      * Process a single attachment for AI analysis
+     * 
+     * Reference: SPEC.md - Attachment Content Processing requirements
+     * 
+     * Processes attachments (images, PDFs, DOCX, XLSX) entirely on-device.
+     * For images: uses multimodal Prompt API (triggered via UI)
+     * For documents: placeholder (PDF/DOCX/XLSX parsing not yet implemented)
+     * 
      * @param {Object} attachment - Attachment metadata and content
      * @param {Function} sendResponse - Response callback
      */
@@ -862,7 +910,7 @@ class InboxTriageServiceWorker {
         } catch (error) {
             console.error('Attachment processing error:', error);
             
-            const sanitizedError = this.sanitizeErrorMessage(error.message);
+            const sanitizedError = sanitizeErrorMessage(error.message);
             sendResponse({
                 success: false,
                 error: sanitizedError,
@@ -877,23 +925,37 @@ class InboxTriageServiceWorker {
     
     /**
      * Process image attachment using multimodal Prompt API
+     * 
+     * STATUS: Partial implementation - image analysis via sidepanel.js analyzeImage() method
+     * See: sidepanel.js analyzeImage() for full multimodal implementation
+     * Reference: https://developer.chrome.com/docs/ai/prompt-api
+     * 
+     * This method is called during attachment processing but currently returns
+     * a placeholder message. Full image analysis is implemented in the side panel
+     * via the analyzeImage() method which uses multimodal Prompt API capabilities.
+     * 
+     * Note: This method processes attachments during bulk extraction.
+     * For individual image analysis, users should use the "Analyze Image" button
+     * in the attachment card UI.
+     * 
      * @param {Object} attachment - Image attachment
-     * @returns {string} Extracted description
+     * @returns {string} Placeholder message indicating analysis available via UI
      */
     async processImageAttachment(attachment) {
         try {
             // Check if multimodal Prompt API is available
             if (!this.aiCapabilities.promptApi || this.aiCapabilities.promptApi.available !== 'readily') {
-                return `Image analysis unavailable - AI model not ready`;
+                return `Image analysis unavailable - AI model not ready. Please ensure Chrome AI features are enabled.`;
             }
             
-            // For now, return a placeholder since we need to implement actual image fetching
-            // In the full implementation, we would:
-            // 1. Fetch the image blob from attachment.downloadUrl
-            // 2. Convert to base64 or appropriate format
-            // 3. Use the multimodal Prompt API to analyze the image
+            // Note: Full image analysis is implemented in sidepanel.js analyzeImage() method
+            // which uses multimodal Prompt API. This method is called during bulk processing
+            // but individual image analysis should be triggered via the UI.
+            // 
+            // Future enhancement: Implement full image fetching and analysis here for bulk processing
+            // Reference: SPEC.md - Attachment Content Processing requirements
             
-            return `Image attachment: ${attachment.name}. Full image analysis capabilities coming soon with multimodal AI integration.`;
+            return `Image attachment: ${attachment.name}. Use the "Analyze Image" button in the attachment card for AI-powered analysis.`;
             
         } catch (error) {
             console.error('Image processing error:', error);
@@ -903,17 +965,30 @@ class InboxTriageServiceWorker {
     
     /**
      * Process document attachment (PDF, DOCX, XLSX)
+     * 
+     * STATUS: Not yet implemented - placeholder functionality
+     * See TODO.md Section "Attachment Processing" for implementation roadmap
+     * Reference: SPEC.md - Attachment Content Processing requirements
+     * 
+     * This method is called during attachment processing but currently returns
+     * a placeholder message. File parsing libraries (PDF.js, mammoth.js, SheetJS)
+     * need to be integrated for full document extraction capabilities.
+     * 
+     * Current behavior: Returns informative message indicating feature is planned
+     * Future implementation should:
+     * 1. Fetch the document blob from attachment.downloadUrl
+     * 2. Use appropriate library (PDF.js for PDF, mammoth.js for DOCX, SheetJS for XLSX)
+     * 3. Extract text content for AI summarization
+     * 4. Return extracted text (respecting privacy: all processing on-device)
+     * 
+     * Privacy Note: All file processing must occur on-device per SPEC.md requirements.
+     * No attachment content should be transmitted to external services.
+     * 
      * @param {Object} attachment - Document attachment  
-     * @returns {string} Extracted text content
+     * @returns {string} Placeholder message indicating feature not yet available
      */
     async processDocumentAttachment(attachment) {
         try {
-            // For now, return a placeholder since we need to implement file parsing libraries
-            // In the full implementation, we would:
-            // 1. Fetch the document blob from attachment.downloadUrl  
-            // 2. Use appropriate library (PDF.js, mammoth.js, SheetJS) to extract text
-            // 3. Return the extracted text content
-            
             const typeMap = {
                 'pdf': 'PDF text extraction',
                 'docx': 'Word document text extraction', 
@@ -921,7 +996,7 @@ class InboxTriageServiceWorker {
             };
             
             const description = typeMap[attachment.type] || 'Document processing';
-            return `${description} for ${attachment.name}. Full document parsing capabilities coming soon with integrated file processing libraries.`;
+            return `${description} for ${attachment.name}. Document parsing capabilities are planned but not yet implemented. See TODO.md for roadmap.`;
             
         } catch (error) {
             console.error('Document processing error:', error);
@@ -931,6 +1006,7 @@ class InboxTriageServiceWorker {
     
     /**
      * Generate summary of attachment content using Summarizer API
+     * Reference: https://developer.chrome.com/docs/ai/summarizer-api
      * @param {string} content - Extracted content from attachment
      * @param {Object} attachment - Attachment metadata
      * @returns {string} Generated summary
@@ -942,8 +1018,10 @@ class InboxTriageServiceWorker {
             }
             
             // Create summarizer session for attachment content
-            const summarizer = await self.ai.summarizer.create({
-                type: 'tl;dr',
+            // Using global Summarizer constructor - matching pattern used elsewhere in this file
+            // Reference: https://developer.chrome.com/docs/ai/summarizer-api
+            const summarizer = await Summarizer.create({
+                type: 'tldr',
                 format: 'plain-text',
                 length: 'short'
             });
@@ -1041,113 +1119,14 @@ class InboxTriageServiceWorker {
     }
     
     /**
-     * JSON Schema for reply drafts to ensure structured output
-     * @returns {Object} JSON schema object for validation
-     */
-    getReplyDraftsSchema() {
-        return {
-            type: "object",
-            required: ["drafts"],
-            properties: {
-                drafts: {
-                    type: "array",
-                    minItems: 3,
-                    maxItems: 3,
-                    items: {
-                        type: "object",
-                        required: ["type", "subject", "body"],
-                        properties: {
-                            type: {
-                                type: "string",
-                                minLength: 1,
-                                maxLength: 50
-                            },
-                            subject: {
-                                type: "string",
-                                minLength: 1,
-                                maxLength: 100
-                            },
-                            body: {
-                                type: "string",
-                                minLength: 10,
-                                maxLength: 1500
-                            }
-                        },
-                        additionalProperties: false
-                    }
-                }
-            },
-            additionalProperties: false
-        };
-    }
-    
-    /**
-     * Validate reply drafts against JSON schema
-     * @param {Object} drafts - The drafts object to validate
-     * @returns {Object} Validation result with isValid and errors
-     */
-    validateDraftsSchema(drafts) {
-        const schema = this.getReplyDraftsSchema();
-        const errors = [];
-        
-        try {
-            // Basic structure validation
-            if (!drafts || typeof drafts !== 'object') {
-                errors.push('Response must be a valid JSON object');
-                return { isValid: false, errors };
-            }
-            
-            if (!drafts.drafts || !Array.isArray(drafts.drafts)) {
-                errors.push('Response must contain a "drafts" array');
-                return { isValid: false, errors };
-            }
-            
-            if (drafts.drafts.length !== 3) {
-                errors.push(`Must contain exactly 3 drafts, found ${drafts.drafts.length}`);
-                return { isValid: false, errors };
-            }
-            
-            // Validate each draft
-            drafts.drafts.forEach((draft, index) => {
-                if (!draft || typeof draft !== 'object') {
-                    errors.push(`Draft ${index + 1} must be an object`);
-                    return;
-                }
-                
-                // Check required fields
-                const requiredFields = ['type', 'subject', 'body'];
-                requiredFields.forEach(field => {
-                    if (!draft[field] || typeof draft[field] !== 'string') {
-                        errors.push(`Draft ${index + 1} missing or invalid "${field}" field`);
-                    }
-                });
-                
-                // Check field length constraints
-                if (draft.type && draft.type.length > 50) {
-                    errors.push(`Draft ${index + 1} type too long (max 50 chars)`);
-                }
-                if (draft.subject && draft.subject.length > 100) {
-                    errors.push(`Draft ${index + 1} subject too long (max 100 chars)`);
-                }
-                if (draft.body && draft.body.length > 1500) {
-                    errors.push(`Draft ${index + 1} body too long (max 1500 chars)`);
-                }
-                if (draft.body && draft.body.length < 10) {
-                    errors.push(`Draft ${index + 1} body too short (min 10 chars)`);
-                }
-            });
-            
-            return { isValid: errors.length === 0, errors };
-            
-        } catch (error) {
-            errors.push(`Validation error: ${error.message}`);
-            return { isValid: false, errors };
-        }
-    }
-    
-    /**
      * Create system prompt with JSON schema constraints
-     * @param {string} tone - The tone to use for replies
+     * 
+     * Reference: SPEC.md - Reply Draft Generation requirements (JSON schema enforcement)
+     * 
+     * Creates a system prompt that instructs the AI to generate exactly 3 drafts
+     * in the specified tone, conforming to the JSON schema structure.
+     * 
+     * @param {string} tone - The tone to use for replies (neutral, friendly, assertive, formal)
      * @returns {string} System prompt with schema requirements
      */
     createSystemPrompt(tone) {
@@ -1172,9 +1151,13 @@ Each draft must have exactly these three fields: type, subject, body. Generate e
     
     /**
      * Create a structured prompt for reply generation with JSON schema specification
+     * 
+     * Reference: SPEC.md - Reply Draft Generation requirements
+     * 
      * @param {string} threadText - The email thread content
      * @param {string} originalSubject - The original email subject
      * @param {string} tone - The tone to use for replies
+     * @param {string} guidance - Optional user guidance for customizing drafts
      * @returns {string} Structured prompt with JSON requirements
      */
     createReplyPrompt(threadText, originalSubject, tone, guidance = '') {
@@ -1266,136 +1249,6 @@ Respond with ONLY the following JSON format (no other text):
                 }
             ]
         };
-    }
-    
-    /**
-     * Validate and format drafts with enhanced error checking
-     * @param {Object} drafts - The drafts object to validate and format
-     * @param {string} originalSubject - The original email subject for fallback
-     * @returns {Array} Array of validated and formatted draft objects
-     */
-    validateAndFormatDrafts(drafts, originalSubject) {
-        const draftArray = drafts.drafts || drafts || [];
-        
-        if (!Array.isArray(draftArray)) {
-            console.warn('Drafts is not an array, creating empty array');
-            return [];
-        }
-        
-        return draftArray.slice(0, 3).map((draft, index) => {
-            // Ensure draft is an object
-            if (!draft || typeof draft !== 'object') {
-                console.warn(`Draft ${index + 1} is not an object, using defaults`);
-                draft = {};
-            }
-            
-            // Sanitize and validate each field
-            const type = this.sanitizeString(draft.type, 50) || `Draft ${index + 1}`;
-            const subject = this.sanitizeString(draft.subject, 100) || `Re: ${originalSubject}`;
-            const body = this.sanitizeString(draft.body, 1500) || 'No content generated.';
-            
-            return {
-                type,
-                subject,
-                body
-            };
-        });
-    }
-    
-    /**
-     * Sanitize and truncate string fields
-     * @param {*} value - The value to sanitize
-     * @param {number} maxLength - Maximum allowed length
-     * @returns {string|null} Sanitized string or null if invalid
-     */
-    sanitizeString(value, maxLength) {
-        if (typeof value !== 'string') {
-            return null;
-        }
-        
-        // Remove any potentially harmful content
-        const sanitized = value
-            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove scripts
-            .replace(/<[^>]*>/g, '') // Remove HTML tags
-            .replace(/javascript:/gi, '') // Remove javascript: URLs
-            .trim();
-        
-        if (sanitized.length === 0) {
-            return null;
-        }
-        
-        // Truncate if too long
-        return sanitized.length > maxLength 
-            ? sanitized.substring(0, maxLength - 3) + '...' 
-            : sanitized;
-    }
-    
-    /**
-     * Sanitize error messages to prevent technical details from reaching users
-     * @param {string} errorMessage - Raw error message
-     * @returns {string} User-friendly error message
-     */
-    sanitizeErrorMessage(errorMessage) {
-        if (!errorMessage || typeof errorMessage !== 'string') {
-            return 'An unexpected error occurred. Please try again.';
-        }
-        
-        // Define patterns for technical errors and their user-friendly alternatives
-        const errorMappings = [
-            {
-                patterns: [/stack trace/i, /error.*stack/i, /at\s+\w+\s*\(/, /\n\s*at\s+/],
-                message: 'An unexpected error occurred. Please try again.'
-            },
-            {
-                patterns: [/language model.*not available/i, /prompt api.*not available/i],
-                message: 'AI reply drafting is not available. Please enable Chrome AI features or try using Chrome 120+.'
-            },
-            {
-                patterns: [/summarizer.*not available/i, /summarization.*not available/i],
-                message: 'AI summarization is not available. Please enable Chrome AI features or try using Chrome 120+.'
-            },
-            {
-                patterns: [/downloading/i, /after.*download/i],
-                message: 'AI models are still downloading. This can take several minutes. Please try again shortly.'
-            },
-            {
-                patterns: [/session.*failed/i, /session.*error/i],
-                message: 'AI processing session failed. Please try again.'
-            },
-            {
-                patterns: [/invalid.*json/i, /json.*parse/i, /unexpected token/i],
-                message: 'AI response was malformed. Please try regenerating.'
-            },
-            {
-                patterns: [/network.*error/i, /connection.*failed/i, /timeout/i],
-                message: 'Connection error occurred. Please check your internet connection and try again.'
-            },
-            {
-                patterns: [/permission.*denied/i, /not.*authorized/i],
-                message: 'Permission denied. Please ensure Chrome AI features are enabled.'
-            }
-        ];
-        
-        // Check for known error patterns
-        for (const mapping of errorMappings) {
-            if (mapping.patterns.some(pattern => pattern.test(errorMessage))) {
-                return mapping.message;
-            }
-        }
-        
-        // For unknown errors, provide a generic message but preserve some context if it's safe
-        const safeMessage = errorMessage.replace(/\s*at\s+.*$/gm, '') // Remove stack traces
-                                      .split('\n')[0] // Take only first line
-                                      .replace(/^(TypeError|Error|ReferenceError|SyntaxError):\s*/i, '') // Remove error types
-                                      .trim();
-        
-        // If the cleaned message is too short or technical, use generic message
-        if (safeMessage.length < 10 || /^[A-Z_]+$/i.test(safeMessage)) {
-            return 'An unexpected error occurred. Please try again.';
-        }
-        
-        // Return the cleaned message if it seems user-friendly
-        return safeMessage.charAt(0).toUpperCase() + safeMessage.slice(1);
     }
     
     /**
@@ -1579,7 +1432,7 @@ Respond with ONLY the following JSON format (no other text):
             
         } catch (error) {
             console.error('External API summary generation error:', error);
-            const sanitizedError = this.sanitizeErrorMessage(error.message);
+            const sanitizedError = sanitizeErrorMessage(error.message);
             sendResponse({
                 success: false,
                 error: `External API error: ${sanitizedError}`
@@ -1628,12 +1481,12 @@ Respond with ONLY the following JSON format (no other text):
             }
             
             // Validate and format drafts
-            const formattedDrafts = this.validateAndFormatDrafts({ drafts }, subject);
+            const formattedDrafts = validateAndFormatDrafts({ drafts }, subject);
             
             if (formattedDrafts.length !== 3) {
                 console.warn(`Expected 3 drafts, got ${formattedDrafts.length}`);
                 const fallback = this.createFallbackDrafts('', subject, tone);
-                const fallbackFormatted = this.validateAndFormatDrafts(fallback, subject);
+                const fallbackFormatted = validateAndFormatDrafts(fallback, subject);
                 
                 sendResponse({
                     success: true,
@@ -1652,7 +1505,7 @@ Respond with ONLY the following JSON format (no other text):
             
         } catch (error) {
             console.error('External API draft generation error:', error);
-            const sanitizedError = this.sanitizeErrorMessage(error.message);
+            const sanitizedError = sanitizeErrorMessage(error.message);
             sendResponse({
                 success: false,
                 error: `External API error: ${sanitizedError}`
@@ -1756,26 +1609,86 @@ Respond with ONLY the following JSON format (no other text):
     
     /**
      * Placeholder for Anthropic API calls (Claude)
-     * TODO: Implement when Anthropic API key is provided
+     * 
+     * STATUS: Not yet implemented - placeholder functionality
+     * See TODO.md for implementation roadmap
+     * 
+     * This method is called when users select Anthropic as their API provider,
+     * but the integration is not yet complete. Users are directed to use 
+     * OpenAI or Google AI providers instead.
+     * 
+     * Future implementation should:
+     * - Use Anthropic's Messages API (https://docs.anthropic.com/claude/reference/messages_post)
+     * - Follow privacy requirements: only send extracted email text, never attachments
+     * - Handle rate limits and errors gracefully
+     * 
+     * @param {string} text - Text to summarize
+     * @param {string} apiKey - Anthropic API key
+     * @returns {Object} Summary and key points
+     * @throws {Error} Always throws error indicating feature not available
      */
     async callAnthropicSummarize(text, apiKey) {
-        throw new Error('Anthropic API integration coming soon. Please use OpenAI or Google AI for now.');
+        throw new Error('Anthropic (Claude) API integration is not yet implemented. Please use OpenAI or Google AI providers, or Chrome\'s built-in AI. See TODO.md for implementation roadmap.');
     }
     
+    /**
+     * Placeholder for Anthropic API draft generation
+     * 
+     * STATUS: Not yet implemented - placeholder functionality
+     * See TODO.md for implementation roadmap
+     * 
+     * @param {string} text - Thread text
+     * @param {string} subject - Email subject
+     * @param {string} tone - Selected tone
+     * @param {string} guidance - User guidance
+     * @param {string} apiKey - Anthropic API key
+     * @returns {Array} Draft objects
+     * @throws {Error} Always throws error indicating feature not available
+     */
     async callAnthropicDrafts(text, subject, tone, guidance, apiKey) {
-        throw new Error('Anthropic API integration coming soon. Please use OpenAI or Google AI for now.');
+        throw new Error('Anthropic (Claude) API integration is not yet implemented. Please use OpenAI or Google AI providers, or Chrome\'s built-in AI. See TODO.md for implementation roadmap.');
     }
     
     /**
      * Placeholder for Google AI API calls (Gemini)
-     * TODO: Implement when Google AI API key is provided
+     * 
+     * STATUS: Not yet implemented - placeholder functionality
+     * See TODO.md for implementation roadmap
+     * 
+     * This method is called when users select Google AI as their API provider,
+     * but the integration is not yet complete. Users are directed to use 
+     * OpenAI provider instead.
+     * 
+     * Future implementation should:
+     * - Use Google's Generative AI API (https://ai.google.dev/docs)
+     * - Follow privacy requirements: only send extracted email text, never attachments
+     * - Handle rate limits and errors gracefully
+     * 
+     * @param {string} text - Text to summarize
+     * @param {string} apiKey - Google AI API key
+     * @returns {Object} Summary and key points
+     * @throws {Error} Always throws error indicating feature not available
      */
     async callGoogleAISummarize(text, apiKey) {
-        throw new Error('Google AI API integration coming soon. Please use OpenAI for now.');
+        throw new Error('Google AI (Gemini) API integration is not yet implemented. Please use OpenAI provider, or Chrome\'s built-in AI. See TODO.md for implementation roadmap.');
     }
     
+    /**
+     * Placeholder for Google AI API draft generation
+     * 
+     * STATUS: Not yet implemented - placeholder functionality
+     * See TODO.md for implementation roadmap
+     * 
+     * @param {string} text - Thread text
+     * @param {string} subject - Email subject
+     * @param {string} tone - Selected tone
+     * @param {string} guidance - User guidance
+     * @param {string} apiKey - Google AI API key
+     * @returns {Array} Draft objects
+     * @throws {Error} Always throws error indicating feature not available
+     */
     async callGoogleAIDrafts(text, subject, tone, guidance, apiKey) {
-        throw new Error('Google AI API integration coming soon. Please use OpenAI for now.');
+        throw new Error('Google AI (Gemini) API integration is not yet implemented. Please use OpenAI provider, or Chrome\'s built-in AI. See TODO.md for implementation roadmap.');
     }
     
     async openSidePanel(tab) {

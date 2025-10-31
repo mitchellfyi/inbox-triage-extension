@@ -92,8 +92,8 @@ Enhanced with:
 ✅ Implemented OpenAI GPT-4 integration
   ✅ callOpenAISummarize() - Full implementation
   ✅ callOpenAIDrafts() - Full implementation
-✅ Prepared Anthropic Claude integration (placeholders)
-✅ Prepared Google Gemini integration (placeholders)
+🔄 Prepared Anthropic Claude integration (placeholders - throws errors, not yet implemented)
+🔄 Prepared Google Gemini integration (placeholders - throws errors, not yet implemented)
 ✅ Routing logic to choose Chrome AI or external API
 ✅ Error handling for API failures
 ✅ Fallback to Chrome AI when possible
@@ -117,22 +117,22 @@ Based on [developer.chrome.com/docs/ai/built-in](https://developer.chrome.com/do
 
 #### API Access
 ```javascript
-✅ Using: self.ai (in service worker) - CORRECT
-✅ Using: window.ai (in pages) - CORRECT  
+✅ Using: Summarizer, LanguageModel, Translator (global constructors) - CORRECT
+✅ Available in service worker context - CORRECT  
 ```
 
 #### Summarizer API
 ```javascript
-✅ Capabilities check: await self.ai.summarizer.capabilities() - CORRECT
-✅ Create session: await self.ai.summarizer.create({ type, format, length }) - CORRECT
+✅ Availability check: await Summarizer.availability() - CORRECT
+✅ Create session: await Summarizer.create({ type, format, length }) - CORRECT
 ✅ Summarize: await summarizer.summarize(text) - CORRECT
 ✅ Cleanup: summarizer.destroy() - CORRECT
 ```
 
 #### Language Model API (Prompt API)
 ```javascript
-✅ Capabilities check: await self.ai.languageModel.capabilities() - CORRECT
-✅ Create session: await self.ai.languageModel.create({ initialPrompts: [{ role: 'system', content: ... }], temperature, topK }) - CORRECT
+✅ Availability check: await LanguageModel.availability() - CORRECT
+✅ Create session: await LanguageModel.create({ initialPrompts: [...], temperature, topK }) - CORRECT
 ✅ Prompt: await session.prompt(text) - CORRECT
 ✅ Cleanup: session.destroy() - CORRECT
 ```
@@ -192,14 +192,19 @@ Based on [developer.chrome.com/docs/ai/built-in](https://developer.chrome.com/do
 | API Key Settings UI | ✅ Complete | Full settings section |
 | API Key Storage | ✅ Complete | Secure Chrome sync storage |
 | OpenAI Integration | ✅ Complete | GPT-4 summarization + drafts |
-| Anthropic Integration | 🔄 Prepared | Placeholder methods ready |
-| Google AI Integration | 🔄 Prepared | Placeholder methods ready |
+| Anthropic Integration | 🔄 Prepared | Placeholder methods ready - not yet implemented |
+| Google AI Integration | 🔄 Prepared | Placeholder methods ready - not yet implemented |
+| Image Analysis | ✅ Partial | Multimodal Prompt API via UI button (not bulk processing) |
+| PDF/DOCX/XLSX Processing | 🔄 Planned | Not yet implemented - see TODO.md |
+| Attachment Detail Modal | 🔄 Planned | Uses alert() placeholder - see TODO.md |
+| Translation Support | ✅ Complete | Translator API integration complete |
 | Setup Documentation | ✅ Complete | SETUP.md comprehensive |
 | Quick Reference | ✅ Complete | QUICK-REFERENCE.md |
 | Troubleshooting Guide | ✅ Complete | 10+ common issues |
 | Privacy Documentation | ✅ Complete | Clear explanations |
-| Error Handling | ✅ Complete | User-friendly messages |
+| Error Handling | ✅ Complete | User-friendly messages (centralized in utils/) |
 | Model Download Status | ✅ Complete | Progress tracking |
+| Draft Validation | ✅ Complete | Centralized validation utilities |
 
 ---
 

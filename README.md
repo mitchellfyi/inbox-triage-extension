@@ -7,11 +7,12 @@ This Chrome extension transforms email overwhelm into actionable insights by ins
 ## Value Proposition
 
 - **Save Time**: Get instant TL;DR summaries and key points from lengthy email threads
-- **Understand Attachments**: Automatically analyze PDFs, documents, spreadsheets, and images locally
+- **Understand Attachments**: 
+  - ✅ **Image Analysis**: AI-powered image understanding and OCR text extraction (via UI button)
+  - 🔜 **Document Processing**: PDF, DOCX, XLSX parsing planned (see TODO.md)
 - **Stay Responsive**: Generate professional reply drafts in multiple tones and lengths with custom guidance
 - **Voice Input**: Use voice dictation to quickly add guidance for your reply drafts
 - **🆕 Multilingual Support**: Translate summaries and drafts to 15+ languages on-device
-- **🆕 Image Analysis**: AI-powered image understanding and OCR text extraction from attachments
 - **Protect Privacy**: All processing happens locally—no data or files leave your device, including translations
 - **Work Offline**: Fully functional once AI models are downloaded
 
@@ -21,9 +22,11 @@ This extension showcases multiple Chrome AI APIs working together:
 
 - **✅ Summarizer API** - Email thread condensation and key points extraction
 - **✅ Prompt API** - Structured draft generation with JSON schema
-- **✅ Prompt API (Multimodal)** - Image analysis and OCR text extraction
+- **✅ Prompt API (Multimodal)** - Image analysis and OCR text extraction (via UI button)
 - **✅ Translator API** - On-device multilingual translation (15+ languages)
 - **🔜 More Coming Soon** - Proofreader, Rewriter, Writer APIs for enhanced content refinement
+
+**Custom API Keys**: OpenAI integration is fully implemented. Anthropic and Google AI integrations are planned but not yet available (see TODO.md).
 
 All processing happens locally on your device for complete privacy.
 
@@ -98,12 +101,13 @@ Start here to understand the project and contribute effectively:
 
 Don't have Chrome 128+ or sufficient resources? No problem!
 
-1. Get an API key from [Google AI Studio](https://aistudio.google.com/app/apikey) (recommended), [Anthropic](https://console.anthropic.com/), or [OpenAI](https://platform.openai.com/api-keys)
+1. Get an API key from [OpenAI](https://platform.openai.com/api-keys) (currently supported), [Anthropic](https://console.anthropic.com/) (planned), or [Google AI Studio](https://aistudio.google.com/app/apikey) (planned)
 2. Open extension → Settings (⚙️ button) → "API Settings (Optional)"
 3. Check "Use custom API key"
-4. Enter your API key and click "Save"
+4. Select provider (OpenAI supported, others coming soon)
+5. Enter your API key and click "Save"
 
-**Note:** Custom API keys work anywhere but send data to external servers. Chrome AI is private and free but requires setup.
+**Note:** Currently only OpenAI API keys are supported. Anthropic and Google AI integrations are planned. Custom API keys work anywhere but send data to external servers. Chrome AI is private and free but requires setup.
 
 ---
 
@@ -162,7 +166,10 @@ npm run test:e2e
 
 **Voice Privacy:** Voice dictation uses the browser's built-in Web Speech API for on-device transcription. Audio is not transmitted to external servers.
 
-**Attachment Privacy:** PDF, DOCX, XLSX, and image files are processed locally using on-device parsing libraries. No attachment content is ever uploaded or transmitted, even in hybrid mode.
+**Attachment Privacy:** 
+- ✅ Image files are analyzed locally using multimodal Prompt API (user-triggered)
+- 🔜 PDF, DOCX, XLSX parsing is planned but not yet implemented (see TODO.md)
+- All attachment processing happens on-device when implemented. No attachment content is ever uploaded or transmitted, even in hybrid mode.
 
 **No Data Collection:** The extension does not collect, store, or transmit any user data, email content, attachment content, voice recordings, or usage analytics.
 
