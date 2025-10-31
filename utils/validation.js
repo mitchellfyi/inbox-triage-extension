@@ -154,18 +154,17 @@ export function sanitizeString(value, maxLength) {
 }
 
 /**
- * Validate and format drafts with enhanced error checking
- * 
- * Ensures drafts are properly formatted and sanitized, with fallback
- * values for missing or invalid fields.
+ * Validate and format draft objects
+ * Ensures drafts match expected schema and adds default values
  * 
  * Reference: docs/spec.md - Reply Draft Generation requirements
  * 
- * @param {Object} drafts - The drafts object to validate and format
- * @param {string} originalSubject - The original email subject for fallback
- * @returns {Array} Array of validated and formatted draft objects
+ * @param {Object|Array} drafts - Draft objects from AI (can be object with drafts array or array directly)
+ * @param {string} originalSubject - Original email subject for default subject generation
+ * @param {string} signature - Optional signature to append to draft bodies
+ * @returns {Array<Object>} Validated and formatted draft array
  */
-export function validateAndFormatDrafts(drafts, originalSubject) {
+export function validateAndFormatDrafts(drafts, originalSubject, signature = '') {
     const draftArray = drafts.drafts || drafts || [];
     
     if (!Array.isArray(draftArray)) {
@@ -183,7 +182,26 @@ export function validateAndFormatDrafts(drafts, originalSubject) {
         // Sanitize and validate each field
         const type = sanitizeString(draft.type, 50) || `Draft ${index + 1}`;
         const subject = sanitizeString(draft.subject, 100) || `Re: ${originalSubject}`;
-        const body = sanitizeString(draft.body, 1500) || 'No content generated.';
+        let body = sanitizeString(draft.body, 1500) || 'No content generated.';
+        
+        // Append signature if provided
+        if (signature && signature.trim()) {
+            const sig = signature.trim();
+            // Add signature with proper spacing
+            if (body && !body.endsWith('\n')) {
+                body += '\n\n';
+            } else if (body) {
+                body += '\n';
+            }
+            body += sig;
+            
+            // Re-enforce length limit after signature is added
+            if (body.length > 1500) {
+                // Keep signature, truncate body
+                const maxBodyLength = 1500 - sig.length - 2; // 2 for newlines
+                body = body.substring(0, maxBodyLength) + '\n\n' + sig;
+            }
+        }
         
         return {
             type,

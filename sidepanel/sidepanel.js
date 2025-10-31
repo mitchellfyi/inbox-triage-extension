@@ -346,6 +346,9 @@ class InboxTriageSidePanel {
             apiKeySection: document.getElementById('api-key-section'),
             saveApiKeyBtn: document.getElementById('save-api-key-btn'),
             apiProviderNotice: document.getElementById('api-provider-notice'),
+            // Signature settings
+            signatureInput: document.getElementById('signature-input'),
+            saveSignatureBtn: document.getElementById('save-signature-btn'),
             // Translation settings
             targetLanguageSelect: document.getElementById('target-language'),
             // Attachment modal

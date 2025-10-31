@@ -11,7 +11,8 @@ export class SettingsManager {
             processingMode: 'device-only',
             useApiKey: false,
             apiKey: '',
-            apiProvider: 'google'
+            apiProvider: 'google',
+            signature: ''
         };
     }
 
@@ -64,6 +65,11 @@ export class SettingsManager {
         if (this.elements.saveApiKeyBtn) {
             this.elements.saveApiKeyBtn.addEventListener('click', () => this.saveApiKey());
         }
+        
+        // Bind signature events
+        if (this.elements.saveSignatureBtn) {
+            this.elements.saveSignatureBtn.addEventListener('click', () => this.saveSignature());
+        }
     }
 
     /**
@@ -76,7 +82,8 @@ export class SettingsManager {
                     'processingMode',
                     'useApiKey',
                     'apiKey',
-                    'apiProvider'
+                    'apiProvider',
+                    'signature'
                 ]);
 
                 if (result.processingMode) {
@@ -91,14 +98,19 @@ export class SettingsManager {
                 if (result.apiProvider) {
                     this.settings.apiProvider = result.apiProvider;
                 }
+                if (result.signature) {
+                    this.settings.signature = result.signature;
+                }
             }
 
             this.updateProcessingModeUI();
             this.updateApiKeyUI();
+            this.updateSignatureUI();
         } catch (error) {
             console.error('Error loading settings:', error);
             this.updateProcessingModeUI();
             this.updateApiKeyUI();
+            this.updateSignatureUI();
         }
     }
 
@@ -112,7 +124,8 @@ export class SettingsManager {
                     processingMode: this.settings.processingMode,
                     useApiKey: this.settings.useApiKey,
                     apiKey: this.settings.apiKey,
-                    apiProvider: this.settings.apiProvider
+                    apiProvider: this.settings.apiProvider,
+                    signature: this.settings.signature
                 });
                 console.log('Settings saved (API key hidden):', {
                     ...this.settings,
@@ -196,6 +209,37 @@ export class SettingsManager {
         document.body.style.overflow = '';
     }
 
+    /**
+     * Update signature UI
+     */
+    updateSignatureUI() {
+        if (this.elements.signatureInput) {
+            this.elements.signatureInput.value = this.settings.signature || '';
+        }
+    }
+    
+    /**
+     * Save signature settings
+     */
+    async saveSignature() {
+        try {
+            const signature = this.elements.signatureInput?.value?.trim() || '';
+            
+            this.settings.signature = signature;
+            
+            await this.save();
+            
+            if (signature) {
+                this.updateStatus('✓ Signature saved', 'success');
+            } else {
+                this.updateStatus('✓ Signature cleared', 'success');
+            }
+        } catch (error) {
+            console.error('Error saving signature:', error);
+            this.updateStatus('Failed to save signature', 'error');
+        }
+    }
+    
     /**
      * Get current settings
      */

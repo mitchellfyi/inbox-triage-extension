@@ -27,13 +27,6 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 
 ## Extension Core
 
-### Enhancement Opportunities
-- `[todo]` Nested thread handling - Improve handling of complex reply chains
-- `[todo]` Dynamic content handling - MutationObserver for SPA updates
-- `[todo]` Multiple conversation views - Different Gmail layouts and themes (dark mode, compact view)
-- `[todo]` Outlook version variations - Office 365, Outlook.com differences
-- `[todo]` Timestamp parsing improvements - More consistent date/time extraction
-
 ## Attachment Processing
 
 ### File Processing

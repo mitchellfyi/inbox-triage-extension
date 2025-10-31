@@ -6,10 +6,18 @@
  * Reference: AGENTS.md - Content Script Layer architecture
  */
 
+import { cleanText, extractEmailFromText } from '../utils/text-cleaner.js';
+import { parseTimestamp, normalizeTimestamp, parseRelativeTime } from '../utils/timestamp-parser.js';
+import { createThreadObserver } from './mutation-observer.js';
+import { setupUrlChangeMonitor } from './url-monitor.js';
+import { detectUITheme } from '../utils/ui-theme-detector.js';
+
 class EmailThreadExtractor {
     constructor() {
         this.siteConfig = getSelectorsForCurrentSite();
         this.isInitialized = false;
+        this.mutationObserver = null;
+        this.observerTimeout = null;
         this.init();
     }
     
@@ -27,6 +35,125 @@ class EmailThreadExtractor {
             this.handleMessage(message, sender, sendResponse);
             return true; // Keep message channel open for async responses
         });
+        
+        // Initialize MutationObserver for dynamic content handling
+        this.setupMutationObserver();
+        
+        // Also listen for URL changes (Gmail/Outlook use pushState for navigation)
+        this.setupUrlChangeListener();
+    }
+    
+    /**
+     * Setup MutationObserver to watch for DOM changes in email threads
+     * Handles dynamic content updates in Gmail and Outlook SPAs
+     */
+    setupMutationObserver() {
+        if (!this.siteConfig) return;
+        
+        const { selectors } = this.siteConfig;
+        
+        this.mutationObserver = createThreadObserver({
+            selectors,
+            onUpdate: () => this.handleThreadUpdate(),
+            isPageReady: () => this.isPageReady()
+        });
+    }
+    
+    /**
+     * Handle thread updates detected by MutationObserver
+     * Revalidates thread structure and updates internal state
+     */
+    handleThreadUpdate() {
+        console.log('Inbox Triage: Thread update detected, revalidating...');
+        
+        // Re-check if page is still ready
+        if (!this.isPageReady()) {
+            console.log('Inbox Triage: Page no longer ready, may have navigated away');
+            return;
+        }
+        
+        // Verify thread still exists
+        const { selectors } = this.siteConfig;
+        const threadContainer = document.querySelector(selectors.threadContainer) || 
+                               document.querySelector(selectors.threadView);
+        
+        if (!threadContainer) {
+            console.log('Inbox Triage: Thread container not found, page may have changed');
+            return;
+        }
+        
+        // Update initialization status if needed
+        if (!this.isInitialized) {
+            this.isInitialized = true;
+            console.log('Inbox Triage: Re-initialized after thread update');
+        }
+    }
+    
+    /**
+     * Setup listener for URL changes (SPA navigation)
+     * Gmail and Outlook use pushState/replaceState for navigation
+     */
+    setupUrlChangeListener() {
+        this.urlChangeCleanup = setupUrlChangeMonitor((newUrl) => {
+            this.handleUrlChange();
+        });
+    }
+    
+    /**
+     * Handle URL changes (SPA navigation)
+     * Re-initializes observer if needed for new thread
+     */
+    handleUrlChange() {
+        console.log('Inbox Triage: URL changed, checking for thread updates');
+        
+        // Check if still on a supported email page
+        const newSiteConfig = getSelectorsForCurrentSite();
+        if (!newSiteConfig) {
+            console.log('Inbox Triage: Navigated away from email page');
+            this.cleanup();
+            return;
+        }
+        
+        // Update site config if provider changed
+        if (newSiteConfig.provider !== this.siteConfig?.provider) {
+            console.log(`Inbox Triage: Provider changed from ${this.siteConfig?.provider} to ${newSiteConfig.provider}`);
+            this.siteConfig = newSiteConfig;
+        }
+        
+        // Re-check page readiness
+        setTimeout(() => {
+            if (this.isPageReady()) {
+                this.handleThreadUpdate();
+                
+                // Restart observer if it was stopped
+                if (!this.mutationObserver) {
+                    this.setupMutationObserver();
+                }
+            }
+        }, 500); // Wait for page to stabilize
+    }
+    
+    /**
+     * Cleanup MutationObserver and event listeners
+     */
+    cleanup() {
+        if (this.mutationObserver) {
+            this.mutationObserver.disconnect();
+            this.mutationObserver = null;
+        }
+        
+        if (this.observerTimeout) {
+            clearTimeout(this.observerTimeout);
+            this.observerTimeout = null;
+        }
+        
+        if (this.urlChangeCleanup) {
+            this.urlChangeCleanup();
+            this.urlChangeCleanup = null;
+        }
+        
+        this.isInitialized = false;
+        console.log('Inbox Triage: Cleaned up observers');
     }
     
     handleMessage(message, sender, sendResponse) {
@@ -86,13 +213,19 @@ class EmailThreadExtractor {
             // Wait for page to be ready
             await this.waitForPageReady();
             
+            // Detect UI theme and view mode
+            const uiConfig = detectUITheme(this.siteConfig.provider);
+            
             const threadData = {
                 provider: this.siteConfig.provider,
                 subject: this.extractSubject(),
                 messages: this.extractMessages(),
                 attachments: this.extractAttachments(),
                 extractedAt: new Date().toISOString(),
-                url: window.location.href
+                url: window.location.href,
+                uiTheme: uiConfig.theme,
+                viewMode: uiConfig.viewMode,
+                density: uiConfig.density
             };
             
             // Validate that we found content
@@ -111,6 +244,7 @@ class EmailThreadExtractor {
 
     /**
      * Combines all thread messages into a single string with deduplication and trimming
+     * Enhanced for nested threads with proper thread structure representation
      * Respects the 50,000-character limit as specified in requirements
      * @returns {string} Combined thread text or empty string if no content
      */
@@ -130,12 +264,12 @@ class EmailThreadExtractor {
                 combinedText += `Subject: ${threadData.subject}\n\n`;
             }
             
-            // Process each message
+            // Process each message with thread structure awareness
             for (const message of threadData.messages) {
                 if (!message.content) continue;
                 
                 // Create a normalized version for duplicate detection
-                const normalizedContent = this.cleanText(message.content).toLowerCase();
+                const normalizedContent = cleanText(message.content).toLowerCase();
                 
                 // Skip if we've seen this content before (duplicate removal)
                 if (seenContent.has(normalizedContent)) {
@@ -143,9 +277,29 @@ class EmailThreadExtractor {
                 }
                 seenContent.add(normalizedContent);
                 
-                // Add sender info and content
+                // Build message text with thread structure indicators
                 const senderName = message.sender?.name || 'Unknown';
-                const messageText = `From: ${senderName}\n${message.content}\n\n---\n\n`;
+                let messageText = `From: ${senderName}`;
+                
+                // Add thread depth indicator for nested messages
+                if (message.isNested && message.threadDepth > 0) {
+                    const indent = '  '.repeat(message.threadDepth);
+                    messageText = `${indent}${messageText}`;
+                }
+                
+                // Add timestamp if available
+                if (message.timestamp) {
+                    messageText += ` (${message.timestamp})`;
+                }
+                
+                messageText += `\n${message.content}\n\n`;
+                
+                // Add separator - use different separator for nested threads
+                if (message.isNested) {
+                    messageText += `${'  '.repeat(message.threadDepth)}---\n\n`;
+                } else {
+                    messageText += '---\n\n';
+                }
                 
                 // Check if adding this message would exceed the 50,000 character limit
                 if ((combinedText + messageText).length > 50000) {
@@ -158,7 +312,7 @@ class EmailThreadExtractor {
             
             // Final cleanup and trimming
             combinedText = combinedText.replace(/\n\n---\n\n$/, ''); // Remove trailing separator
-            combinedText = this.cleanText(combinedText);
+            combinedText = cleanText(combinedText);
             
             // Ensure we don't exceed the limit after cleanup
             if (combinedText.length > 50000) {
@@ -188,12 +342,18 @@ class EmailThreadExtractor {
                 return null;
             }
             
+            // Detect UI theme and view mode
+            const uiConfig = detectUITheme(this.siteConfig.provider);
+            
             return {
                 provider: this.siteConfig.provider,
                 subject: this.extractSubject(),
                 messages: this.extractMessages(),
                 extractedAt: new Date().toISOString(),
-                url: window.location.href
+                url: window.location.href,
+                uiTheme: uiConfig.theme,
+                viewMode: uiConfig.viewMode,
+                density: uiConfig.density
             };
             
         } catch (error) {
@@ -214,12 +374,23 @@ class EmailThreadExtractor {
         }
         
         if (subjectElement) {
-            return this.cleanText(subjectElement.textContent);
+            return cleanText(subjectElement.textContent);
         }
         
         return null;
     }
     
+    /**
+     * Extract messages from thread with improved nested thread handling
+     * 
+     * Enhanced to handle complex reply chains by:
+     * - Detecting thread depth and nesting relationships
+     * - Preserving chronological order while respecting thread structure
+     * - Handling collapsed/nested replies
+     * - Detecting quoted content boundaries
+     * 
+     * @returns {Array<Object>} Array of message objects with thread metadata
+     */
     extractMessages() {
         const { selectors } = this.siteConfig;
         const messages = [];
@@ -227,11 +398,40 @@ class EmailThreadExtractor {
         // Find all message elements
         const messageElements = document.querySelectorAll(selectors.messages);
         
+        // Build a map of message elements to their DOM position for thread analysis
+        const messageMap = new Map();
+        messageElements.forEach((el, index) => {
+            messageMap.set(el, index);
+        });
+        
+        // Extract messages with thread relationship detection
         messageElements.forEach((messageEl, index) => {
             const message = this.extractSingleMessage(messageEl, index);
             if (message && message.content) {
+                // Detect thread depth and relationships
+                const threadInfo = this.detectThreadInfo(messageEl, messageElements, index);
+                message.threadDepth = threadInfo.depth;
+                message.parentIndex = threadInfo.parentIndex;
+                message.isNested = threadInfo.isNested;
+                message.hasQuotedContent = threadInfo.hasQuotedContent;
+                
                 messages.push(message);
             }
+        });
+        
+        // Sort messages by chronological order if timestamps are available
+        // This ensures proper thread ordering even with nested structures
+        messages.sort((a, b) => {
+            // If we have timestamps, use them
+            if (a.timestamp && b.timestamp) {
+                const timeA = parseTimestamp(a.timestamp);
+                const timeB = parseTimestamp(b.timestamp);
+                if (timeA && timeB) {
+                    return timeA - timeB;
+                }
+            }
+            // Fall back to index order
+            return a.index - b.index;
         });
         
         // If no messages found with primary method, try alternative approach
@@ -243,6 +443,84 @@ class EmailThreadExtractor {
         }
         
         return messages;
+    }
+    
+    /**
+     * Detect thread information for a message element
+     * Analyzes DOM structure to determine thread depth, parent relationships, and nesting
+     * 
+     * @param {Element} messageElement - The message DOM element
+     * @param {NodeList} allMessages - All message elements in the thread
+     * @param {number} currentIndex - Current message index
+     * @returns {Object} Thread information object
+     */
+    detectThreadInfo(messageElement, allMessages, currentIndex) {
+        const info = {
+            depth: 0,
+            parentIndex: null,
+            isNested: false,
+            hasQuotedContent: false
+        };
+        
+        // Check for nested structure indicators
+        // Gmail uses indentation/positioning to show nesting
+        const computedStyle = window.getComputedStyle(messageElement);
+        const marginLeft = parseInt(computedStyle.marginLeft) || 0;
+        const paddingLeft = parseInt(computedStyle.paddingLeft) || 0;
+        
+        // Detect nesting depth based on indentation (common in Gmail)
+        if (marginLeft > 0 || paddingLeft > 20) {
+            info.isNested = true;
+            // Estimate depth based on indentation (each level typically 20-40px)
+            info.depth = Math.floor((marginLeft + paddingLeft) / 30);
+        }
+        
+        // Check for quoted content indicators
+        const quotedSelectors = [
+            '.gmail_quote',
+            '.gmail_extra',
+            '.quote',
+            '[class*="quoted"]',
+            '[class*="reply"]',
+            '.gmail_default'
+        ];
+        
+        for (const selector of quotedSelectors) {
+            if (messageElement.querySelector(selector)) {
+                info.hasQuotedContent = true;
+                break;
+            }
+        }
+        
+        // Try to find parent message by looking for previous messages with lower depth
+        if (info.isNested && currentIndex > 0) {
+            for (let i = currentIndex - 1; i >= 0; i--) {
+                const prevElement = allMessages[i];
+                if (prevElement) {
+                    const prevStyle = window.getComputedStyle(prevElement);
+                    const prevMarginLeft = parseInt(prevStyle.marginLeft) || 0;
+                    const prevPaddingLeft = parseInt(prevStyle.paddingLeft) || 0;
+                    const prevDepth = Math.floor((prevMarginLeft + prevPaddingLeft) / 30);
+                    
+                    // Found a parent if it has lower depth
+                    if (prevDepth < info.depth) {
+                        info.parentIndex = i;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Check for Outlook-specific nested indicators
+        if (this.siteConfig.provider === 'outlook') {
+            const parentConvid = messageElement.closest('[data-convid]');
+            if (parentConvid && parentConvid !== messageElement) {
+                info.isNested = true;
+                info.depth = 1; // Outlook typically has simpler nesting
+            }
+        }
+        
+        return info;
     }
     
     extractSingleMessage(messageElement, index) {
@@ -264,7 +542,7 @@ class EmailThreadExtractor {
             bodyElement = messageElement.querySelector(selectors.messageBodyAlt);
         }
         
-        const content = bodyElement ? this.cleanText(bodyElement.textContent) : '';
+        const content = bodyElement ? cleanText(bodyElement.textContent) : '';
         
         if (!content) {
             return null;
@@ -299,7 +577,7 @@ class EmailThreadExtractor {
         for (const selector of contentSelectors) {
             const element = document.querySelector(selector);
             if (element) {
-                const content = this.cleanText(element.textContent);
+                const content = cleanText(element.textContent);
                 if (content && content.length > 20) { // Minimum content threshold
                     return {
                         index: 0,
@@ -357,7 +635,7 @@ class EmailThreadExtractor {
             let name = '';
             const nameEl = attachmentElement.querySelector(selectors.attachmentNames);
             if (nameEl) {
-                name = this.cleanText(nameEl.textContent);
+                name = cleanText(nameEl.textContent);
             }
             
             // Extract attachment link
@@ -371,7 +649,7 @@ class EmailThreadExtractor {
             let size = '';
             const sizeEl = attachmentElement.querySelector(selectors.attachmentSizes);
             if (sizeEl) {
-                size = this.cleanText(sizeEl.textContent);
+                size = cleanText(sizeEl.textContent);
             }
             
             // Skip if no name or download URL
@@ -475,14 +753,14 @@ class EmailThreadExtractor {
         // Extract sender name
         const senderNameEl = messageElement.querySelector(selectors.senderName || selectors.sender);
         if (senderNameEl) {
-            senderName = this.cleanText(senderNameEl.textContent);
+            senderName = cleanText(senderNameEl.textContent);
         }
         
         // Extract sender email if available
         const senderEmailEl = messageElement.querySelector(selectors.senderEmail || selectors.sender);
         if (senderEmailEl) {
             const emailAttr = senderEmailEl.getAttribute('email');
-            senderEmail = emailAttr || this.extractEmailFromText(senderEmailEl.textContent);
+            senderEmail = emailAttr || extractEmailFromText(senderEmailEl.textContent);
         }
         
         return {
@@ -491,19 +769,103 @@ class EmailThreadExtractor {
         };
     }
     
+    /**
+     * Extract timestamp from message element with improved parsing
+     * Tries multiple extraction strategies and normalizes the output
+     * 
+     * @param {Element} messageElement - The message DOM element
+     * @returns {string|null} Normalized timestamp string or null if not found
+     */
     extractTimestamp(messageElement) {
         const { selectors } = this.siteConfig;
-        
         const timestampEl = messageElement.querySelector(selectors.timestamp);
+        
         if (timestampEl) {
-            // Try title attribute first (often contains full datetime)
+            // Strategy 1: Try title attribute first (often contains full datetime)
             const title = timestampEl.getAttribute('title');
-            if (title) {
-                return title;
+            if (title && title.trim().length > 0) {
+                return normalizeTimestamp(title);
             }
             
-            // Fall back to text content
-            return this.cleanText(timestampEl.textContent);
+            // Strategy 2: Check data attributes for timestamp
+            const dataTimestamp = timestampEl.getAttribute('data-timestamp') || 
+                                 timestampEl.getAttribute('data-time') ||
+                                 timestampEl.getAttribute('datetime');
+            if (dataTimestamp && dataTimestamp.trim().length > 0) {
+                return normalizeTimestamp(dataTimestamp);
+            }
+            
+            // Strategy 3: Extract from text content
+            const textContent = timestampEl.textContent;
+            if (textContent && textContent.trim().length > 0) {
+                return normalizeTimestamp(textContent);
+            }
+            
+            // Strategy 4: Check parent element for timestamp attributes
+            const parent = timestampEl.parentElement;
+            if (parent) {
+                const parentTimestamp = parent.getAttribute('title') || 
+                                       parent.getAttribute('data-timestamp');
+                if (parentTimestamp && parentTimestamp.trim().length > 0) {
+                    return normalizeTimestamp(parentTimestamp);
+                }
+            }
+        }
+        
+        // Strategy 5: Try alternative timestamp selectors (provider-specific)
+        if (this.siteConfig.provider === 'gmail') {
+            // Gmail sometimes uses different timestamp locations
+            const altTimestamp = messageElement.querySelector('.g3 span, .gK span');
+            if (altTimestamp) {
+                const altTitle = altTimestamp.getAttribute('title');
+                if (altTitle) {
+                    return normalizeTimestamp(altTitle);
+                }
+                return normalizeTimestamp(altTimestamp.textContent);
+            }
+        } else if (this.siteConfig.provider === 'outlook') {
+            // Outlook timestamp variations based on version
+            const variant = this.siteConfig.variant || 'default';
+            let altSelectors = [];
+            
+            if (variant === 'office365') {
+                // Office 365 specific selectors
+                altSelectors = [
+                    '[data-testid="message-header-date"]',
+                    '[aria-label*="Date"]',
+                    '.ms-fontColor-neutralSecondary',
+                    '[class*="dateTime"]'
+                ];
+            } else if (variant === 'com') {
+                // Outlook.com specific selectors
+                altSelectors = [
+                    '[data-testid="message-header-date"]',
+                    '[aria-label*="received"]',
+                    '.ms-fontColor-neutralSecondary'
+                ];
+            } else {
+                // Default Outlook selectors
+                altSelectors = [
+                    '[data-testid="message-header-date"]',
+                    '[data-testid*="date"]',
+                    '.ms-fontColor-neutralSecondary'
+                ];
+            }
+            
+            for (const selector of altSelectors) {
+                const altTimestamp = messageElement.querySelector(selector);
+                if (altTimestamp) {
+                    const altTitle = altTimestamp.getAttribute('title') || 
+                                   altTimestamp.getAttribute('aria-label');
+                    if (altTitle) {
+                        return normalizeTimestamp(altTitle);
+                    }
+                    const textContent = altTimestamp.textContent;
+                    if (textContent && textContent.trim().length > 0) {
+                        return normalizeTimestamp(textContent);
+                    }
+                }
+            }
         }
         
         return null;
@@ -581,24 +943,6 @@ class EmailThreadExtractor {
         }
         
         return false;
-    }
-    
-    cleanText(text) {
-        if (!text) return '';
-        
-        return text
-            .replace(/\s+/g, ' ') // Normalize whitespace
-            .replace(/^\s+|\s+$/g, '') // Trim start and end
-            .replace(/\n\s*\n\s*\n/g, '\n\n') // Clean up excessive line breaks
-            .replace(/\t+/g, ' ') // Replace tabs with spaces
-            .replace(/[\r\f\v]/g, '') // Remove other whitespace chars
-            .trim();
-    }
-    
-    extractEmailFromText(text) {
-        const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/;
-        const match = text.match(emailRegex);
-        return match ? match[1] : '';
     }
     
     isPageReady() {

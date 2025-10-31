@@ -9,7 +9,7 @@
 import { sanitizeErrorMessage } from '../utils/error-handler.js';
 import { createSuccessResponse, createErrorResponseForService } from '../utils/response-utils.js';
 import { validateDraftsSchema, validateAndFormatDrafts } from '../utils/validation.js';
-import { OpenAIAPI, AnthropicAPI, GoogleAIAPI, createSystemPrompt, createReplyPrompt } from './api-integrations.js';
+import { OpenAIAPI, AnthropicAPI, GoogleAIAPI, createSystemPrompt, createReplyPrompt, extractThreadContext } from './api-integrations.js';
 
 /**
  * Draft Generation Service
@@ -96,6 +96,9 @@ export class DraftService {
                 throw new Error('Not enough content to generate meaningful replies');
             }
             
+            // Extract context for better reply drafting (key points, questions, action items)
+            const context = extractThreadContext(fullText);
+            
             // Create language model session - matching docs pattern exactly
             // Following same pattern as Summarizer API
             // Reference: https://developer.chrome.com/docs/ai/prompt-api
@@ -108,8 +111,8 @@ export class DraftService {
                 topK: 3
             });
             
-            // Generate drafts using structured prompt
-            const prompt = createReplyPrompt(fullText, subject, tone, guidance);
+            // Generate drafts using structured prompt with context preservation
+            const prompt = createReplyPrompt(fullText, subject, tone, guidance, context);
             const response = await session.prompt(prompt);
             
             // Clean up session immediately
@@ -136,13 +139,14 @@ export class DraftService {
             }
             
             // Validate and format drafts
-            const formattedDrafts = validateAndFormatDrafts(drafts, subject);
+            const signature = userSettings?.signature || '';
+            const formattedDrafts = validateAndFormatDrafts(drafts, subject, signature);
             
             // Ensure we always have exactly 3 drafts
             if (formattedDrafts.length !== 3) {
                 console.warn(`Expected 3 drafts, got ${formattedDrafts.length}, using fallback`);
                 const fallback = this.createFallbackDrafts('', subject, tone);
-                const fallbackFormatted = validateAndFormatDrafts(fallback, subject);
+                const fallbackFormatted = validateAndFormatDrafts(fallback, subject, signature);
                 
                 sendResponse(createSuccessResponse(
                     { drafts: fallbackFormatted },
@@ -182,36 +186,40 @@ export class DraftService {
                 throw new Error('Not enough content to generate meaningful replies');
             }
             
+            // Extract context for better reply drafting
+            const context = extractThreadContext(fullText);
+            
             const provider = userSettings.apiProvider || 'openai';
             const apiKey = userSettings.apiKey;
             
             let drafts = [];
             
-            // Call appropriate API based on provider
+            // Call appropriate API based on provider with context preservation
             switch (provider) {
                 case 'openai':
-                    drafts = await OpenAIAPI.generateDrafts(fullText, subject, tone, guidance, apiKey);
+                    drafts = await OpenAIAPI.generateDrafts(fullText, subject, tone, guidance, apiKey, context);
                     break;
                     
                 case 'anthropic':
-                    drafts = await AnthropicAPI.generateDrafts(fullText, subject, tone, guidance, apiKey);
+                    drafts = await AnthropicAPI.generateDrafts(fullText, subject, tone, guidance, apiKey, context);
                     break;
                     
                 case 'google':
-                    drafts = await GoogleAIAPI.generateDrafts(fullText, subject, tone, guidance, apiKey);
+                    drafts = await GoogleAIAPI.generateDrafts(fullText, subject, tone, guidance, apiKey, context);
                     break;
                     
                 default:
                     throw new Error(`Unsupported API provider: ${provider}`);
             }
             
-            // Validate and format drafts
-            const formattedDrafts = validateAndFormatDrafts({ drafts }, subject);
+            // Validate and format drafts with signature
+            const signature = userSettings?.signature || '';
+            const formattedDrafts = validateAndFormatDrafts({ drafts }, subject, signature);
             
             if (formattedDrafts.length !== 3) {
                 console.warn(`Expected 3 drafts, got ${formattedDrafts.length}`);
                 const fallback = this.createFallbackDrafts('', subject, tone);
-                const fallbackFormatted = validateAndFormatDrafts(fallback, subject);
+                const fallbackFormatted = validateAndFormatDrafts(fallback, subject, signature);
                 
                 sendResponse(createSuccessResponse(
                     { drafts: fallbackFormatted },

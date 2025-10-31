@@ -74,19 +74,109 @@ const EMAIL_SELECTORS = {
         attachmentLinks: '[data-testid*="attachment"] a',
         attachmentNames: '[data-testid="attachment-name"]',
         attachmentSizes: '[data-testid="attachment-size"]'
+    },
+    
+    // Outlook.com specific selectors (personal Outlook)
+    outlookCom: {
+        // Main thread container
+        threadContainer: '[data-convid]',
+        
+        // Individual messages
+        messages: '[data-convid] [role="listitem"]',
+        
+        // Message content - Outlook.com uses slightly different structure
+        messageBody: '[data-testid="message-body-content"]',
+        messageBodyAlt: '[data-testid="message-body"] .allowTextSelection',
+        
+        // Subject
+        subject: '[data-testid="conversation-subject"]',
+        subjectAlt: 'h1[data-testid="subject"]',
+        
+        // Sender information
+        sender: '[data-testid="message-header-sender-name"]',
+        senderEmail: '[data-testid="message-header-sender-email"]',
+        
+        // Timestamp
+        timestamp: '[data-testid="message-header-date"]',
+        
+        // Thread container
+        threadView: '[data-testid="conversation-container"]',
+        
+        // Areas to avoid
+        composeArea: '[data-testid="compose-body-wrapper"]',
+        replyArea: '[data-testid="reply-compose-box"]',
+        
+        // Attachment selectors
+        attachments: '[data-testid*="attachment"]',
+        attachmentLinks: '[data-testid*="attachment"] a',
+        attachmentNames: '[data-testid="attachment-name"]',
+        attachmentSizes: '[data-testid="attachment-size"]'
+    },
+    
+    // Outlook Office 365 specific selectors (business/enterprise Outlook)
+    outlookOffice365: {
+        // Main thread container
+        threadContainer: '[data-convid]',
+        
+        // Individual messages
+        messages: '[data-convid] [role="listitem"]',
+        
+        // Message content - Office 365 may use different classes
+        messageBody: '[data-testid="message-body-content"]',
+        messageBodyAlt: '[aria-label*="Message body"] .allowTextSelection',
+        
+        // Subject
+        subject: '[data-testid="conversation-subject"]',
+        subjectAlt: '[id*="subject"]',
+        
+        // Sender information
+        sender: '[data-testid="message-header-sender-name"]',
+        senderEmail: '[data-testid="message-header-sender-email"]',
+        
+        // Timestamp
+        timestamp: '[data-testid="message-header-date"]',
+        
+        // Thread container
+        threadView: '[data-testid="conversation-container"]',
+        
+        // Areas to avoid
+        composeArea: '[data-testid="compose-body-wrapper"]',
+        replyArea: '[data-testid="reply-compose-box"]',
+        
+        // Attachment selectors
+        attachments: '[data-testid*="attachment"]',
+        attachmentLinks: '[data-testid*="attachment"] a',
+        attachmentNames: '[data-testid="attachment-name"]',
+        attachmentSizes: '[data-testid="attachment-size"]'
     }
 };
 
 /**
  * Get the appropriate selectors for the current email provider
+ * Enhanced to detect Outlook version variations (outlook.com vs office365.com)
  */
 function getSelectorsForCurrentSite() {
     const hostname = window.location.hostname;
+    const url = window.location.href;
     
     if (hostname.includes('mail.google.com')) {
         return { provider: 'gmail', selectors: EMAIL_SELECTORS.gmail };
     } else if (hostname.includes('outlook.')) {
-        return { provider: 'outlook', selectors: EMAIL_SELECTORS.outlook };
+        // Detect Outlook version variations
+        if (hostname.includes('outlook.office.com') || 
+            hostname.includes('outlook.office365.com') ||
+            url.includes('/owa/') ||
+            url.includes('/mail/')) {
+            // Office 365 Outlook (business/enterprise)
+            return { provider: 'outlook', variant: 'office365', selectors: EMAIL_SELECTORS.outlookOffice365 };
+        } else if (hostname.includes('outlook.live.com') || 
+                   hostname.includes('outlook.com')) {
+            // Outlook.com (personal)
+            return { provider: 'outlook', variant: 'com', selectors: EMAIL_SELECTORS.outlookCom };
+        } else {
+            // Default Outlook (fallback)
+            return { provider: 'outlook', variant: 'default', selectors: EMAIL_SELECTORS.outlook };
+        }
     }
     
     return null;

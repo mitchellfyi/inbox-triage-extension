@@ -168,10 +168,11 @@ export class OpenAIAPI {
      * @param {string} tone - Selected tone
      * @param {string} guidance - User guidance
      * @param {string} apiKey - OpenAI API key
+     * @param {Object} context - Optional context object with keyPoints, questions, etc.
      * @returns {Array} Draft objects
      */
-    static async generateDrafts(text, subject, tone, guidance, apiKey) {
-        const prompt = createReplyPrompt(text, subject, tone, guidance);
+    static async generateDrafts(text, subject, tone, guidance, apiKey, context = null) {
+        const prompt = createReplyPrompt(text, subject, tone, guidance, context);
         
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
@@ -291,15 +292,16 @@ export class AnthropicAPI {
      * @param {string} tone - Selected tone
      * @param {string} guidance - User guidance
      * @param {string} apiKey - Anthropic API key
+     * @param {Object} context - Optional context object with keyPoints, questions, etc.
      * @returns {Array} Draft objects
      * @throws {Error} If API call fails or response is invalid
      */
-    static async generateDrafts(text, subject, tone, guidance, apiKey) {
+    static async generateDrafts(text, subject, tone, guidance, apiKey, context = null) {
         if (!apiKey) {
             throw new Error('Anthropic API key is required');
         }
         
-        const prompt = createReplyPrompt(text, subject, tone, guidance);
+        const prompt = createReplyPrompt(text, subject, tone, guidance, context);
         const systemPrompt = createSystemPrompt(tone);
         
         const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -441,15 +443,16 @@ export class GoogleAIAPI {
      * @param {string} tone - Selected tone
      * @param {string} guidance - User guidance
      * @param {string} apiKey - Google AI API key
+     * @param {Object} context - Optional context object with keyPoints, questions, etc.
      * @returns {Array} Draft objects
      * @throws {Error} If API call fails or response is invalid
      */
-    static async generateDrafts(text, subject, tone, guidance, apiKey) {
+    static async generateDrafts(text, subject, tone, guidance, apiKey, context = null) {
         if (!apiKey) {
             throw new Error('Google AI API key is required');
         }
         
-        const prompt = createReplyPrompt(text, subject, tone, guidance);
+        const prompt = createReplyPrompt(text, subject, tone, guidance, context);
         const systemPrompt = createSystemPrompt(tone);
         
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
