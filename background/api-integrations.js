@@ -238,7 +238,7 @@ export class AnthropicAPI {
                 'anthropic-version': '2023-06-01'
             },
             body: JSON.stringify({
-                model: 'claude-3-opus-20240229',
+                model: 'claude-3-5-sonnet-20241022',
                 max_tokens: 500,
                 messages: [
                     {
@@ -251,17 +251,30 @@ export class AnthropicAPI {
         });
         
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(`Anthropic API error: ${response.status} ${response.statusText}${errorData.error ? ` - ${errorData.error.message || errorData.error}` : ''}`);
+            let errorMessage = `Anthropic API error: ${response.status} ${response.statusText}`;
+            try {
+                const errorData = await response.json();
+                if (errorData.error) {
+                    errorMessage += ` - ${errorData.error.message || errorData.error.type || JSON.stringify(errorData.error)}`;
+                }
+            } catch (parseError) {
+                // If JSON parsing fails, use status text only
+                console.error('Failed to parse Anthropic API error response:', parseError);
+            }
+            throw new Error(errorMessage);
         }
         
         const data = await response.json();
         
         if (!data.content || !Array.isArray(data.content) || data.content.length === 0) {
-            throw new Error('Invalid response format from Anthropic API');
+            throw new Error('Invalid response format from Anthropic API: missing or empty content array');
         }
         
         const content = data.content[0].text;
+        if (!content || typeof content !== 'string') {
+            throw new Error('Invalid response format from Anthropic API: content is not a string');
+        }
+        
         return parseSummaryResponse(content);
     }
     
@@ -297,7 +310,7 @@ export class AnthropicAPI {
                 'anthropic-version': '2023-06-01'
             },
             body: JSON.stringify({
-                model: 'claude-3-opus-20240229',
+                model: 'claude-3-5-sonnet-20241022',
                 max_tokens: 2000,
                 messages: [
                     {
@@ -310,19 +323,36 @@ export class AnthropicAPI {
         });
         
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(`Anthropic API error: ${response.status} ${response.statusText}${errorData.error ? ` - ${errorData.error.message || errorData.error}` : ''}`);
+            let errorMessage = `Anthropic API error: ${response.status} ${response.statusText}`;
+            try {
+                const errorData = await response.json();
+                if (errorData.error) {
+                    errorMessage += ` - ${errorData.error.message || errorData.error.type || JSON.stringify(errorData.error)}`;
+                }
+            } catch (parseError) {
+                // If JSON parsing fails, use status text only
+                console.error('Failed to parse Anthropic API error response:', parseError);
+            }
+            throw new Error(errorMessage);
         }
         
         const data = await response.json();
         
         if (!data.content || !Array.isArray(data.content) || data.content.length === 0) {
-            throw new Error('Invalid response format from Anthropic API');
+            throw new Error('Invalid response format from Anthropic API: missing or empty content array');
         }
         
         const content = data.content[0].text;
+        if (!content || typeof content !== 'string') {
+            throw new Error('Invalid response format from Anthropic API: content is not a string');
+        }
+        
         const parsed = parseJsonResponse(content);
-        return parsed.drafts || [];
+        if (!parsed || !parsed.drafts || !Array.isArray(parsed.drafts)) {
+            throw new Error('Invalid JSON structure: drafts array not found');
+        }
+        
+        return parsed.drafts;
     }
 }
 
@@ -348,7 +378,7 @@ export class GoogleAIAPI {
             throw new Error('Google AI API key is required');
         }
         
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -367,17 +397,34 @@ export class GoogleAIAPI {
         });
         
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(`Google AI API error: ${response.status} ${response.statusText}${errorData.error ? ` - ${errorData.error.message || JSON.stringify(errorData.error)}` : ''}`);
+            let errorMessage = `Google AI API error: ${response.status} ${response.statusText}`;
+            try {
+                const errorData = await response.json();
+                if (errorData.error) {
+                    errorMessage += ` - ${errorData.error.message || errorData.error.status || JSON.stringify(errorData.error)}`;
+                }
+            } catch (parseError) {
+                // If JSON parsing fails, use status text only
+                console.error('Failed to parse Google AI API error response:', parseError);
+            }
+            throw new Error(errorMessage);
         }
         
         const data = await response.json();
         
-        if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts) {
-            throw new Error('Invalid response format from Google AI API');
+        if (!data.candidates || !Array.isArray(data.candidates) || data.candidates.length === 0) {
+            throw new Error('Invalid response format from Google AI API: missing or empty candidates array');
+        }
+        
+        if (!data.candidates[0].content || !data.candidates[0].content.parts || !Array.isArray(data.candidates[0].content.parts)) {
+            throw new Error('Invalid response format from Google AI API: missing or empty content parts');
         }
         
         const content = data.candidates[0].content.parts[0].text;
+        if (!content || typeof content !== 'string') {
+            throw new Error('Invalid response format from Google AI API: content is not a string');
+        }
+        
         return parseSummaryResponse(content);
     }
     
@@ -405,7 +452,7 @@ export class GoogleAIAPI {
         const prompt = createReplyPrompt(text, subject, tone, guidance);
         const systemPrompt = createSystemPrompt(tone);
         
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -425,19 +472,40 @@ export class GoogleAIAPI {
         });
         
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(`Google AI API error: ${response.status} ${response.statusText}${errorData.error ? ` - ${errorData.error.message || JSON.stringify(errorData.error)}` : ''}`);
+            let errorMessage = `Google AI API error: ${response.status} ${response.statusText}`;
+            try {
+                const errorData = await response.json();
+                if (errorData.error) {
+                    errorMessage += ` - ${errorData.error.message || errorData.error.status || JSON.stringify(errorData.error)}`;
+                }
+            } catch (parseError) {
+                // If JSON parsing fails, use status text only
+                console.error('Failed to parse Google AI API error response:', parseError);
+            }
+            throw new Error(errorMessage);
         }
         
         const data = await response.json();
         
-        if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts) {
-            throw new Error('Invalid response format from Google AI API');
+        if (!data.candidates || !Array.isArray(data.candidates) || data.candidates.length === 0) {
+            throw new Error('Invalid response format from Google AI API: missing or empty candidates array');
+        }
+        
+        if (!data.candidates[0].content || !data.candidates[0].content.parts || !Array.isArray(data.candidates[0].content.parts)) {
+            throw new Error('Invalid response format from Google AI API: missing or empty content parts');
         }
         
         const content = data.candidates[0].content.parts[0].text;
+        if (!content || typeof content !== 'string') {
+            throw new Error('Invalid response format from Google AI API: content is not a string');
+        }
+        
         const parsed = parseJsonResponse(content);
-        return parsed.drafts || [];
+        if (!parsed || !parsed.drafts || !Array.isArray(parsed.drafts)) {
+            throw new Error('Invalid JSON structure: drafts array not found');
+        }
+        
+        return parsed.drafts;
     }
 }
 

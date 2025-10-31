@@ -28,8 +28,8 @@ export class AttachmentService {
      * Reference: docs/spec.md - Attachment Content Processing requirements
      * 
      * Processes attachments (images, PDFs, DOCX, XLSX) entirely on-device.
-     * For images: uses multimodal Prompt API (triggered via UI)
-     * For documents: placeholder (PDF/DOCX/XLSX parsing not yet implemented)
+     * For images: uses multimodal Prompt API (triggered via UI button)
+     * For documents: basic text extraction attempted where possible (advanced parsing requires external libraries)
      * 
      * @param {Object} attachment - Attachment metadata and content
      * @param {Function} sendResponse - Response callback
@@ -135,8 +135,8 @@ export class AttachmentService {
             // Reference: docs/spec.md - Attachment Content Processing requirements
             
             // Image analysis is available via the UI button in sidepanel.js
-            // This method is called during bulk processing and returns a helpful message
-            return `Image: ${attachment.name}\n\nClick the "Analyze Image" button in the attachment card below to view AI-powered analysis, OCR text extraction, and detailed image understanding.`;
+            // For bulk processing, return a brief status message
+            return `Image attachment detected: ${attachment.name}. Use the "Analyze Image" button in the attachment card for AI-powered analysis.`;
             
         } catch (error) {
             console.error('Image processing error:', error);
@@ -300,21 +300,14 @@ export class AttachmentService {
                 // Successfully extracted meaningful text
                 return `Extracted text from ${attachment.name}:\n\n${text}`;
             } else {
-                // PDF is binary/encoded - requires PDF.js for proper parsing
-                return `PDF file ${attachment.name} requires advanced parsing library for text extraction.\n\n` +
-                       `Current status: Basic text extraction attempted but file appears to be binary/encoded.\n\n` +
-                       `To enable full PDF parsing:\n` +
-                       `• Integrate PDF.js library (currently blocked by "no external dependencies" constraint)\n` +
-                       `• See docs/todo.md for implementation roadmap\n\n` +
-                       `For now, you can:\n` +
-                       `• View attachment metadata (name, size, type)\n` +
-                       `• Open the file directly from the attachment card`;
+                // PDF is binary/encoded - native extraction didn't find readable text
+                // Return a brief status message without implementation details
+                return `PDF file ${attachment.name}: Text extraction attempted but file appears to be binary/encoded. Advanced parsing libraries are required for full text extraction.`;
             }
 
         } catch (error) {
             console.error('PDF extraction error:', error);
-            return `Error extracting text from PDF ${attachment.name}: ${error.message}\n\n` +
-                   `PDF parsing requires PDF.js library (see docs/todo.md for implementation roadmap).`;
+            return `Error extracting text from PDF ${attachment.name}: ${error.message}`;
         }
     }
 
@@ -391,20 +384,11 @@ export class AttachmentService {
 
             // DOCX files are ZIP archives - would need unzip library to parse
             // Current implementation documents the limitation clearly
-            return `Word document ${attachment.name} requires parsing library for text extraction.\n\n` +
-                   `DOCX files are ZIP archives containing XML files. To extract text:\n` +
-                   `• Integrate mammoth.js library (currently blocked by "no external dependencies" constraint)\n` +
-                   `• Library would unzip DOCX, parse document.xml, and extract formatted text\n` +
-                   `• See docs/todo.md for implementation roadmap\n\n` +
-                   `For now, you can:\n` +
-                   `• View attachment metadata (name, size, type)\n` +
-                   `• Open the file directly from the attachment card\n\n` +
-                   `File size: ${Math.round(fileBlob.size / 1024)}KB`;
+            return `Word document ${attachment.name}: DOCX parsing requires specialized library to extract text from ZIP archive structure. File size: ${Math.round(fileBlob.size / 1024)}KB.`;
 
         } catch (error) {
             console.error('DOCX extraction error:', error);
-            return `Error processing Word document ${attachment.name}: ${error.message}\n\n` +
-                   `DOCX parsing requires mammoth.js library (see docs/todo.md for implementation roadmap).`;
+            return `Error processing Word document ${attachment.name}: ${error.message}`;
         }
     }
 
@@ -439,20 +423,11 @@ export class AttachmentService {
 
             // XLSX files are ZIP archives - would need unzip library to parse
             // Current implementation documents the limitation clearly
-            return `Spreadsheet ${attachment.name} requires parsing library for data extraction.\n\n` +
-                   `XLSX files are ZIP archives containing XML files. To extract data:\n` +
-                   `• Integrate SheetJS library (currently blocked by "no external dependencies" constraint)\n` +
-                   `• Library would unzip XLSX, parse XML files, and extract cell values\n` +
-                   `• See docs/todo.md for implementation roadmap\n\n` +
-                   `For now, you can:\n` +
-                   `• View attachment metadata (name, size, type)\n` +
-                   `• Open the file directly from the attachment card\n\n` +
-                   `File size: ${Math.round(fileBlob.size / 1024)}KB`;
+            return `Spreadsheet ${attachment.name}: XLSX parsing requires specialized library to extract data from ZIP archive structure. File size: ${Math.round(fileBlob.size / 1024)}KB.`;
 
         } catch (error) {
             console.error('XLSX extraction error:', error);
-            return `Error processing spreadsheet ${attachment.name}: ${error.message}\n\n` +
-                   `XLSX parsing requires SheetJS library (see docs/todo.md for implementation roadmap).`;
+            return `Error processing spreadsheet ${attachment.name}: ${error.message}`;
         }
     }
 
