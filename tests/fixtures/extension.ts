@@ -18,7 +18,7 @@ export const test = baseTest.extend<ExtensionFixtures>({
     
     // Launch persistent context with extension loaded
     const context = await chromium.launchPersistentContext('', {
-      headless: false, // Extensions require headed mode for installation
+      headless: true, // Run headless
       args: [
         `--disable-extensions-except=${extensionPath}`,
         `--load-extension=${extensionPath}`,
@@ -129,18 +129,42 @@ export const test = baseTest.extend<ExtensionFixtures>({
     }
   },
 
-  backgroundPage: async ({ context }, use) => {
+  backgroundPage: async ({ context, extensionId }, use) => {
     // Wait for background page to be available
-    // Service workers may take a moment to initialize
+    // Service workers may take a moment to initialize, especially in headless mode
+    // Trigger service worker activation by navigating to extension page or sending a message
+    const triggerPage = await context.newPage();
+    await triggerPage.goto(`chrome-extension://${extensionId}/sidepanel/sidepanel.html`);
+    await triggerPage.waitForTimeout(1000);
+    
+    // Try to send a message to activate the service worker
+    try {
+      await triggerPage.evaluate(() => {
+        if (typeof chrome !== 'undefined' && chrome.runtime) {
+          chrome.runtime.sendMessage({ action: 'checkAIStatus' }, () => {});
+        }
+      });
+    } catch (e) {
+      // Ignore errors - service worker might not be ready yet
+    }
+    
+    await triggerPage.close();
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
     let backgroundPage = context.backgroundPages()[0];
     
     if (!backgroundPage) {
-      // Wait for background page event with timeout
+      // Try waiting for the background page event with timeout
       try {
-        backgroundPage = await context.waitForEvent('backgroundpage', { timeout: 15000 });
+        backgroundPage = await context.waitForEvent('backgroundpage', { timeout: 5000 });
       } catch (error) {
-        // If timeout, try getting it again
-        backgroundPage = context.backgroundPages()[0];
+        // If timeout, try polling for background pages
+        for (let i = 0; i < 10; i++) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          backgroundPage = context.backgroundPages()[0];
+          if (backgroundPage) break;
+        }
+        
         if (!backgroundPage) {
           throw new Error('Background page did not load within timeout. Ensure extension is properly loaded.');
         }

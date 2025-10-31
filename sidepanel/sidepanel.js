@@ -10,6 +10,8 @@ import { TranslationUI } from './translation-ui.js';
 import { VoiceInput } from './voice-input.js';
 import { SettingsManager } from './settings-manager.js';
 import { DraftRenderer } from './draft-renderer.js';
+import { AttachmentHandler } from './attachment-handler.js';
+import { DisplayManager } from './display-manager.js';
 
 class InboxTriageSidePanel {
     constructor() {
@@ -21,7 +23,6 @@ class InboxTriageSidePanel {
             provider: null, // 'gmail' or 'outlook'
             url: ''
         };
-        this.statusHideTimeout = null;
         this.isVisible = document.visibilityState === 'visible';
         
         this.initializeElements();
@@ -50,6 +51,18 @@ class InboxTriageSidePanel {
             this.elements,
             (msg, type) => this.updateStatus(msg, type)
         );
+        
+        this.attachmentHandler = new AttachmentHandler({
+            elements: this.elements,
+            updateStatus: (msg, type) => this.updateStatus(msg, type),
+            getCurrentThread: () => this.currentThread
+        });
+        
+        // DisplayManager must be created after settingsManager since it depends on it
+        this.displayManager = new DisplayManager({
+            elements: this.elements,
+            settingsManager: this.settingsManager
+        });
         
         this.bindEvents();
         this.loadUserSettings();
@@ -332,8 +345,14 @@ class InboxTriageSidePanel {
             apiProviderSelect: document.getElementById('api-provider'),
             apiKeySection: document.getElementById('api-key-section'),
             saveApiKeyBtn: document.getElementById('save-api-key-btn'),
+            apiProviderNotice: document.getElementById('api-provider-notice'),
             // Translation settings
-            targetLanguageSelect: document.getElementById('target-language')
+            targetLanguageSelect: document.getElementById('target-language'),
+            // Attachment modal
+            attachmentModalOverlay: document.getElementById('attachment-modal-overlay'),
+            attachmentModalClose: document.getElementById('attachment-modal-close'),
+            attachmentModalTitle: document.getElementById('attachment-modal-title'),
+            attachmentModalBody: document.getElementById('attachment-modal-body')
         };
         
         // Initialize voice recognition
@@ -384,25 +403,14 @@ class InboxTriageSidePanel {
      * Show a section and optionally expand it
      */
     showSection(sectionElement, autoExpand = true) {
-        if (sectionElement) {
-            sectionElement.classList.remove('hidden');
-            if (autoExpand && !sectionElement.classList.contains('expanded')) {
-                sectionElement.classList.add('expanded');
-                const header = sectionElement.querySelector('.section-header');
-                if (header) {
-                    header.setAttribute('aria-expanded', 'true');
-                }
-            }
-        }
+        this.displayManager.showSection(sectionElement, autoExpand);
     }
     
     /**
      * Hide a section
      */
     hideSection(sectionElement) {
-        if (sectionElement) {
-            sectionElement.classList.add('hidden');
-        }
+        this.displayManager.hideSection(sectionElement);
     }
     
     /**
@@ -433,6 +441,21 @@ class InboxTriageSidePanel {
         this.voiceInput.initialize();
         this.settingsManager.initialize();
         
+        // Attachment modal event listeners
+        if (this.elements.attachmentModalClose) {
+            this.elements.attachmentModalClose.addEventListener('click', () => this.attachmentHandler.closeAttachmentModal());
+        }
+        if (this.elements.attachmentModalOverlay) {
+            this.elements.attachmentModalOverlay.addEventListener('click', (e) => {
+                if (e.target === this.elements.attachmentModalOverlay) {
+                    this.attachmentHandler.closeAttachmentModal();
+                }
+            });
+        }
+        
+        // API provider selection warning (no longer needed - all providers are available)
+        // Removed warning notice since all providers are now implemented
+        
         // Keyboard navigation support
         this.elements.extractBtn.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -457,42 +480,7 @@ class InboxTriageSidePanel {
     }
     
     updateStatus(message, type = 'info') {
-        // Clear any existing hide timeout
-        if (this.statusHideTimeout) {
-            clearTimeout(this.statusHideTimeout);
-            this.statusHideTimeout = null;
-        }
-        
-        this.elements.status.textContent = message;
-        const statusElement = this.elements.status.parentElement;
-        
-        // Hide status container if message is empty
-        if (!message || message.trim() === '') {
-            statusElement.classList.add('hidden');
-            this.elements.status.setAttribute('aria-label', '');
-            return;
-        }
-        
-        // Show status container
-        statusElement.classList.remove('hidden');
-        
-        // Remove existing status classes
-        statusElement.classList.remove('loading', 'error', 'success', 'info');
-        // Add new status class
-        statusElement.classList.add(type);
-        
-        // Update ARIA live region for screen readers
-        this.elements.status.setAttribute('aria-label', `Status: ${message}`);
-        
-        // Auto-hide after timeout based on type
-        // Don't auto-hide loading states (they'll be updated with completion)
-        if (type !== 'loading') {
-            const hideDelay = type === 'error' ? 10000 : 5000; // Errors stay longer
-            this.statusHideTimeout = setTimeout(() => {
-                statusElement.classList.add('hidden');
-                this.elements.status.setAttribute('aria-label', '');
-            }, hideDelay);
-        }
+        this.displayManager.updateStatus(message, type);
     }
 
     /**
@@ -775,367 +763,36 @@ class InboxTriageSidePanel {
             return;
         }
         
-        // Create attachments list
-        const attachmentsContainer = document.createElement('div');
-        attachmentsContainer.className = 'attachments-container';
+        // Use attachment handler to display attachments
+        this.attachmentHandler.displayAttachments(attachments);
         
-        attachments.forEach((attachment, index) => {
-            const attachmentCard = this.createAttachmentCard(attachment, index);
-            attachmentsContainer.appendChild(attachmentCard);
-        });
-        
-        this.elements.attachments.innerHTML = '';
-        this.elements.attachments.appendChild(attachmentsContainer);
+        // Update aria-label
         this.elements.attachments.setAttribute('aria-label', `${attachments.length} attachments found in email thread`);
         
         // Show the section
         this.showSection(this.elements.attachmentsSection);
         
         // Process attachments for summaries
-        this.processAttachments(attachments);
+        this.attachmentHandler.processAttachments(attachments);
     }
     
     /**
-     * Create an attachment card element
-     * @param {Object} attachment - Attachment metadata
-     * @param {number} index - Card index
-     * @returns {HTMLElement} Attachment card element
-     */
-    createAttachmentCard(attachment, index) {
-        const card = document.createElement('div');
-        card.className = 'attachment-card';
-        card.tabIndex = 0;
-        card.setAttribute('role', 'button');
-        card.setAttribute('aria-label', `Attachment: ${attachment.name}, ${attachment.size || 'unknown size'}`);
-        
-        // Create attachment header
-        const header = document.createElement('div');
-        header.className = 'attachment-header';
-        
-        // Create file type icon
-        const icon = document.createElement('div');
-        icon.className = `attachment-icon ${attachment.type}`;
-        icon.textContent = this.getFileTypeIcon(attachment.type);
-        
-        // Create attachment info
-        const info = document.createElement('div');
-        info.className = 'attachment-info';
-        
-        const name = document.createElement('div');
-        name.className = 'attachment-name';
-        name.textContent = attachment.name;
-        name.title = attachment.name; // For overflow tooltip
-        
-        const meta = document.createElement('div');
-        meta.className = 'attachment-meta';
-        
-        const size = document.createElement('span');
-        size.textContent = attachment.size || 'Unknown size';
-        
-        const processable = document.createElement('span');
-        processable.textContent = attachment.processable ? 'Processable' : 'View only';
-        
-        meta.appendChild(size);
-        meta.appendChild(processable);
-        
-        info.appendChild(name);
-        info.appendChild(meta);
-        
-        header.appendChild(icon);
-        header.appendChild(info);
-        
-        card.appendChild(header);
-        
-        // Add image preview for image attachments
-        if (attachment.type === 'image' && attachment.imageUrl) {
-            const imagePreview = document.createElement('div');
-            imagePreview.className = 'attachment-image-preview';
-            
-            const img = document.createElement('img');
-            img.src = attachment.imageUrl;
-            img.alt = attachment.name;
-            img.loading = 'lazy';
-            img.style.maxWidth = '100%';
-            img.style.maxHeight = '200px';
-            img.style.objectFit = 'contain';
-            
-            imagePreview.appendChild(img);
-            card.appendChild(imagePreview);
-            
-            // Add image analysis buttons
-            const analysisButtons = document.createElement('div');
-            analysisButtons.className = 'image-analysis-buttons';
-            
-            const analyzeBtn = document.createElement('button');
-            analyzeBtn.type = 'button';
-            analyzeBtn.className = 'analyze-image-btn';
-            analyzeBtn.textContent = '🔍 Analyze Image';
-            analyzeBtn.title = 'Analyze this image with AI';
-            analyzeBtn.onclick = (e) => {
-                e.stopPropagation();
-                this.analyzeImage(attachment, 'general', index);
-            };
-            
-            const ocrBtn = document.createElement('button');
-            ocrBtn.type = 'button';
-            ocrBtn.className = 'analyze-image-btn';
-            ocrBtn.textContent = '📄 Extract Text';
-            ocrBtn.title = 'Extract text from this image (OCR)';
-            ocrBtn.onclick = (e) => {
-                e.stopPropagation();
-                this.analyzeImage(attachment, 'ocr', index);
-            };
-            
-            analysisButtons.appendChild(analyzeBtn);
-            analysisButtons.appendChild(ocrBtn);
-            card.appendChild(analysisButtons);
-        }
-        
-        // Create summary/analysis section
-        const summary = document.createElement('div');
-        summary.className = 'attachment-summary';
-        summary.id = `attachment-analysis-${index}`;
-        
-        if (attachment.type === 'image') {
-            summary.innerHTML = '<span class="attachment-info">Click analyze to get AI insights</span>';
-        } else if (attachment.processable) {
-            summary.innerHTML = '<span class="attachment-loading">Analyzing attachment...</span>';
-        } else {
-            summary.innerHTML = '<span class="attachment-error">File type not supported for analysis</span>';
-        }
-        
-        card.appendChild(summary);
-        
-        // Add click handler for future detailed view
-        card.addEventListener('click', () => this.showAttachmentDetails(attachment));
-        card.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                this.showAttachmentDetails(attachment);
-            }
-        });
-        
-        return card;
-    }
-    
-    /**
-     * Get icon text for file type
-     * @param {string} fileType - File type category
-     * @returns {string} Icon text
-     */
-    getFileTypeIcon(fileType) {
-        switch (fileType) {
-            case 'pdf': return 'PDF';
-            case 'docx': return 'DOC';
-            case 'xlsx': return 'XLS';
-            case 'image': return 'IMG';
-            default: return '?';
-        }
-    }
-    
-    /**
-     * Process attachments for AI summarization
-     * @param {Array} attachments - List of attachments to process
-     */
-    async processAttachments(attachments) {
-        const processableCount = attachments.filter(a => a.processable).length;
-        let processed = 0;
-        
-        for (const attachment of attachments) {
-            if (attachment.processable) {
-                try {
-                    processed++;
-                    this.updateStatus(`Analyzing attachment ${processed}/${processableCount}: ${attachment.name}...`, 'loading');
-                    await this.processAttachment(attachment);
-                } catch (error) {
-                    console.error('Error processing attachment:', error);
-                    this.updateAttachmentSummary(attachment.index, 'Error processing attachment', true);
-                }
-            }
-        }
-        
-        if (processableCount > 0) {
-            this.updateStatus(`✓ Analyzed ${processableCount} attachment${processableCount !== 1 ? 's' : ''}`, 'success');
-        }
-    }
-    
-    /**
-     * Process a single attachment (now calls service worker)
-     * @param {Object} attachment - Attachment to process
-     */
-    async processAttachment(attachment) {
-        try {
-            // Check if we're in an extension context
-            if (!chrome?.runtime?.sendMessage) {
-                throw new Error('Chrome extension API not available');
-            }
-            
-            const response = await chrome.runtime.sendMessage({
-                action: 'processAttachment',
-                attachment: attachment
-            });
-            
-            if (response && response.success) {
-                const processedAttachment = response.attachment;
-                this.updateAttachmentSummary(processedAttachment.index, processedAttachment.summary, false);
-            } else {
-                const errorMsg = response?.error || 'Failed to process attachment';
-                this.updateAttachmentSummary(attachment.index, errorMsg, true);
-            }
-            
-        } catch (error) {
-            console.error('Error processing attachment via service worker:', error);
-            
-            // Provide fallback message for non-extension contexts
-            if (error.message.includes('Chrome extension API not available')) {
-                this.updateAttachmentSummary(attachment.index, 'Extension API required for attachment processing', true);
-            } else {
-                this.updateAttachmentSummary(attachment.index, `Error: ${error.message}`, true);
-            }
-        }
-    }
-    
-    /**
-     * Update attachment summary in the UI
-     * @param {number} attachmentIndex - Index of attachment
-     * @param {string} summary - Summary text
-     * @param {boolean} isError - Whether this is an error message
-     */
-    updateAttachmentSummary(attachmentIndex, summary, isError = false) {
-        const cards = this.elements.attachments.querySelectorAll('.attachment-card');
-        if (cards[attachmentIndex]) {
-            const summaryEl = cards[attachmentIndex].querySelector('.attachment-summary');
-            if (summaryEl) {
-                summaryEl.innerHTML = `<span class="${isError ? 'attachment-error' : ''}">${summary}</span>`;
-            }
-        }
-    }
-    
-    /**
-     * Show detailed view of attachment (placeholder implementation)
-     * 
-     * STATUS: Not yet implemented - uses alert() as temporary placeholder
-     * See docs/todo.md Section "Attachment Processing" - "Detailed view modal"
-     * 
-     * This method is called when users click on an attachment card to view
-     * full extracted content and detailed analysis. Currently shows an alert
-     * as a placeholder.
-     * 
-     * Future implementation should:
-     * - Create a modal overlay with full attachment details
-     * - Display extracted content (for processed attachments)
-     * - Show comprehensive analysis results
-     * - Include download/view options
-     * - Support keyboard navigation and accessibility
-     * 
-     * Reference: docs/spec.md - Attachment Summary Display requirements
-     * 
-     * @param {Object} attachment - Attachment to show details for
+     * Show attachment details modal (wrapper for AttachmentHandler)
+     * Exposed for testing purposes
+     * @param {Object} attachment - Attachment object
      */
     showAttachmentDetails(attachment) {
-        // TODO: Implement modal or expanded view per docs/todo.md
-        // This is a placeholder implementation that will be replaced with
-        // a proper modal dialog showing full attachment content and analysis
-        console.log('Showing details for attachment:', attachment);
-        
-        // Temporary placeholder - will be replaced with modal implementation
-        alert(`Detailed view for ${attachment.name}\n\nThis feature will show full extracted content and detailed analysis.\n\nSee docs/todo.md for implementation roadmap.`);
+        this.attachmentHandler.showAttachmentDetails(attachment);
     }
     
     /**
-     * Analyze an image attachment using multimodal AI
-     * @param {Object} attachment - Attachment object
-     * @param {string} analysisType - Type of analysis ('general', 'ocr', 'chart', 'context')
-     * @param {number} index - Attachment index
+     * Format file size (wrapper for AttachmentHandler)
+     * Exposed for testing purposes
+     * @param {number} bytes - File size in bytes
+     * @returns {string} Formatted size
      */
-    async analyzeImage(attachment, analysisType = 'general', index) {
-        if (!attachment.imageUrl) {
-            this.updateStatus('Image URL not available for analysis', 'error');
-            return;
-        }
-        
-        const summaryElement = document.getElementById(`attachment-analysis-${index}`);
-        if (!summaryElement) return;
-        
-        try {
-            // Show loading state
-            summaryElement.innerHTML = '<span class="attachment-loading">🤖 Analyzing image with AI...</span>';
-            this.updateStatus('Analyzing image...', 'loading');
-            
-            // Get context from email for contextual analysis
-            const context = analysisType === 'context' ? this.currentThread.subject : '';
-            
-            // Send analysis request to background
-            const response = await chrome.runtime.sendMessage({
-                action: 'analyzeImage',
-                imageUrl: attachment.imageUrl,
-                analysisType,
-                context
-            });
-            
-            if (response && response.success) {
-                const analysis = response.analysis;
-                
-                // Display results
-                summaryElement.innerHTML = '';
-                summaryElement.className = 'attachment-summary analysis-result';
-                
-                const header = document.createElement('div');
-                header.className = 'analysis-header';
-                header.textContent = this.getAnalysisTypeLabel(analysisType);
-                
-                const description = document.createElement('div');
-                description.className = 'analysis-description';
-                description.textContent = analysis.description;
-                
-                summaryElement.appendChild(header);
-                summaryElement.appendChild(description);
-                
-                // For OCR, add copy button
-                if (analysisType === 'ocr' && analysis.description !== 'No text detected') {
-                    const copyBtn = document.createElement('button');
-                    copyBtn.type = 'button';
-                    copyBtn.className = 'copy-text-btn';
-                    copyBtn.textContent = '📋 Copy Text';
-                    copyBtn.onclick = async () => {
-                        try {
-                            await navigator.clipboard.writeText(analysis.description);
-                            copyBtn.textContent = '✓ Copied!';
-                            setTimeout(() => {
-                                copyBtn.textContent = '📋 Copy Text';
-                            }, 2000);
-                        } catch (error) {
-                            console.error('Failed to copy:', error);
-                        }
-                    };
-                    summaryElement.appendChild(copyBtn);
-                }
-                
-                this.updateStatus(`✓ Image analyzed successfully`, 'success');
-            } else {
-                throw new Error(response?.error || 'Image analysis failed');
-            }
-            
-        } catch (error) {
-            console.error('Image analysis error:', error);
-            summaryElement.innerHTML = `<span class="attachment-error">Analysis failed: ${error.message}</span>`;
-            this.updateStatus(`Image analysis error: ${error.message}`, 'error');
-        }
-    }
-    
-    /**
-     * Get human-readable label for analysis type
-     * @param {string} type - Analysis type
-     * @returns {string} Label
-     */
-    getAnalysisTypeLabel(type) {
-        const labels = {
-            general: '🔍 AI Analysis',
-            ocr: '📄 Extracted Text',
-            chart: '📊 Chart Analysis',
-            context: '🎯 Contextual Analysis'
-        };
-        return labels[type] || '🔍 Analysis';
+    formatFileSize(bytes) {
+        return this.attachmentHandler.formatFileSize(bytes);
     }
     
     async generateReplyDrafts() {
@@ -1821,72 +1478,18 @@ class InboxTriageSidePanel {
      * @param {boolean} usedFallback - Whether cloud fallback was used
      */
     addProcessingIndicator(operation, usedFallback = false) {
-        const settings = this.settingsManager.settings;
-        if (settings.processingMode === 'hybrid' && usedFallback) {
-            // Show cloud processing indicator
-            this.showCloudProcessingIndicator(operation);
-            console.log(`${operation} processed using cloud fallback`);
-        } else {
-            console.log(`${operation} processed on-device`);
-        }
-    }
-    
-    /**
-     * Display cloud processing indicator in the UI
-     * @param {string} operation - The operation that used cloud processing
-     */
-    showCloudProcessingIndicator(operation) {
-        // Create or update cloud processing indicator
-        let indicator = document.getElementById('cloud-processing-indicator');
-        if (!indicator) {
-            indicator = document.createElement('div');
-            indicator.id = 'cloud-processing-indicator';
-            indicator.className = 'cloud-indicator';
-            indicator.innerHTML = `
-                <span class="cloud-icon">☁️</span>
-                <span class="indicator-text">Cloud processing used</span>
-                <button class="info-button" onclick="this.showCloudInfo()" aria-label="Learn more about cloud processing">ⓘ</button>
-            `;
-            
-            // Add to the appropriate section
-            const targetSection = operation === 'summarization' ? 
-                document.getElementById('summary') : 
-                document.getElementById('drafts');
-                
-            if (targetSection) {
-                targetSection.insertBefore(indicator, targetSection.firstChild);
-            }
-        }
-        
-        // Update the text for current operation
-        const textElement = indicator.querySelector('.indicator-text');
-        if (textElement) {
-            textElement.textContent = `${operation} processed in cloud for enhanced reliability`;
-        }
-        
-        // Auto-hide after 10 seconds
-        setTimeout(() => {
-            if (indicator && indicator.parentNode) {
-                indicator.remove();
-            }
-        }, 10000);
+        this.displayManager.addProcessingIndicator(operation, usedFallback);
     }
     
     /**
      * Show information about cloud processing
+     * 
+     * Displays privacy information when cloud processing is used.
+     * Uses status message instead of alert() for better UX.
      */
     showCloudInfo() {
-        const message = `
-Cloud Processing Information:
-
-✅ Only extracted email text was sent to cloud services
-✅ No attachments, images, or files were transmitted  
-✅ Processing occurred due to device limitations or content size
-✅ You can disable cloud fallback in Processing Settings
-
-Your privacy remains protected with minimal necessary data transmission.
-        `;
-        alert(message);
+        const message = `Cloud processing used. Only extracted email text was sent—no attachments, images, or files. Your privacy remains protected. You can disable cloud fallback in Processing Settings.`;
+        this.updateStatus(message, 'info');
     }
 }
 
@@ -1929,7 +1532,11 @@ window.copyToClipboard = async (subject, body, buttonElement) => {
     }
 };
 
-// Initialize side panel when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    new InboxTriageSidePanel();
-});
+// Initialize side panel when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        window.sidePanelInstance = new InboxTriageSidePanel();
+    });
+} else {
+    window.sidePanelInstance = new InboxTriageSidePanel();
+}

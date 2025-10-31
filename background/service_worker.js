@@ -7,6 +7,10 @@ import { TranslationService } from './translation-service.js';
 import { MultimodalAnalysisService } from './multimodal-service.js';
 import { sanitizeErrorMessage } from '../utils/error-handler.js';
 import { validateDraftsSchema, validateAndFormatDrafts } from '../utils/validation.js';
+import { OpenAIAPI, AnthropicAPI, GoogleAIAPI, createSystemPrompt, createReplyPrompt } from './api-integrations.js';
+import { SummaryService } from './summary-service.js';
+import { DraftService } from './draft-service.js';
+import { AttachmentService } from './attachment-service.js';
 
 class InboxTriageServiceWorker {
     constructor() {
@@ -21,6 +25,19 @@ class InboxTriageServiceWorker {
         // Initialize services
         this.translationService = new TranslationService();
         this.multimodalService = new MultimodalAnalysisService();
+        this.summaryService = new SummaryService({
+            aiCapabilities: this.aiCapabilities,
+            broadcastModelStatus: (type, capabilities) => this.broadcastModelStatus(type, capabilities),
+            shouldUseCloudFallback: (operation, processingMode, thread) => this.shouldUseCloudFallback(operation, processingMode, thread)
+        });
+        this.draftService = new DraftService({
+            aiCapabilities: this.aiCapabilities,
+            shouldUseCloudFallback: (operation, processingMode, thread) => this.shouldUseCloudFallback(operation, processingMode, thread),
+            summaryService: this.summaryService
+        });
+        this.attachmentService = new AttachmentService({
+            aiCapabilities: this.aiCapabilities
+        });
         
         // Periodic check interval (30 seconds)
         this.modelCheckInterval = null;
@@ -562,148 +579,14 @@ class InboxTriageServiceWorker {
      * Reference: docs/spec.md - AI-Powered Summarization requirements
      * Reference: https://developer.chrome.com/docs/ai/summarizer-api
      * 
-     * Generates TL;DR summary (under 100 words) and up to 5 key points.
-     * Handles model availability checks, content size limits, and fallback logic.
+     * Delegates to SummaryService for implementation
      * 
      * @param {Object} thread - Email thread data
      * @param {Function} sendResponse - Response callback
      * @param {Object} userSettings - User settings (processing mode, API key)
      */
     async generateSummary(thread, sendResponse, userSettings = null) {
-        try {
-            const processingMode = userSettings?.processingMode || 'device-only';
-            const useApiKey = userSettings?.useApiKey || false;
-            let usedFallback = false;
-            
-            // If user has configured a custom API key, use it
-            if (useApiKey && userSettings?.apiKey) {
-                return await this.generateSummaryWithExternalAPI(thread, sendResponse, userSettings);
-            }
-            
-            // Apply hybrid fallback decision rules as documented in docs/spec.md
-            const fallbackDecision = this.shouldUseCloudFallback('summarization', processingMode, thread);
-            
-            if (fallbackDecision.shouldFallback && processingMode === 'hybrid') {
-                // Cloud fallback would be implemented here
-                // For now, show privacy-preserving error message
-                throw new Error(`${fallbackDecision.reason}. Cloud fallback is not implemented to maintain privacy guarantees.`);
-            }
-            
-            // Check AI capabilities first
-            if (!this.aiCapabilities.summarizer) {
-                if (processingMode === 'hybrid') {
-                    throw new Error('AI summarization is not available in this browser. Cloud fallback is not implemented to maintain privacy guarantees. Please use Chrome 120+ with AI features enabled.');
-                } else {
-                    throw new Error('AI summarization is not available in this browser. Please use Chrome 120+ with AI features enabled.');
-                }
-            }
-            
-            // Check if model is ready  
-            const capabilities = this.aiCapabilities.summarizer;
-            if (capabilities.available === 'after-download') {
-                if (processingMode === 'hybrid') {
-                    throw new Error('AI model is downloading. Cloud fallback is not implemented to maintain privacy guarantees. Please wait for download to complete.');
-                } else {
-                    throw new Error('AI model is downloading. This may take a few minutes. Please try again later.');
-                }
-            } else if (capabilities.available === 'no') {
-                if (processingMode === 'hybrid') {
-                    throw new Error('AI summarization is not available. Cloud fallback is not implemented to maintain privacy guarantees. Please enable Chrome AI features in Settings > Privacy and security > Experimental AI.');
-                } else {
-                    throw new Error('AI summarization is not available. Please enable Chrome AI features in Settings > Privacy and security > Experimental AI.');
-                }
-            }
-            
-            // Combine all message content and apply content size limits
-            let fullText = this.combineThreadMessages(thread);
-            
-            // Apply content size limits as per docs/spec.md (32,000 characters max)
-            if (fullText && fullText.length > 32000) {
-                console.warn('Content exceeds 32,000 character limit, truncating for on-device processing');
-                fullText = this.truncateContentForProcessing(fullText, 32000);
-            }
-            
-            if (!fullText || fullText.length < 50) {
-                throw new Error('Not enough content to summarize');
-            }
-            
-            // Broadcast progress update
-            this.broadcastModelStatus('summarizing', { stage: 'generating_tldr' });
-            
-            // Create TL;DR summarizer session - matching docs exactly
-            // Reference: https://developer.chrome.com/docs/ai/summarizer-api
-            // Example from docs: const summarizer = await Summarizer.create({...})
-            const tldrSummarizer = await Summarizer.create({
-                type: 'tldr',
-                format: 'plain-text',
-                length: 'short',
-                monitor(m) {
-                    m.addEventListener('downloadprogress', (e) => {
-                        console.log(`Summarizer download progress: ${e.loaded * 100}%`);
-                    });
-                }
-            });
-            
-            // Generate TL;DR summary
-            const summary = await tldrSummarizer.summarize(fullText);
-            tldrSummarizer.destroy();
-            
-            // Broadcast progress update
-            this.broadcastModelStatus('summarizing', { stage: 'generating_key_points' });
-            
-            let keyPoints = [];
-            
-            // Try to use key-points summarizer if available, fallback to manual extraction
-            try {
-                const keyPointsSummarizer = await Summarizer.create({
-                    type: 'key-points',
-                    format: 'plain-text',
-                    length: 'short',
-                    monitor(m) {
-                        m.addEventListener('downloadprogress', (e) => {
-                            console.log(`Key-points summarizer download: ${e.loaded * 100}%`);
-                        });
-                    }
-                });
-                
-                const keyPointsText = await keyPointsSummarizer.summarize(fullText);
-                keyPointsSummarizer.destroy();
-                
-                // Parse the key points text into an array
-                keyPoints = this.parseKeyPointsFromText(keyPointsText);
-                
-            } catch (keyPointsError) {
-                console.warn('Key-points summarizer not available, using fallback extraction:', keyPointsError.message);
-                // Fallback to manual extraction
-                keyPoints = this.extractKeyPoints(fullText, 5);
-            }
-            
-            // Broadcast completion
-            this.broadcastModelStatus('summarizing', { stage: 'completed' });
-            
-            sendResponse({
-                success: true,
-                summary: summary,
-                keyPoints: keyPoints,
-                usedFallback: usedFallback
-            });
-            
-        } catch (error) {
-            console.error('Summary generation error:', error);
-            
-            // Sanitize error message for user display
-            const sanitizedError = sanitizeErrorMessage(error.message);
-            
-            this.broadcastModelStatus('summarizing', { 
-                stage: 'error', 
-                error: sanitizedError
-            });
-            
-            sendResponse({
-                success: false,
-                error: sanitizedError
-            });
-        }
+        return await this.summaryService.generateSummary(thread, sendResponse, userSettings);
     }
     
     /**
@@ -712,10 +595,7 @@ class InboxTriageServiceWorker {
      * Reference: docs/spec.md - Reply Draft Generation requirements
      * Reference: https://developer.chrome.com/docs/ai/prompt-api
      * 
-     * Generates exactly 3 reply drafts in selected tone:
-     * 1. Short answer (quick acknowledgment)
-     * 2. Medium with clarifications (detailed response)
-     * 3. Polite with next steps (comprehensive response)
+     * Delegates to DraftService for implementation
      * 
      * @param {Object} thread - Email thread data
      * @param {string} tone - Selected tone (neutral, friendly, assertive, formal)
@@ -724,130 +604,7 @@ class InboxTriageServiceWorker {
      * @param {Object} userSettings - User settings (processing mode, API key)
      */
     async generateReplyDrafts(thread, tone, guidance, sendResponse, userSettings = null) {
-        try {
-            const processingMode = userSettings?.processingMode || 'device-only';
-            const useApiKey = userSettings?.useApiKey || false;
-            let usedFallback = false;
-            
-            // If user has configured a custom API key, use it
-            if (useApiKey && userSettings?.apiKey) {
-                return await this.generateDraftsWithExternalAPI(thread, tone, guidance, sendResponse, userSettings);
-            }
-            
-            // Apply hybrid fallback decision rules as documented in docs/spec.md  
-            const fallbackDecision = this.shouldUseCloudFallback('drafting', processingMode, thread);
-            
-            if (fallbackDecision.shouldFallback && processingMode === 'hybrid') {
-                // Cloud fallback would be implemented here
-                // For now, show privacy-preserving error message
-                throw new Error(`${fallbackDecision.reason}. Cloud fallback is not implemented to maintain privacy guarantees.`);
-            }
-            
-            if (!this.aiCapabilities.promptApi) {
-                if (processingMode === 'hybrid') {
-                    throw new Error('Language Model API not available. Cloud fallback is not implemented to maintain privacy guarantees. Please enable AI features in Chrome.');
-                } else {
-                    throw new Error('Language Model API not available. Please enable AI features in Chrome.');
-                }
-            }
-            
-            // Check if model is ready
-            const capabilities = this.aiCapabilities.promptApi;
-            if (capabilities.available === 'after-download') {
-                if (processingMode === 'hybrid') {
-                    throw new Error('AI model is downloading. Cloud fallback is not implemented to maintain privacy guarantees. Please wait for download to complete.');
-                } else {
-                    throw new Error('AI model is downloading. This may take a few minutes. Please try again later.');
-                }
-            } else if (capabilities.available === 'no') {
-                if (processingMode === 'hybrid') {
-                    throw new Error('Language Model API is not available. Cloud fallback is not implemented to maintain privacy guarantees. Please enable Chrome AI features in Settings > Privacy and security > Experimental AI.');
-                } else {
-                    throw new Error('Language Model API is not available. Please enable Chrome AI features in Settings > Privacy and security > Experimental AI.');
-                }
-            }
-            
-            const fullText = this.combineThreadMessages(thread);
-            const subject = thread.subject || 'Re: Email Thread';
-            
-            if (!fullText || fullText.length < 20) {
-                throw new Error('Not enough content to generate meaningful replies');
-            }
-            
-            // Create language model session - matching docs pattern exactly
-            // Following same pattern as Summarizer API
-            // Reference: https://developer.chrome.com/docs/ai/prompt-api
-            // Example: const session = await LanguageModel.create({...})
-            const session = await LanguageModel.create({
-                initialPrompts: [
-                    { role: 'system', content: this.createSystemPrompt(tone) }
-                ],
-                temperature: 0.7,
-                topK: 3
-            });
-            
-            // Generate drafts using structured prompt
-            const prompt = this.createReplyPrompt(fullText, subject, tone, guidance);
-            const response = await session.prompt(prompt);
-            
-            // Clean up session immediately
-            session.destroy();
-            
-            // Parse and validate JSON response
-            let drafts;
-            try {
-                // Clean the response - remove any non-JSON text
-                const cleanedResponse = this.cleanJsonResponse(response);
-                drafts = JSON.parse(cleanedResponse);
-                
-                // Validate against schema
-                const validation = validateDraftsSchema(drafts);
-                if (!validation.isValid) {
-                    console.warn('Schema validation failed:', validation.errors);
-                    throw new Error(`Invalid response format: ${validation.errors.join(', ')}`);
-                }
-                
-            } catch (parseError) {
-                console.warn('JSON parsing failed, using fallback:', parseError.message);
-                // Enhanced fallback with original response
-                drafts = this.createFallbackDrafts(response, subject, tone);
-            }
-            
-            // Validate and format drafts
-            const formattedDrafts = validateAndFormatDrafts(drafts, subject);
-            
-            // Ensure we always have exactly 3 drafts
-            if (formattedDrafts.length !== 3) {
-                console.warn(`Expected 3 drafts, got ${formattedDrafts.length}, using fallback`);
-                const fallback = this.createFallbackDrafts('', subject, tone);
-                const fallbackFormatted = validateAndFormatDrafts(fallback, subject);
-                
-                sendResponse({
-                    success: true,
-                    drafts: fallbackFormatted,
-                    warning: 'AI response was incomplete, using fallback drafts',
-                    usedFallback: usedFallback
-                });
-                return;
-            }
-            
-            sendResponse({
-                success: true,
-                drafts: formattedDrafts,
-                usedFallback: usedFallback
-            });
-            
-        } catch (error) {
-            console.error('Draft generation error:', error);
-            
-            // Sanitize error message for user display
-            const sanitizedError = sanitizeErrorMessage(error.message);
-            
-            sendResponse({
-                success: false,
-                error: sanitizedError
-            });
-        }
+        return await this.draftService.generateReplyDrafts(thread, tone, guidance, sendResponse, userSettings);
     }
     
     /**
@@ -855,400 +612,13 @@ class InboxTriageServiceWorker {
      * 
      * Reference: docs/spec.md - Attachment Content Processing requirements
      * 
-     * Processes attachments (images, PDFs, DOCX, XLSX) entirely on-device.
-     * For images: uses multimodal Prompt API (triggered via UI)
-     * For documents: placeholder (PDF/DOCX/XLSX parsing not yet implemented)
+     * Delegates to AttachmentService for implementation
      * 
      * @param {Object} attachment - Attachment metadata and content
      * @param {Function} sendResponse - Response callback
      */
     async processAttachment(attachment, sendResponse) {
-        try {
-            // Check AI capabilities first
-            if (!this.aiCapabilities.summarizer && !this.aiCapabilities.promptApi) {
-                throw new Error('AI processing is not available in this browser. Please use Chrome 120+ with AI features enabled.');
-            }
-            
-            let extractedText = '';
-            let processedContent = '';
-            
-            // For now, implement basic attachment processing based on type
-            // This is a simplified version that will be enhanced with actual file parsing
-            switch (attachment.type) {
-                case 'image':
-                    processedContent = await this.processImageAttachment(attachment);
-                    break;
-                    
-                case 'pdf':
-                case 'docx':
-                case 'xlsx':
-                    processedContent = await this.processDocumentAttachment(attachment);
-                    break;
-                    
-                default:
-                    throw new Error(`Unsupported attachment type: ${attachment.type}`);
-            }
-            
-            // Generate summary using Summarizer API
-            let summary = '';
-            if (processedContent && this.aiCapabilities.summarizer?.available === 'readily') {
-                summary = await this.generateAttachmentSummary(processedContent, attachment);
-            } else {
-                summary = `${attachment.name} (${attachment.type.toUpperCase()}) - Local processing capabilities coming soon.`;
-            }
-            
-            sendResponse({
-                success: true,
-                attachment: {
-                    ...attachment,
-                    extractedContent: processedContent,
-                    summary: summary,
-                    processed: true
-                }
-            });
-            
-        } catch (error) {
-            console.error('Attachment processing error:', error);
-            
-            const sanitizedError = sanitizeErrorMessage(error.message);
-            sendResponse({
-                success: false,
-                error: sanitizedError,
-                attachment: {
-                    ...attachment,
-                    summary: `Error processing ${attachment.name}: ${sanitizedError}`,
-                    processed: false
-                }
-            });
-        }
-    }
-    
-    /**
-     * Process image attachment using multimodal Prompt API
-     * 
-     * STATUS: Partial implementation - image analysis via sidepanel.js analyzeImage() method
-     * See: sidepanel.js analyzeImage() for full multimodal implementation
-     * Reference: https://developer.chrome.com/docs/ai/prompt-api
-     * 
-     * This method is called during attachment processing but currently returns
-     * a placeholder message. Full image analysis is implemented in the side panel
-     * via the analyzeImage() method which uses multimodal Prompt API capabilities.
-     * 
-     * Note: This method processes attachments during bulk extraction.
-     * For individual image analysis, users should use the "Analyze Image" button
-     * in the attachment card UI.
-     * 
-     * @param {Object} attachment - Image attachment
-     * @returns {string} Placeholder message indicating analysis available via UI
-     */
-    async processImageAttachment(attachment) {
-        try {
-            // Check if multimodal Prompt API is available
-            if (!this.aiCapabilities.promptApi || this.aiCapabilities.promptApi.available !== 'readily') {
-                return `Image analysis unavailable - AI model not ready. Please ensure Chrome AI features are enabled.`;
-            }
-            
-            // Note: Full image analysis is implemented in sidepanel.js analyzeImage() method
-            // which uses multimodal Prompt API. This method is called during bulk processing
-            // but individual image analysis should be triggered via the UI.
-            // 
-            // Future enhancement: Implement full image fetching and analysis here for bulk processing
-            // Reference: SPEC.md - Attachment Content Processing requirements
-            
-            return `Image attachment: ${attachment.name}. Use the "Analyze Image" button in the attachment card for AI-powered analysis.`;
-            
-        } catch (error) {
-            console.error('Image processing error:', error);
-            return `Error analyzing image: ${error.message}`;
-        }
-    }
-    
-    /**
-     * Process document attachment (PDF, DOCX, XLSX)
-     * 
-     * STATUS: Not yet implemented - placeholder functionality
-     * See docs/todo.md Section "Attachment Processing" for implementation roadmap
-     * Reference: docs/spec.md - Attachment Content Processing requirements
-     * 
-     * This method is called during attachment processing but currently returns
-     * a placeholder message. File parsing libraries (PDF.js, mammoth.js, SheetJS)
-     * need to be integrated for full document extraction capabilities.
-     * 
-     * Current behavior: Returns informative message indicating feature is planned
-     * Future implementation should:
-     * 1. Fetch the document blob from attachment.downloadUrl
-     * 2. Use appropriate library (PDF.js for PDF, mammoth.js for DOCX, SheetJS for XLSX)
-     * 3. Extract text content for AI summarization
-     * 4. Return extracted text (respecting privacy: all processing on-device)
-     * 
-     * Privacy Note: All file processing must occur on-device per docs/spec.md requirements.
-     * No attachment content should be transmitted to external services.
-     * 
-     * @param {Object} attachment - Document attachment  
-     * @returns {string} Placeholder message indicating feature not yet available
-     */
-    async processDocumentAttachment(attachment) {
-        try {
-            const typeMap = {
-                'pdf': 'PDF text extraction',
-                'docx': 'Word document text extraction', 
-                'xlsx': 'Spreadsheet data extraction'
-            };
-            
-            const description = typeMap[attachment.type] || 'Document processing';
-            return `${description} for ${attachment.name}. Document parsing capabilities are planned but not yet implemented. See docs/todo.md for roadmap.`;
-            
-        } catch (error) {
-            console.error('Document processing error:', error);
-            return `Error processing document: ${error.message}`;
-        }
-    }
-    
-    /**
-     * Generate summary of attachment content using Summarizer API
-     * Reference: https://developer.chrome.com/docs/ai/summarizer-api
-     * @param {string} content - Extracted content from attachment
-     * @param {Object} attachment - Attachment metadata
-     * @returns {string} Generated summary
-     */
-    async generateAttachmentSummary(content, attachment) {
-        try {
-            if (!content || content.length < 50) {
-                return `${attachment.name} - Content too short to summarize effectively`;
-            }
-            
-            // Create summarizer session for attachment content
-            // Using global Summarizer constructor - matching pattern used elsewhere in this file
-            // Reference: https://developer.chrome.com/docs/ai/summarizer-api
-            const summarizer = await Summarizer.create({
-                type: 'tldr',
-                format: 'plain-text',
-                length: 'short'
-            });
-            
-            // Generate summary with context about the file type
-            const contextualContent = `File: ${attachment.name} (${attachment.type.toUpperCase()})\n\n${content}`;
-            const summary = await summarizer.summarize(contextualContent);
-            
-            // Clean up session
-            summarizer.destroy();
-            
-            return summary;
-            
-        } catch (error) {
-            console.error('Attachment summary generation error:', error);
-            return `${attachment.name} - Error generating summary: ${error.message}`;
-        }
-    }
-    
-    /**
-     * Clean JSON response by removing non-JSON text
-     * @param {string} response - Raw response from AI
-     * @returns {string} Cleaned JSON string
-     */
-    cleanJsonResponse(response) {
-        // Find JSON object boundaries
-        const startIndex = response.indexOf('{');
-        const lastIndex = response.lastIndexOf('}');
-        
-        if (startIndex === -1 || lastIndex === -1) {
-            throw new Error('No JSON object found in response');
-        }
-        
-        return response.substring(startIndex, lastIndex + 1);
-    }
-    
-    combineThreadMessages(thread) {
-        if (!thread.messages || thread.messages.length === 0) {
-            return '';
-        }
-        
-        return thread.messages
-            .map(msg => `From: ${msg.sender?.name || 'Unknown'}\n${msg.content}`)
-            .join('\n\n---\n\n');
-    }
-    
-    /**
-     * Parse key points text returned by the AI into an array
-     * @param {string} keyPointsText - Text containing key points from AI
-     * @returns {Array<string>} Array of key points
-     */
-    parseKeyPointsFromText(keyPointsText) {
-        if (!keyPointsText || typeof keyPointsText !== 'string') {
-            return [];
-        }
-        
-        // Split by common delimiters and clean up
-        const points = keyPointsText
-            .split(/[\n\r•\-\*]\s*/)
-            .map(point => point.trim())
-            .filter(point => point.length > 10 && !point.match(/^(\d+\.|\•|\-|\*)/))
-            .slice(0, 5); // Limit to 5 key points
-        
-        return points.length > 0 ? points : [keyPointsText.trim()];
-    }
-    
-    extractKeyPoints(text, maxPoints = 5) {
-        // Simple key point extraction (could be enhanced with AI)
-        const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 20);
-        const keyPoints = [];
-        
-        // Look for sentences with key indicators
-        const indicators = ['important', 'need', 'require', 'must', 'should', 'deadline', 'urgent'];
-        
-        sentences.forEach(sentence => {
-            if (keyPoints.length >= maxPoints) return;
-            
-            const lowerSentence = sentence.toLowerCase();
-            if (indicators.some(indicator => lowerSentence.includes(indicator))) {
-                keyPoints.push(sentence.trim());
-            }
-        });
-        
-        // Fill remaining slots with longest sentences
-        if (keyPoints.length < maxPoints) {
-            const remainingSentences = sentences
-                .filter(s => !keyPoints.includes(s.trim()))
-                .sort((a, b) => b.length - a.length);
-            
-            const needed = maxPoints - keyPoints.length;
-            keyPoints.push(...remainingSentences.slice(0, needed).map(s => s.trim()));
-        }
-        
-        return keyPoints.filter(point => point.length > 0);
-    }
-    
-    /**
-     * Create system prompt with JSON schema constraints
-     * 
-     * Reference: docs/spec.md - Reply Draft Generation requirements (JSON schema enforcement)
-     * 
-     * Creates a system prompt that instructs the AI to generate exactly 3 drafts
-     * in the specified tone, conforming to the JSON schema structure.
-     * 
-     * @param {string} tone - The tone to use for replies (neutral, friendly, assertive, formal)
-     * @returns {string} System prompt with schema requirements
-     */
-    createSystemPrompt(tone) {
-        return `You are an AI assistant helping to draft email replies. Generate responses that are:
-- ${tone} in tone
-- Professional and appropriate for business communication
-- Concise but complete
-- Properly structured with subject and body
-- Return responses as valid JSON with exactly 3 drafts
-
-CRITICAL: You must respond with ONLY valid JSON in the exact format below. Do not include any other text or explanations:
-{
-  "drafts": [
-    {"type": "string", "subject": "string (max 100 chars)", "body": "string (max 500 chars)"},
-    {"type": "string", "subject": "string (max 100 chars)", "body": "string (max 1000 chars)"},
-    {"type": "string", "subject": "string (max 100 chars)", "body": "string (max 1500 chars)"}
-  ]
-}
-
-Each draft must have exactly these three fields: type, subject, body. Generate exactly 3 drafts.`;
-    }
-    
-    /**
-     * Create a structured prompt for reply generation with JSON schema specification
-     * 
-     * Reference: docs/spec.md - Reply Draft Generation requirements
-     * 
-     * @param {string} threadText - The email thread content
-     * @param {string} originalSubject - The original email subject
-     * @param {string} tone - The tone to use for replies
-     * @param {string} guidance - Optional user guidance for customizing drafts
-     * @returns {string} Structured prompt with JSON requirements
-     */
-    createReplyPrompt(threadText, originalSubject, tone, guidance = '') {
-        const guidanceSection = guidance ? `\nUSER GUIDANCE:\n${guidance}\n` : '';
-        
-        return `Based on this email thread, generate 3 different reply drafts in ${tone} tone.
-
-THREAD:
-${threadText}
-
-ORIGINAL SUBJECT: ${originalSubject}${guidanceSection}
-
-Generate exactly 3 reply drafts with these characteristics:
-1. SHORT RESPONSE: Quick acknowledgment (1-2 sentences, max 500 chars body)
-2. MEDIUM RESPONSE: Detailed with clarifications (2-3 paragraphs, max 1000 chars body) 
-3. COMPREHENSIVE RESPONSE: Complete with next steps (3-4 paragraphs, max 1500 chars body)
-${guidance ? '\nIncorporate the user guidance above into all three drafts where relevant.\n' : ''}
-Respond with ONLY the following JSON format (no other text):
-{
-  "drafts": [
-    {
-      "type": "Quick Response",
-      "subject": "Re: ${originalSubject}",
-      "body": "Brief acknowledgment and next steps in ${tone} tone"
-    },
-    {
-      "type": "Detailed Response", 
-      "subject": "Re: ${originalSubject}",
-      "body": "Comprehensive response with clarifications in ${tone} tone"
-    },
-    {
-      "type": "Action-Oriented Response",
-      "subject": "Re: ${originalSubject}", 
-      "body": "Complete response with specific next steps in ${tone} tone"
-    }
-  ]
-}`;
-    }
-    
-    /**
-     * Create fallback drafts if AI response parsing fails
-     * @param {string} response - The failed AI response (for context)
-     * @param {string} subject - The original email subject
-     * @param {string} tone - The selected tone
-     * @returns {Object} Fallback drafts object
-     */
-    createFallbackDrafts(response, subject, tone) {
-        const toneAdjustments = {
-            neutral: {
-                quick: 'Thank you for your email. I will review this and get back to you soon.',
-                medium: 'I received your email and understand your request. Let me look into this and provide you with a detailed response by end of day.',
-                detailed: 'Thank you for reaching out. I will review the information you provided and schedule a follow-up meeting to discuss next steps. I will send you a meeting invite within the next 24 hours.'
-            },
-            friendly: {
-                quick: 'Thanks so much for your email! I\'ll take a look and get back to you shortly.',
-                medium: 'Hi there! I got your email and really appreciate you reaching out. Let me dive into this and I\'ll send you a thoughtful response later today.',
-                detailed: 'Hi! Thanks for your message - I really appreciate you taking the time to reach out. I want to give this the attention it deserves, so I\'ll review everything carefully and set up some time for us to chat about next steps. Expect a meeting invite from me soon!'
-            },
-            assertive: {
-                quick: 'I have received your email and will respond with the requested information shortly.',
-                medium: 'I understand your request and will provide a comprehensive response. I will review the details and deliver my analysis by the end of the business day.',
-                detailed: 'I have carefully noted your requirements and will address each point systematically. I will conduct a thorough review of the information provided and schedule a meeting to present my findings and recommended action items. You can expect my detailed response within 24 hours.'
-            },
-            formal: {
-                quick: 'Thank you for your correspondence. I shall review your request and respond accordingly.',
-                medium: 'I acknowledge receipt of your message and appreciate you bringing this matter to my attention. I will conduct a thorough review of the information provided and respond with a comprehensive analysis by close of business today.',
-                detailed: 'Dear colleague, I am writing to acknowledge receipt of your correspondence. I appreciate you taking the time to outline your requirements in detail. I shall conduct a comprehensive review of all materials provided and prepare a thorough response addressing each of your points. I will schedule a follow-up meeting to discuss the matter further and present my recommendations. Please expect my detailed response within one business day.'
-            }
-        };
-        
-        const selectedTone = toneAdjustments[tone] || toneAdjustments.neutral;
-        
-        return {
-            drafts: [
-                {
-                    type: 'Quick Response',
-                    subject: `Re: ${subject}`,
-                    body: selectedTone.quick
-                },
-                {
-                    type: 'Acknowledgment',
-                    subject: `Re: ${subject}`,
-                    body: selectedTone.medium
-                },
-                {
-                    type: 'Next Steps',
-                    subject: `Re: ${subject}`,
-                    body: selectedTone.detailed
-                }
-            ]
-        };
+        return await this.attachmentService.processAttachment(attachment, sendResponse);
     }
     
     /**
@@ -1296,7 +666,7 @@ Respond with ONLY the following JSON format (no other text):
         
         // Check content size limits if thread provided
         if (thread) {
-            const fullText = this.combineThreadMessages(thread);
+            const fullText = this.summaryService.combineThreadMessages(thread);
             
             // Content size limit check (32,000 characters as per docs/spec.md)
             if (fullText && fullText.length > 32000) {
@@ -1329,119 +699,39 @@ Respond with ONLY the following JSON format (no other text):
     
     /**
      * Truncate content for local processing while preserving essential information
+     * Delegates to SummaryService
      * @param {string} content - Original content
      * @param {number} maxLength - Maximum character length  
      * @returns {string} Truncated content
      */
     truncateContentForProcessing(content, maxLength) {
-        if (!content || content.length <= maxLength) return content;
-        
-        // Try to truncate at sentence boundaries to preserve coherence
-        const sentences = content.split(/[.!?]+/);
-        let truncated = '';
-        let totalLength = 0;
-        
-        for (const sentence of sentences) {
-            const sentenceWithPunct = sentence.trim() + '.';
-            if (totalLength + sentenceWithPunct.length > maxLength - 100) {
-                // Leave some buffer for essential information marker
-                break;
-            }
-            truncated += sentenceWithPunct + ' ';
-            totalLength += sentenceWithPunct.length + 1;
-        }
-        
-        // Add truncation indicator
-        truncated += '\n\n[Content truncated for processing...]';
-        
-        return truncated.trim();
+        return this.summaryService.truncateContentForProcessing(content, maxLength);
     }
     
     /**
      * Prepare content for cloud processing (text only, no attachments)
-     * This ensures only extracted text is sent, never raw files or images
+     * Delegates to SummaryService
      * @param {Object} thread - Email thread data
      * @returns {Object} Sanitized content for cloud processing
      */
     prepareContentForCloudProcessing(thread) {
-        // Extract only text content, never attachments or images
-        const textContent = this.combineThreadMessages(thread);
-        
-        return {
-            content: textContent,
-            metadata: {
-                threadLength: thread.messages?.length || 0,
-                subject: thread.subject || '',
-                // Never include attachment content or personal identifiers
-                hasAttachments: (thread.attachments?.length || 0) > 0,
-                attachmentCount: thread.attachments?.length || 0
-            }
-        };
+        return this.summaryService.prepareContentForCloudProcessing(thread);
     }
     
     /**
      * Generate summary using external API (OpenAI, Anthropic, Google)
+     * Delegates to SummaryService
      * @param {Object} thread - Email thread data
      * @param {Function} sendResponse - Response callback
      * @param {Object} userSettings - User settings including API key
      */
     async generateSummaryWithExternalAPI(thread, sendResponse, userSettings) {
-        try {
-            const fullText = this.combineThreadMessages(thread);
-            
-            if (!fullText || fullText.length < 50) {
-                throw new Error('Not enough content to summarize');
-            }
-            
-            const provider = userSettings.apiProvider || 'openai';
-            const apiKey = userSettings.apiKey;
-            
-            let summary = '';
-            let keyPoints = [];
-            
-            // Call appropriate API based on provider
-            switch (provider) {
-                case 'openai':
-                    const openaiResult = await this.callOpenAISummarize(fullText, apiKey);
-                    summary = openaiResult.summary;
-                    keyPoints = openaiResult.keyPoints;
-                    break;
-                    
-                case 'anthropic':
-                    const claudeResult = await this.callAnthropicSummarize(fullText, apiKey);
-                    summary = claudeResult.summary;
-                    keyPoints = claudeResult.keyPoints;
-                    break;
-                    
-                case 'google':
-                    const geminiResult = await this.callGoogleAISummarize(fullText, apiKey);
-                    summary = geminiResult.summary;
-                    keyPoints = geminiResult.keyPoints;
-                    break;
-                    
-                default:
-                    throw new Error(`Unsupported API provider: ${provider}`);
-            }
-            
-            sendResponse({
-                success: true,
-                summary: summary,
-                keyPoints: keyPoints,
-                usedFallback: true // Indicate external API was used
-            });
-            
-        } catch (error) {
-            console.error('External API summary generation error:', error);
-            const sanitizedError = sanitizeErrorMessage(error.message);
-            sendResponse({
-                success: false,
-                error: `External API error: ${sanitizedError}`
-            });
-        }
+        return await this.summaryService.generateSummaryWithExternalAPI(thread, sendResponse, userSettings);
     }
     
     /**
      * Generate drafts using external API (OpenAI, Anthropic, Google)
+     * Delegates to DraftService
      * @param {Object} thread - Email thread data
      * @param {string} tone - Selected tone
      * @param {string} guidance - User guidance
@@ -1449,246 +739,7 @@ Respond with ONLY the following JSON format (no other text):
      * @param {Object} userSettings - User settings including API key
      */
     async generateDraftsWithExternalAPI(thread, tone, guidance, sendResponse, userSettings) {
-        try {
-            const fullText = this.combineThreadMessages(thread);
-            const subject = thread.subject || 'Re: Email Thread';
-            
-            if (!fullText || fullText.length < 20) {
-                throw new Error('Not enough content to generate meaningful replies');
-            }
-            
-            const provider = userSettings.apiProvider || 'openai';
-            const apiKey = userSettings.apiKey;
-            
-            let drafts = [];
-            
-            // Call appropriate API based on provider
-            switch (provider) {
-                case 'openai':
-                    drafts = await this.callOpenAIDrafts(fullText, subject, tone, guidance, apiKey);
-                    break;
-                    
-                case 'anthropic':
-                    drafts = await this.callAnthropicDrafts(fullText, subject, tone, guidance, apiKey);
-                    break;
-                    
-                case 'google':
-                    drafts = await this.callGoogleAIDrafts(fullText, subject, tone, guidance, apiKey);
-                    break;
-                    
-                default:
-                    throw new Error(`Unsupported API provider: ${provider}`);
-            }
-            
-            // Validate and format drafts
-            const formattedDrafts = validateAndFormatDrafts({ drafts }, subject);
-            
-            if (formattedDrafts.length !== 3) {
-                console.warn(`Expected 3 drafts, got ${formattedDrafts.length}`);
-                const fallback = this.createFallbackDrafts('', subject, tone);
-                const fallbackFormatted = validateAndFormatDrafts(fallback, subject);
-                
-                sendResponse({
-                    success: true,
-                    drafts: fallbackFormatted,
-                    warning: 'External API response was incomplete, using fallback drafts',
-                    usedFallback: true
-                });
-                return;
-            }
-            
-            sendResponse({
-                success: true,
-                drafts: formattedDrafts,
-                usedFallback: true // Indicate external API was used
-            });
-            
-        } catch (error) {
-            console.error('External API draft generation error:', error);
-            const sanitizedError = sanitizeErrorMessage(error.message);
-            sendResponse({
-                success: false,
-                error: `External API error: ${sanitizedError}`
-            });
-        }
-    }
-    
-    /**
-     * Call OpenAI API for summarization
-     * @param {string} text - Text to summarize
-     * @param {string} apiKey - OpenAI API key
-     * @returns {Object} Summary and key points
-     */
-    async callOpenAISummarize(text, apiKey) {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-                model: 'gpt-4-turbo-preview',
-                messages: [
-                    {
-                        role: 'system',
-                        content: 'You are a helpful assistant that summarizes email threads. Provide a concise TL;DR summary and extract 3-5 key points.'
-                    },
-                    {
-                        role: 'user',
-                        content: `Summarize this email thread:\n\n${text}\n\nProvide:\n1. A TL;DR summary (under 100 words)\n2. 3-5 key points as a bullet list`
-                    }
-                ],
-                temperature: 0.7,
-                max_tokens: 500
-            })
-        });
-        
-        if (!response.ok) {
-            throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        const content = data.choices[0].message.content;
-        
-        // Parse the response to extract summary and key points
-        const parts = content.split(/Key [Pp]oints?:|Summary:/);
-        const summary = parts[0].replace(/TL;DR:?/i, '').trim();
-        const keyPointsText = parts[parts.length - 1].trim();
-        const keyPoints = keyPointsText.split(/\n/).filter(line => line.trim().match(/^[\-\•\*\d]/)).map(line => line.replace(/^[\-\•\*\d\.\)]\s*/, '').trim()).slice(0, 5);
-        
-        return { summary, keyPoints };
-    }
-    
-    /**
-     * Call OpenAI API for draft generation
-     * @param {string} text - Thread text
-     * @param {string} subject - Email subject
-     * @param {string} tone - Selected tone
-     * @param {string} guidance - User guidance
-     * @param {string} apiKey - OpenAI API key
-     * @returns {Array} Draft objects
-     */
-    async callOpenAIDrafts(text, subject, tone, guidance, apiKey) {
-        const prompt = this.createReplyPrompt(text, subject, tone, guidance);
-        
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-                model: 'gpt-4-turbo-preview',
-                messages: [
-                    {
-                        role: 'system',
-                        content: this.createSystemPrompt(tone)
-                    },
-                    {
-                        role: 'user',
-                        content: prompt
-                    }
-                ],
-                temperature: 0.7,
-                max_tokens: 1500,
-                response_format: { type: 'json_object' }
-            })
-        });
-        
-        if (!response.ok) {
-            throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        const content = data.choices[0].message.content;
-        
-        // Parse JSON response
-        const parsed = JSON.parse(content);
-        return parsed.drafts || [];
-    }
-    
-    /**
-     * Placeholder for Anthropic API calls (Claude)
-     * 
-     * STATUS: Not yet implemented - placeholder functionality
-     * See docs/todo.md for implementation roadmap
-     * 
-     * This method is called when users select Anthropic as their API provider,
-     * but the integration is not yet complete. Users are directed to use 
-     * OpenAI or Google AI providers instead.
-     * 
-     * Future implementation should:
-     * - Use Anthropic's Messages API (https://docs.anthropic.com/claude/reference/messages_post)
-     * - Follow privacy requirements: only send extracted email text, never attachments
-     * - Handle rate limits and errors gracefully
-     * 
-     * @param {string} text - Text to summarize
-     * @param {string} apiKey - Anthropic API key
-     * @returns {Object} Summary and key points
-     * @throws {Error} Always throws error indicating feature not available
-     */
-    async callAnthropicSummarize(text, apiKey) {
-        throw new Error('Anthropic (Claude) API integration is not yet implemented. Please use OpenAI or Google AI providers, or Chrome\'s built-in AI. See docs/todo.md for implementation roadmap.');
-    }
-    
-    /**
-     * Placeholder for Anthropic API draft generation
-     * 
-     * STATUS: Not yet implemented - placeholder functionality
-     * See docs/todo.md for implementation roadmap
-     * 
-     * @param {string} text - Thread text
-     * @param {string} subject - Email subject
-     * @param {string} tone - Selected tone
-     * @param {string} guidance - User guidance
-     * @param {string} apiKey - Anthropic API key
-     * @returns {Array} Draft objects
-     * @throws {Error} Always throws error indicating feature not available
-     */
-    async callAnthropicDrafts(text, subject, tone, guidance, apiKey) {
-        throw new Error('Anthropic (Claude) API integration is not yet implemented. Please use OpenAI or Google AI providers, or Chrome\'s built-in AI. See docs/todo.md for implementation roadmap.');
-    }
-    
-    /**
-     * Placeholder for Google AI API calls (Gemini)
-     * 
-     * STATUS: Not yet implemented - placeholder functionality
-     * See docs/todo.md for implementation roadmap
-     * 
-     * This method is called when users select Google AI as their API provider,
-     * but the integration is not yet complete. Users are directed to use 
-     * OpenAI provider instead.
-     * 
-     * Future implementation should:
-     * - Use Google's Generative AI API (https://ai.google.dev/docs)
-     * - Follow privacy requirements: only send extracted email text, never attachments
-     * - Handle rate limits and errors gracefully
-     * 
-     * @param {string} text - Text to summarize
-     * @param {string} apiKey - Google AI API key
-     * @returns {Object} Summary and key points
-     * @throws {Error} Always throws error indicating feature not available
-     */
-    async callGoogleAISummarize(text, apiKey) {
-        throw new Error('Google AI (Gemini) API integration is not yet implemented. Please use OpenAI provider, or Chrome\'s built-in AI. See docs/todo.md for implementation roadmap.');
-    }
-    
-    /**
-     * Placeholder for Google AI API draft generation
-     * 
-     * STATUS: Not yet implemented - placeholder functionality
-     * See docs/todo.md for implementation roadmap
-     * 
-     * @param {string} text - Thread text
-     * @param {string} subject - Email subject
-     * @param {string} tone - Selected tone
-     * @param {string} guidance - User guidance
-     * @param {string} apiKey - Google AI API key
-     * @returns {Array} Draft objects
-     * @throws {Error} Always throws error indicating feature not available
-     */
-    async callGoogleAIDrafts(text, subject, tone, guidance, apiKey) {
-        throw new Error('Google AI (Gemini) API integration is not yet implemented. Please use OpenAI provider, or Chrome\'s built-in AI. See docs/todo.md for implementation roadmap.');
+        return await this.draftService.generateDraftsWithExternalAPI(thread, tone, guidance, sendResponse, userSettings);
     }
     
     async openSidePanel(tab) {

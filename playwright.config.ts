@@ -20,9 +20,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: process.env.CI 
-    ? [['list'], ['html', { outputFolder: 'playwright-report' }]]
-    : 'html',
+  reporter: 'list',
   
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
@@ -31,6 +29,9 @@ export default defineConfig({
     
     /* Take screenshot on failure */
     screenshot: 'only-on-failure',
+    
+    /* Run headless */
+    headless: true,
   },
 
   /* Configure projects for major browsers */

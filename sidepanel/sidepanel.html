@@ -1023,6 +1023,106 @@
             letter-spacing: 0.5px;
             font-weight: 600;
         }
+        
+        /* Attachment Detail Modal */
+        .attachment-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .attachment-modal-overlay.active {
+            display: flex;
+            opacity: 1;
+        }
+        
+        .attachment-modal {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            max-width: 90vw;
+            max-height: 90vh;
+            width: 600px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .attachment-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            border-bottom: 2px solid #e0e0e0;
+            background: #fafafa;
+        }
+        
+        .attachment-modal-header h2 {
+            margin: 0;
+            font-size: 18px;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .attachment-modal-close {
+            background: transparent;
+            color: #666;
+            border: none;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 28px;
+            line-height: 1;
+            min-height: auto;
+            transition: color 0.2s ease;
+        }
+        
+        .attachment-modal-close:hover {
+            color: #333;
+        }
+        
+        .attachment-modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        
+        .attachment-detail-section {
+            margin-bottom: 20px;
+        }
+        
+        .attachment-detail-section h3 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+        
+        .attachment-detail-content {
+            padding: 12px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            border-left: 4px solid #1976d2;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .attachment-detail-content.empty {
+            color: #999;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -1282,9 +1382,9 @@
                         <div id="api-key-section" style="display: none; margin-top: 12px;">
                             <label for="api-provider" style="display: block; margin-bottom: 8px; font-size: 14px; color: #555;">Provider:</label>
                             <select id="api-provider" style="width: 100%; margin-bottom: 12px;">
-                                <option value="google">Google AI (Gemini)</option>
-                                <option value="anthropic">Anthropic (Claude)</option>
-                                <option value="openai">OpenAI (GPT-4, GPT-3.5)</option>
+                                <option value="openai">OpenAI (GPT-4, GPT-3.5) ✓ Available</option>
+                                <option value="anthropic">Anthropic (Claude) ✓ Available</option>
+                                <option value="google">Google AI (Gemini) ✓ Available</option>
                             </select>
                             
                             <label for="api-key-input" style="display: block; margin-bottom: 8px; font-size: 14px; color: #555;">API Key:</label>
@@ -1309,6 +1409,19 @@
                     </fieldset>
                 </div>
             </section>
+        </div>
+    </div>
+    
+    <!-- Attachment Detail Modal -->
+    <div class="attachment-modal-overlay" id="attachment-modal-overlay" role="dialog" aria-labelledby="attachment-modal-title" aria-modal="true">
+        <div class="attachment-modal">
+            <div class="attachment-modal-header">
+                <h2 id="attachment-modal-title">Attachment Details</h2>
+                <button class="attachment-modal-close" id="attachment-modal-close" type="button" aria-label="Close attachment details">×</button>
+            </div>
+            <div class="attachment-modal-body" id="attachment-modal-body">
+                <!-- Content will be populated by JavaScript -->
+            </div>
         </div>
     </div>
     

@@ -205,32 +205,13 @@ export class SettingsManager {
 
     /**
      * Show privacy information
+     * 
+     * Displays privacy information to users.
+     * Uses status message instead of alert() for better UX.
      */
     showPrivacyInfo() {
-        const message = `
-Privacy & Data Usage:
-
-🔒 On-Device Processing (Default):
-• All AI processing happens locally in your browser
-• Email content never leaves your device
-• No data is transmitted to external servers
-• Maximum privacy and security
-
-☁️ Hybrid Mode (Optional):
-• Falls back to cloud AI when device models are unavailable
-• Only processes extracted email text and metadata
-• Never transmits: attachments, images, raw files, or personal identifiers
-• You maintain control with clear indicators
-
-🔑 Cloud API Keys (Optional):
-• Required only for cloud fallback in Hybrid mode
-• Stored securely in Chrome's sync storage
-• Used exclusively for AI API authentication
-• Never shared with third parties
-
-Your privacy remains protected with minimal necessary data transmission.
-        `;
-        alert(message);
+        const message = `Privacy Information: All processing happens on-device by default. Cloud API keys are optional and stored securely in Chrome sync storage. Your privacy remains protected with minimal necessary data transmission.`;
+        this.updateStatus(message, 'info');
     }
 }
 

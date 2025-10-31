@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures/extension.js';
 
 test.describe('Deep Link Generation', () => {
-  test('generates deep-link URLs with thread metadata', async ({ sidePanelPage, backgroundPage }) => {
+  test('generates deep-link URLs with thread metadata', async ({ sidePanelPage }) => {
     // Wait for page to load
     await sidePanelPage.waitForLoadState('domcontentloaded');
     

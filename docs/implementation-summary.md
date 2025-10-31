@@ -205,11 +205,11 @@ Based on [developer.chrome.com/docs/ai/built-in](https://developer.chrome.com/do
 | API Key Settings UI | ✅ Complete | Full settings section |
 | API Key Storage | ✅ Complete | Secure Chrome sync storage |
 | OpenAI Integration | ✅ Complete | GPT-4 summarization + drafts |
-| Anthropic Integration | 🔄 Prepared | Placeholder methods ready - not yet implemented |
-| Google AI Integration | 🔄 Prepared | Placeholder methods ready - not yet implemented |
+| Anthropic Integration | ✅ Complete | Claude API integration for summaries and drafts |
+| Google AI Integration | ✅ Complete | Gemini API integration for summaries and drafts |
 | Image Analysis | ✅ Partial | Multimodal Prompt API via UI button (not bulk processing) |
 | PDF/DOCX/XLSX Processing | 🔄 Planned | Not yet implemented - see [todo.md](./todo.md) |
-| Attachment Detail Modal | 🔄 Planned | Uses alert() placeholder - see [todo.md](./todo.md) |
+| Attachment Detail Modal | ✅ Complete | Fully implemented modal dialog with metadata, summary, and extracted content display |
 | Setup Documentation | ✅ Complete | [setup.md](./setup.md) comprehensive |
 | Quick Reference | ✅ Complete | [quick-reference.md](./quick-reference.md) |
 | Troubleshooting Guide | ✅ Complete | 10+ common issues |
