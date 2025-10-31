@@ -15,7 +15,7 @@ Get up and running with AI-powered email triage in just a few minutes!
   - macOS 13+ (Ventura or later)
   - Linux (most distributions)
 
-**Note:** If you have less storage/GPU, you can still use the extension with custom API keys (Google Gemini, Anthropic, OpenAI)
+**Note:** If you have less storage/GPU, you can still use the extension with custom API keys (OpenAI GPT-4, Anthropic Claude, or Google Gemini - all fully supported)
 
 ### Step 2: Enable Chrome AI Features (2 minutes)
 
@@ -149,15 +149,15 @@ After enabling flags and restarting Chrome:
 If you can't use Chrome AI (incompatible system, insufficient resources, etc.):
 
 1. **Get an API Key:**
-   - **OpenAI:** https://platform.openai.com/api-keys (GPT-4 - Currently Supported)
-   - **Google AI Studio:** https://aistudio.google.com/app/apikey (Gemini - Planned)
-   - **Anthropic:** https://console.anthropic.com/ (Claude - Planned)
+   - **OpenAI:** https://platform.openai.com/api-keys (GPT-4 - Fully Supported)
+   - **Google AI Studio:** https://aistudio.google.com/app/apikey (Gemini - Fully Supported)
+   - **Anthropic:** https://console.anthropic.com/ (Claude - Fully Supported)
 
 2. **Configure in Extension:**
    - Open the extension
    - Scroll to **"API Settings (Optional)"**
    - Check **"Use custom API key"**
-   - Select your provider (currently only OpenAI supported)
+   - Select your provider (OpenAI, Anthropic, or Google AI)
    - Enter your API key (securely stored)
    - Click **"Save API Key"**
 
@@ -166,7 +166,7 @@ If you can't use Chrome AI (incompatible system, insufficient resources, etc.):
    - You'll be charged based on API provider pricing
    - Chrome AI is free and private (all local processing)
    - Custom keys work across all platforms/browsers
-   - Currently only OpenAI is fully implemented; Anthropic and Google AI are planned
+   - All three providers (OpenAI, Anthropic, Google AI) are fully implemented and ready to use
 
 ---
 
@@ -276,14 +276,14 @@ If you can't use Chrome AI (incompatible system, insufficient resources, etc.):
 | **Speed** | ⚡ Fast (local) | 🌐 Network dependent |
 | **Offline** | ✅ Works offline | ❌ Requires internet |
 | **Setup** | 🔧 Requires Chrome flags | 🔑 Just need API key |
-| **Quality** | ✨ Good (Gemini Nano) | ✨ Excellent (GPT-4/Claude) |
+| **Quality** | ✨ Good (Gemini Nano) | ✨ Excellent (GPT-4/Claude/Gemini) |
 | **Platforms** | 🖥️ Chrome 138+ only | 🌍 Works anywhere |
 
 **Recommendation:** Use Chrome AI for best privacy and cost. Use custom API keys if you need:
-- Maximum quality (GPT-4)
+- Maximum quality (GPT-4, Claude, Gemini)
 - Support for older Chrome versions
 - Cross-browser compatibility
-- Specific model preferences
+- Specific model preferences (OpenAI, Anthropic, or Google AI)
 
 ---
 

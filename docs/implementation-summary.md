@@ -90,8 +90,12 @@ Enhanced with:
 ✅ Implemented OpenAI GPT-4 integration
   ✅ callOpenAISummarize() - Full implementation
   ✅ callOpenAIDrafts() - Full implementation
-🔄 Prepared Anthropic Claude integration (placeholders - throws errors, not yet implemented)
-🔄 Prepared Google Gemini integration (placeholders - throws errors, not yet implemented)
+✅ Implemented Anthropic Claude integration
+  ✅ callAnthropicSummarize() - Full implementation
+  ✅ callAnthropicDrafts() - Full implementation
+✅ Implemented Google Gemini integration
+  ✅ callGoogleAISummarize() - Full implementation
+  ✅ callGoogleAIDrafts() - Full implementation
 ✅ Routing logic to choose Chrome AI or external API
 ✅ Error handling for API failures
 ✅ Fallback to Chrome AI when possible
@@ -337,18 +341,15 @@ inbox-triage-extension/
 ## 📝 Next Steps (Optional Enhancements)
 
 ### Short Term
-1. **Implement Anthropic (Claude) API**
-   - Similar to OpenAI implementation
-   - Use Claude 3 Sonnet/Opus
-
-2. **Implement Google Gemini API**
-   - Use Gemini Pro
-   - Fallback to Gemini Flash for speed
-
-3. **Add API Usage Tracking**
+1. **Add API Usage Tracking**
    - Show costs (for custom APIs)
    - Track request counts
    - Set usage limits
+
+2. **Implement Additional Chrome AI APIs**
+   - Proofreader API for grammar checking
+   - Rewriter API for alternative phrasings
+   - Writer API for enhanced content generation
 
 **Reference**: See [todo.md](./todo.md) for detailed task list
 
@@ -390,7 +391,7 @@ inbox-triage-extension/
 7. ✅ **Well-documented** with comprehensive guides
 8. ✅ **Accessible** with keyboard navigation and ARIA labels
 9. ✅ **Tested** with manual and automated test plans
-10. ✅ **Future-proof** with prepared integrations for other providers
+10. ✅ **Complete API integrations** - OpenAI, Anthropic, and Google AI fully implemented and ready to use
 11. ✅ **Organized documentation** - All docs in `/docs` with consistent naming and cross-links
 
 ---

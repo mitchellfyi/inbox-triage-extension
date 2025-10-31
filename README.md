@@ -24,9 +24,9 @@ This extension showcases multiple Chrome AI APIs working together:
 - **✅ Prompt API** - Structured draft generation with JSON schema
 - **✅ Prompt API (Multimodal)** - Image analysis and OCR text extraction (via UI button)
 - **✅ Translator API** - On-device multilingual translation (15+ languages)
-- **🔜 More Coming Soon** - Proofreader, Rewriter, Writer APIs for enhanced content refinement
+- **🔜 More Coming Soon** - Proofreader, Rewriter, Writer APIs for enhanced content refinement (see [docs/todo.md](docs/todo.md))
 
-**Custom API Keys**: OpenAI integration is fully implemented. Anthropic and Google AI integrations are planned but not yet available (see [docs/todo.md](docs/todo.md)).
+**Custom API Keys**: OpenAI, Anthropic (Claude), and Google AI (Gemini) integrations are fully implemented and ready to use.
 
 All processing happens locally on your device for complete privacy.
 
@@ -37,7 +37,6 @@ Start here to understand the project and contribute effectively:
 - **[docs/spec.md](docs/spec.md)** - Complete functional and technical requirements
 - **[AGENTS.md](AGENTS.md)** - Development guidelines for AI coding agents and contributors  
 - **[docs/todo.md](docs/todo.md)** - Project tasks and progress tracking
-- **[.github/copilot-instructions.md](.github/copilot-instructions.md)** - GitHub Copilot configuration and rules
 
 ## 🚀 Quick Start (5 Minutes)
 
@@ -88,7 +87,7 @@ Start here to understand the project and contribute effectively:
 **Detailed Setup Guide:** See **[docs/setup.md](docs/setup.md)** for:
 - Complete system requirements
 - Troubleshooting common issues  
-- Custom API key setup (Google Gemini, Anthropic, OpenAI)
+- Custom API key setup (OpenAI GPT-4, Anthropic Claude, Google Gemini)
 - Advanced configuration options
 - Feature comparison table
 
@@ -101,13 +100,13 @@ Start here to understand the project and contribute effectively:
 
 Don't have Chrome 128+ or sufficient resources? No problem!
 
-1. Get an API key from [OpenAI](https://platform.openai.com/api-keys) (currently supported), [Anthropic](https://console.anthropic.com/) (planned), or [Google AI Studio](https://aistudio.google.com/app/apikey) (planned)
+1. Get an API key from [OpenAI](https://platform.openai.com/api-keys), [Anthropic](https://console.anthropic.com/), or [Google AI Studio](https://aistudio.google.com/app/apikey)
 2. Open extension → Settings (⚙️ button) → "API Settings (Optional)"
 3. Check "Use custom API key"
-4. Select provider (OpenAI supported, others coming soon)
+4. Select provider (OpenAI, Anthropic, or Google AI)
 5. Enter your API key and click "Save"
 
-**Note:** Currently only OpenAI API keys are supported. Anthropic and Google AI integrations are planned. Custom API keys work anywhere but send data to external servers. Chrome AI is private and free but requires setup.
+**Note:** Custom API keys work anywhere but send data to external servers. Chrome AI is private and free but requires setup. All three providers (OpenAI, Anthropic, Google AI) are fully supported.
 
 ---
 
