@@ -11,8 +11,11 @@ This Chrome extension transforms email overwhelm into actionable insights by ins
   - ✅ **Image Analysis**: AI-powered image understanding and OCR text extraction (via UI button)
   - 🔜 **Document Processing**: PDF, DOCX, XLSX parsing planned (see [docs/todo.md](docs/todo.md))
 - **Stay Responsive**: Generate professional reply drafts in multiple tones and lengths with custom guidance
+- **Create Drafts in Email**: One-click button to create drafts directly in Gmail/Outlook with content ready to send
+- **State Persistence**: Your work is saved automatically—navigate away and come back without losing summaries or drafts
 - **Voice Input**: Use voice dictation to quickly add guidance for your reply drafts
 - **🆕 Multilingual Support**: Translate summaries and drafts to 15+ languages on-device
+- **Visual Feedback**: Beautiful animated loading indicators show progress during AI operations
 - **Protect Privacy**: All processing happens locally—no data or files leave your device, including translations
 - **Work Offline**: Fully functional once AI models are downloaded
 
@@ -144,6 +147,9 @@ npm run test:e2e
 - **Draft Generation** - Prompt API with JSON schema for structured replies  
 - **Tone Controls** - User-selectable tone parameters (neutral, friendly, assertive, formal)
 - **Processing Mode Settings** - User configuration for on-device vs hybrid processing with privacy controls
+- **State Persistence** - Automatic saving and restoration of thread, summary, and drafts across sessions
+- **Draft Creation** - One-click button to create drafts directly in Gmail/Outlook compose windows
+- **Visual Feedback** - Animated loading indicators for all operations
 
 **Message Flow:** Content Script → Service Worker → AI APIs → Side Panel UI
 

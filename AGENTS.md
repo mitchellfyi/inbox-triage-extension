@@ -157,7 +157,8 @@ This document serves as a guide for AI coding agents working on the Inbox Triage
 - **Avoid blocking operations**: Use async/await for API calls
 - **Memory management**: Clean up event listeners and observers
 - **Efficient messaging**: Batch message passing between components
-- **Response times**: Keep UI responsive, show loading states
+- **Response times**: Keep UI responsive, show loading states with animated indicators
+- **State persistence**: Use `chrome.storage.local` for saving/restoring user work (thread, summary, drafts)
 
 ## Commit Message Patterns
 
@@ -236,16 +237,39 @@ if (fallbackDecision.shouldFallback && processingMode === 'hybrid') {
 }
 ```
 
+## Recent Feature Additions
+
+The following features have been recently added and should be tested when making changes:
+
+### State Persistence (`sidepanel/sidepanel.js`)
+- **`saveState()`**: Automatically saves thread, summary, and drafts to `chrome.storage.local`
+- **`restoreState()`**: Restores saved state when returning to same thread URL
+- **`urlsMatch()`**: Handles Gmail/Outlook URL variations for state matching
+- **Triggered**: After thread extraction, summary generation, draft creation
+- **Test**: `tests/state-persistence.spec.ts`
+
+### Draft Creation in Email Client (`sidepanel/draft-renderer.js`, `content/content.js`)
+- **`createDraftInEmailUI()`**: Creates drafts directly in Gmail/Outlook compose window
+- **`createDraft` message handler**: Content script handles draft insertion
+- **`createGmailDraft()` / `createOutlookDraft()`**: Provider-specific implementations
+- **Test**: `tests/state-persistence.spec.ts` - "create draft button appears on each draft"
+
+### Loading Indicators (`sidepanel/display-manager.js`, `sidepanel/sidepanel.html`)
+- **`createLoadingIndicator()`**: Smart indicator selection (spinner vs dots)
+- **CSS animations**: Shimmer, progress bar, spinner, pulsing dots
+- **Button loading states**: Animated gradients and spinners for disabled buttons
+- **Test**: `tests/state-persistence.spec.ts` - Loading indicator tests
+
 ## Critical "Don't" List
 
 **Never do these things - they violate core project constraints:**
 
 - ❌ **Add external dependencies** - No npm packages, CDN imports, or third-party libraries
 - ❌ **Make network calls** - No fetch(), XMLHttpRequest, or external API calls of any kind (except when using custom API keys)
-- ❌ **Store user data** - No localStorage, IndexedDB, or chrome.storage of personal information
+- ❌ **Store user data** - No localStorage or IndexedDB (use chrome.storage.local for state persistence only, per requirements)
 - ❌ **Add new permissions** - Only request minimal permissions needed for current functionality
 - ❌ **Create inaccessible UI** - All controls must be keyboard accessible with proper ARIA labels
-- ❌ **Use global state** - Avoid shared mutable state between extension components
+- ❌ **Use global state** - Avoid shared mutable state between extension components (use instance properties)
 - ❌ **Ignore error states** - Always handle AI model unavailability and provide user feedback
 - ❌ **Break privacy guarantees** - Email content must never leave the user's device (default mode)
 - ❌ **Skip documentation** - Update [docs/todo.md](./docs/todo.md) and relevant docs with every change

@@ -129,6 +129,12 @@ npx playwright test && npx playwright show-report
   - Tests draft panel closing and scrolling after generation
   - Ensures button disabled state persists through async operations
   
+- **`tests/state-persistence.spec.ts`** - State persistence and restoration tests
+  - Tests state saving after thread extraction, summary generation, draft creation
+  - Verifies state restoration when returning to same thread URL
+  - Tests URL matching logic for Gmail/Outlook variations
+  - Ensures state is not restored when URL doesn't match
+  
 - **`tests/deeplink.spec.ts`** - Deep-link URL generation tests
   - Tests URL generation with thread metadata
   - Verifies URL encoding and parameter handling
@@ -170,6 +176,9 @@ Check the "Actions" tab in GitHub for CI results and artifacts.
 - Validate privacy compliance (no external network calls when using Chrome AI)
 - Test multimodal image analysis functionality
 - Verify attachment processing (images, PDFs, DOCX, XLSX where applicable)
+- **Test state persistence**: Navigate away and return to verify summaries/drafts are restored
+- **Test draft creation**: Click "Create Draft" button and verify draft appears in Gmail/Outlook compose window
+- **Test loading indicators**: Verify animated indicators appear during all operations
 
 ### For Automated Testing
 - Write tests that match user workflows
@@ -227,6 +236,27 @@ The following critical fixes have automated tests to prevent regressions:
 - **Issue**: Draft controls panel didn't close after draft generation
 - **Fix**: Hide controls section and scroll to drafts section after generation
 - **Test**: `tests/extraction-flow.spec.ts` - "draft controls panel closes and scrolls to drafts after generation"
+
+### State Persistence
+- **Feature**: Automatic state saving and restoration when navigating away
+- **Implementation**: `saveState()` and `restoreState()` methods in `sidepanel.js`, using `chrome.storage.local`
+- **Test**: `tests/state-persistence.spec.ts` - "saves state after thread extraction"
+- **Test**: `tests/state-persistence.spec.ts` - "restores state when returning to same thread URL"
+- **Test**: `tests/state-persistence.spec.ts` - "does not restore state when URL does not match"
+
+### Draft Creation in Email Client
+- **Feature**: One-click button to create drafts directly in Gmail/Outlook
+- **Implementation**: `createDraftInEmailUI()` in `draft-renderer.js`, `createDraft` action handler in `content.js`
+- **Test**: `tests/state-persistence.spec.ts` - "create draft button appears on each draft"
+- **Test**: `tests/state-persistence.spec.ts` - "create draft button is accessible"
+
+### Loading Indicators
+- **Feature**: Animated loading indicators for all operations
+- **Implementation**: `createLoadingIndicator()` in `display-manager.js`, CSS animations in `sidepanel.html`
+- **Test**: `tests/state-persistence.spec.ts` - "loading status shows spinner for long operations"
+- **Test**: `tests/state-persistence.spec.ts` - "loading status shows dots for short operations"
+- **Test**: `tests/state-persistence.spec.ts` - "loading status has progress bar animation"
+- **Test**: `tests/state-persistence.spec.ts` - "disabled buttons show loading state"
 
 ## Contributing Test Changes
 

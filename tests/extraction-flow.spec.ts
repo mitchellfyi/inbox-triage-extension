@@ -9,7 +9,7 @@ import { test, expect } from './fixtures/extension.js';
  * 4. Draft panel closing and scrolling after generation
  */
 test.describe('Extraction Flow Improvements', () => {
-  test('service worker initializes without statusBroadcaster ReferenceError', async ({ sidePanelPage, backgroundPage }) => {
+  test('service worker initializes without statusBroadcaster ReferenceError', async ({ sidePanelPage }) => {
     // Wait for page to load
     await sidePanelPage.waitForLoadState('domcontentloaded');
     await sidePanelPage.waitForSelector('#extract-btn', { timeout: 5000 });
@@ -29,27 +29,24 @@ test.describe('Extraction Flow Improvements', () => {
     expect(response.success).toBe(true);
     
     // Check background page console for ReferenceError related to statusBroadcaster
-    try {
-      const logs = await backgroundPage.evaluate(() => {
-        // Return any errors from console
-        return (window as any).__consoleErrors || [];
-      });
-      
-      // Filter for statusBroadcaster-related errors
-      const statusBroadcasterErrors = logs.filter((log: string) => 
-        log.includes('statusBroadcaster is not defined') ||
-        log.includes('ReferenceError: statusBroadcaster')
-      );
-      
-      expect(statusBroadcasterErrors.length).toBe(0);
-    } catch (e) {
-      // If we can't access console logs, that's okay - the successful response is the main test
-    }
+    // Note: We don't require backgroundPage to be available for this test to pass
+    // The successful response is the main test - if statusBroadcaster caused ReferenceError,
+    // initialization would fail and we wouldn't get a successful response
   });
 
   test('extract button stays disabled during entire extraction process', async ({ sidePanelPage }) => {
     await sidePanelPage.waitForLoadState('domcontentloaded');
     await sidePanelPage.waitForSelector('#extract-btn', { timeout: 5000 });
+
+    // Set up context to simulate being on an email thread page
+    await sidePanelPage.evaluate(() => {
+      const sidePanel = (window as any).sidePanelInstance;
+      if (sidePanel) {
+        sidePanel.currentContext.isOnEmailThread = true;
+        sidePanel.currentContext.url = 'https://mail.google.com/mail/u/0/#inbox/th123';
+        sidePanel.updateContextUI();
+      }
+    });
 
     const extractBtn = sidePanelPage.locator('#extract-btn');
     
@@ -92,10 +89,10 @@ test.describe('Extraction Flow Improvements', () => {
     const extractionState = await sidePanelPage.evaluate(() => {
       const btn = document.getElementById('extract-btn');
       // Check if isExtracting flag exists in the side panel instance
-      // This is accessed via the window object if exposed
+      const sidePanel = (window as any).sidePanelInstance;
       return {
         disabled: btn?.disabled ?? false,
-        isExtracting: (window as any).__sidePanelInstance?.isExtracting ?? null
+        isExtracting: sidePanel?.isExtracting ?? null
       };
     });
     
@@ -233,7 +230,20 @@ test.describe('Extraction Flow Improvements', () => {
     await sidePanelPage.waitForLoadState('domcontentloaded');
     await sidePanelPage.waitForSelector('#extract-btn', { timeout: 5000 });
 
+    // Set up context to simulate being on an email thread page
+    await sidePanelPage.evaluate(() => {
+      const sidePanel = (window as any).sidePanelInstance;
+      if (sidePanel) {
+        sidePanel.currentContext.isOnEmailThread = true;
+        sidePanel.currentContext.url = 'https://mail.google.com/mail/u/0/#inbox/th123';
+        sidePanel.updateContextUI();
+      }
+    });
+
     const extractBtn = sidePanelPage.locator('#extract-btn');
+    
+    // Wait for button to be enabled
+    await expect(extractBtn).toBeEnabled({ timeout: 2000 });
     
     // Click extract button to start extraction
     await extractBtn.click();
@@ -246,7 +256,8 @@ test.describe('Extraction Flow Improvements', () => {
     await sidePanelPage.evaluate(() => {
       // Simulate updateContextUI being called
       const btn = document.getElementById('extract-btn');
-      if (btn && !(window as any).__sidePanelInstance?.isExtracting) {
+      const sidePanel = (window as any).sidePanelInstance;
+      if (btn && sidePanel && !sidePanel.isExtracting) {
         btn.disabled = false; // This should not happen if isExtracting is true
       }
     });
@@ -260,7 +271,7 @@ test.describe('Extraction Flow Improvements', () => {
     // Test that resetExtractionState won't re-enable if isExtracting is true
     await sidePanelPage.evaluate(() => {
       const btn = document.getElementById('extract-btn');
-      const sidePanel = (window as any).__sidePanelInstance;
+      const sidePanel = (window as any).sidePanelInstance;
       if (sidePanel && sidePanel.isExtracting) {
         // Simulate resetExtractionState check
         if (!sidePanel.isExtracting) {

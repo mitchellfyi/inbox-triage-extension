@@ -34,7 +34,6 @@ export class DisplayManager {
             this.statusHideTimeout = null;
         }
         
-        this.elements.status.textContent = message;
         const statusElement = this.elements.status.parentElement;
         
         // Hide status container if message is empty
@@ -52,6 +51,13 @@ export class DisplayManager {
         // Add new status class
         statusElement.classList.add(type);
         
+        // Update message content with loading indicator if needed
+        if (type === 'loading') {
+            this.elements.status.innerHTML = this.createLoadingIndicator(message);
+        } else {
+            this.elements.status.textContent = message;
+        }
+        
         // Update ARIA live region for screen readers
         this.elements.status.setAttribute('aria-label', `Status: ${message}`);
         
@@ -63,6 +69,50 @@ export class DisplayManager {
                 statusElement.classList.add('hidden');
                 this.elements.status.setAttribute('aria-label', '');
             }, hideDelay);
+        }
+    }
+
+    /**
+     * Create animated loading indicator
+     * @param {string} message - Status message
+     * @returns {string} HTML with loading indicator
+     */
+    createLoadingIndicator(message) {
+        // Escape HTML to prevent XSS
+        const escapeHtml = (text) => {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        };
+        
+        const escapedMessage = escapeHtml(message);
+        
+        // Choose indicator style based on message content
+        const isLongOperation = message.includes('Generating') || 
+                               message.includes('Composing') || 
+                               message.includes('Extracting') ||
+                               message.includes('downloading');
+        
+        if (isLongOperation) {
+            // Use spinner for longer operations
+            return `
+                <span class="loading-indicator">
+                    <span class="loading-spinner" aria-hidden="true"></span>
+                    <span>${escapedMessage}</span>
+                </span>
+            `;
+        } else {
+            // Use pulsing dots for shorter operations
+            return `
+                <span class="loading-indicator">
+                    <span class="loading-dots" aria-hidden="true">
+                        <span class="loading-dot"></span>
+                        <span class="loading-dot"></span>
+                        <span class="loading-dot"></span>
+                    </span>
+                    <span>${escapedMessage}</span>
+                </span>
+            `;
         }
     }
 

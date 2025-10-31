@@ -272,6 +272,18 @@ class EmailThreadExtractor {
                 sendResponse({ success: true, ready: this.isPageReady() });
                 return true;
                 
+            case 'createDraft':
+                console.log('Creating draft in email client...');
+                this.createDraftInEmailUI(message.draftBody)
+                    .then(() => {
+                        sendResponse({ success: true });
+                    })
+                    .catch(error => {
+                        console.error('Failed to create draft:', error);
+                        sendResponse({ success: false, error: error.message });
+                    });
+                return true; // Keep message channel open for async response
+                
             default:
                 console.warn('Unknown action received:', message.action);
                 sendResponse({ success: false, error: `Unknown action: ${message.action}` });
@@ -1052,6 +1064,242 @@ class EmailThreadExtractor {
         }
         
         throw new Error('Page did not become ready within timeout period');
+    }
+
+    /**
+     * Format draft content for insertion into contenteditable editor
+     * Escapes HTML entities and converts newlines to <br> tags
+     * @param {string} draftBody - Draft body text
+     * @returns {string} Formatted HTML string
+     */
+    formatDraftContentForEditor(draftBody) {
+        if (!draftBody) return '';
+        
+        // Escape HTML entities to prevent XSS
+        const div = document.createElement('div');
+        div.textContent = draftBody;
+        const escaped = div.innerHTML;
+        
+        // Convert newlines to <br> tags
+        // Handle both \n and \r\n line endings
+        return escaped
+            .replace(/\r\n/g, '<br>')
+            .replace(/\n/g, '<br>')
+            .replace(/\r/g, '<br>');
+    }
+
+    /**
+     * Create draft in email client (Gmail/Outlook)
+     * Opens reply compose window and fills it with draft content
+     * @param {string} draftBody - Draft body text to insert
+     * @returns {Promise<void>}
+     */
+    async createDraftInEmailUI(draftBody) {
+        const { provider, selectors } = this.siteConfig;
+        
+        if (provider === 'gmail') {
+            await this.createGmailDraft(draftBody);
+        } else if (provider === 'outlook') {
+            await this.createOutlookDraft(draftBody);
+        } else {
+            throw new Error(`Unsupported email provider: ${provider}`);
+        }
+    }
+
+    /**
+     * Create draft in Gmail
+     */
+    async createGmailDraft(draftBody) {
+        // Find and click Reply button
+        const replySelectors = [
+            '[aria-label*="Reply"]',
+            '[data-tooltip*="Reply"]',
+            '[data-tooltip*="Reply all"]',
+            'div[role="button"][aria-label*="Reply"]',
+            '.ams.bkH button[aria-label*="Reply"]',
+            '[gh="cm"]', // Gmail compose shortcut
+            'div[role="button"][data-tooltip="Reply"]'
+        ];
+
+        let replyButton = null;
+        for (const selector of replySelectors) {
+            const buttons = document.querySelectorAll(selector);
+            for (const btn of buttons) {
+                const text = btn.textContent?.toLowerCase() || '';
+                const ariaLabel = btn.getAttribute('aria-label')?.toLowerCase() || '';
+                if ((text.includes('reply') || ariaLabel.includes('reply')) && 
+                    !ariaLabel.includes('reply all') && 
+                    !ariaLabel.includes('forward')) {
+                    replyButton = btn;
+                    break;
+                }
+            }
+            if (replyButton) break;
+        }
+
+        if (!replyButton) {
+            throw new Error('Could not find Reply button in Gmail');
+        }
+
+        // Click Reply button
+        replyButton.click();
+        
+        // Wait for compose window to open
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Find compose body editor
+        const composeBodySelectors = [
+            '.Am.Al.editable',
+            '[contenteditable="true"][aria-label*="Message"]',
+            '[contenteditable="true"][aria-label*="Email"]',
+            '.Am.Al.editable[contenteditable="true"]',
+            'div[contenteditable="true"][aria-label*="Message Body"]'
+        ];
+
+        let composeBody = null;
+        let retries = 0;
+        while (!composeBody && retries < 20) {
+            for (const selector of composeBodySelectors) {
+                const element = document.querySelector(selector);
+                if (element && element.offsetParent !== null) { // Check if visible
+                    composeBody = element;
+                    break;
+                }
+            }
+            if (!composeBody) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                retries++;
+            }
+        }
+
+        if (!composeBody) {
+            throw new Error('Could not find compose body editor in Gmail');
+        }
+
+        // Focus and insert content
+        composeBody.focus();
+        
+        // Clear any existing content
+        composeBody.textContent = '';
+        
+        // Insert draft body with preserved newlines
+        // Convert newlines to <br> tags for contenteditable elements
+        const formattedBody = this.formatDraftContentForEditor(draftBody);
+        composeBody.innerHTML = formattedBody;
+        
+        // Trigger input event to ensure Gmail recognizes the change
+        const inputEvent = new Event('input', { bubbles: true });
+        composeBody.dispatchEvent(inputEvent);
+        
+        // Also trigger change event
+        const changeEvent = new Event('change', { bubbles: true });
+        composeBody.dispatchEvent(changeEvent);
+
+        console.log('Draft content inserted into Gmail compose window');
+    }
+
+    /**
+     * Create draft in Outlook
+     */
+    async createOutlookDraft(draftBody) {
+        // Find and click Reply button
+        const replySelectors = [
+            '[aria-label*="Reply"]',
+            '[data-testid*="reply"]',
+            'button[aria-label*="Reply"]',
+            '[role="button"][aria-label*="Reply"]',
+            'button:has-text("Reply")',
+            '[title*="Reply"]'
+        ];
+
+        let replyButton = null;
+        for (const selector of replySelectors) {
+            const buttons = Array.from(document.querySelectorAll(selector));
+            for (const btn of buttons) {
+                const text = btn.textContent?.toLowerCase() || '';
+                const ariaLabel = btn.getAttribute('aria-label')?.toLowerCase() || '';
+                const title = btn.getAttribute('title')?.toLowerCase() || '';
+                if ((text.includes('reply') || ariaLabel.includes('reply') || title.includes('reply')) && 
+                    !ariaLabel.includes('reply all') && 
+                    !ariaLabel.includes('forward')) {
+                    // Check if button is visible
+                    if (btn.offsetParent !== null) {
+                        replyButton = btn;
+                        break;
+                    }
+                }
+            }
+            if (replyButton) break;
+        }
+
+        if (!replyButton) {
+            throw new Error('Could not find Reply button in Outlook');
+        }
+
+        // Click Reply button
+        replyButton.click();
+        
+        // Wait for compose window to open
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        // Find compose body editor
+        const composeBodySelectors = [
+            '[data-testid="compose-body"]',
+            '[data-testid="compose-body-wrapper"] [contenteditable="true"]',
+            '[aria-label*="Message body"]',
+            '[contenteditable="true"][aria-label*="Message"]',
+            '[contenteditable="true"][data-testid*="compose"]',
+            '.elementToProof',
+            '[role="textbox"]'
+        ];
+
+        let composeBody = null;
+        let retries = 0;
+        while (!composeBody && retries < 25) {
+            for (const selector of composeBodySelectors) {
+                const elements = document.querySelectorAll(selector);
+                for (const element of elements) {
+                    // Check if it's in the compose area
+                    const composeArea = element.closest('[data-testid*="compose"]');
+                    if (composeArea && element.offsetParent !== null) {
+                        composeBody = element;
+                        break;
+                    }
+                }
+                if (composeBody) break;
+            }
+            if (!composeBody) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                retries++;
+            }
+        }
+
+        if (!composeBody) {
+            throw new Error('Could not find compose body editor in Outlook');
+        }
+
+        // Focus and insert content
+        composeBody.focus();
+        
+        // Clear any existing content
+        if (composeBody.textContent) {
+            composeBody.textContent = '';
+        }
+        
+        // Insert draft body with preserved newlines
+        // Convert newlines to <br> tags for contenteditable elements
+        const formattedBody = this.formatDraftContentForEditor(draftBody);
+        composeBody.innerHTML = formattedBody;
+        
+        // Trigger input event
+        const inputEvent = new Event('input', { bubbles: true });
+        composeBody.dispatchEvent(inputEvent);
+        
+        // Trigger change event
+        const changeEvent = new Event('change', { bubbles: true });
+        composeBody.dispatchEvent(changeEvent);
+
+        console.log('Draft content inserted into Outlook compose window');
     }
 }
 

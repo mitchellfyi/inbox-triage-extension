@@ -90,10 +90,16 @@ export class TranslationUI {
 
     /**
      * Update translation UI with current language setting
+     * Only updates if the select value doesn't already match (prevents resetting user selection)
      */
     updateUI() {
         if (this.elements.targetLanguageSelect) {
-            this.elements.targetLanguageSelect.value = this.translationSettings.targetLanguage || 'none';
+            const currentValue = this.elements.targetLanguageSelect.value;
+            const targetValue = this.translationSettings.targetLanguage || 'none';
+            // Only update if values don't match (prevents resetting during user interaction)
+            if (currentValue !== targetValue) {
+                this.elements.targetLanguageSelect.value = targetValue;
+            }
         }
     }
 
@@ -104,47 +110,69 @@ export class TranslationUI {
         const newLanguage = this.elements.targetLanguageSelect.value;
         const oldLanguage = this.translationSettings.targetLanguage;
         
+        // Update internal state immediately to prevent race conditions
         this.translationSettings.targetLanguage = newLanguage;
-        await this.saveSettings();
         
         // If switching from a language to "none", restore originals
         if (newLanguage === 'none' && oldLanguage !== 'none') {
             this.restoreOriginalContent();
             this.updateStatus('Translation disabled, showing original content', 'info');
+            await this.saveSettings();
             return;
         }
         
         // If switching to a language, ensure model is downloaded and translate content
         if (newLanguage !== 'none') {
+            // Save settings first to persist the selection
+            await this.saveSettings();
+            
             try {
-                // This will trigger download if needed
-                const response = await chrome.runtime.sendMessage({
-                    action: 'translateText',
-                    text: 'test', // Small test text to trigger model download
+                // Check availability first (non-blocking check)
+                const availabilityCheck = await chrome.runtime.sendMessage({
+                    action: 'checkTranslationAvailability',
                     sourceLanguage: 'en',
                     targetLanguage: newLanguage
                 });
                 
-                if (response && response.success) {
-                    // Model is ready, translate existing content
-                    await this.translateExistingContent();
-                } else {
-                    // Translation not available - show helpful message
+                if (availabilityCheck && availabilityCheck.available) {
+                    // Translation is available, proceed with translation
+                    try {
+                        // Try to translate existing content
+                        await this.translateExistingContent();
+                    } catch (translateError) {
+                        console.error('Error translating content:', translateError);
+                        const langName = this.getLanguageName(newLanguage);
+                        this.updateStatus(`Translation selected: ${langName}. Content will be translated as it becomes available.`, 'info');
+                    }
+                } else if (availabilityCheck && availabilityCheck.needsDownload) {
+                    // Model needs to download - show message but keep selection
                     const langName = this.getLanguageName(newLanguage);
-                    this.updateStatus(`Translation to ${langName} is not available. Please check Chrome AI settings.`, 'info');
-                    // Reset to 'none' since translation isn't working
-                    this.translationSettings.targetLanguage = 'none';
-                    this.elements.targetLanguageSelect.value = 'none';
-                    await this.saveSettings();
+                    this.updateStatus(`Downloading translation model for ${langName}... This may take a moment.`, 'loading');
+                    // Try to translate anyway - it will trigger download
+                    try {
+                        await this.translateExistingContent();
+                    } catch (translateError) {
+                        // Download in progress - selection is kept, will translate when ready
+                        console.log('Translation model downloading, will translate when ready');
+                    }
+                } else {
+                    // Translation not available - show message but keep selection
+                    const langName = this.getLanguageName(newLanguage);
+                    this.updateStatus(`Translation to ${langName} may not be available. Please check Chrome AI settings.`, 'info');
+                    // Don't reset selection - user may want to keep it for when it becomes available
                 }
             } catch (error) {
-                console.error('Error initializing translation:', error);
+                console.error('Error checking translation availability:', error);
                 const langName = this.getLanguageName(newLanguage);
-                this.updateStatus(`Translation to ${langName} is not available.`, 'info');
-                // Reset to 'none' since translation isn't working
-                this.translationSettings.targetLanguage = 'none';
-                this.elements.targetLanguageSelect.value = 'none';
-                await this.saveSettings();
+                this.updateStatus(`Translation to ${langName} selected. Checking availability...`, 'info');
+                // Don't reset selection on error - might be temporary
+                // Try to translate anyway in case it works
+                try {
+                    await this.translateExistingContent();
+                } catch (translateError) {
+                    // Silent fail - selection is kept
+                    console.log('Translation not immediately available, but selection kept');
+                }
             }
         }
     }

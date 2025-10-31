@@ -87,7 +87,7 @@ test.describe('Service Worker', () => {
     await sidePanelPage.close();
   });
 
-  test('statusBroadcaster is properly scoped as instance property', async ({ sidePanelPage, backgroundPage }) => {
+  test('statusBroadcaster is properly scoped as instance property', async ({ sidePanelPage }) => {
     // This test specifically verifies the fix for ReferenceError: statusBroadcaster is not defined
     // The service worker should initialize AI capabilities without throwing ReferenceError
     // because statusBroadcaster is now correctly referenced as this.statusBroadcaster

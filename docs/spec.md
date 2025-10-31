@@ -96,6 +96,13 @@ This project builds a Chrome extension for inbox triage that summarises email th
 **And** all drafts should reflect the selected tone (neutral, friendly, assertive, formal)  
 **And** the output should conform to a predefined JSON schema  
 
+**When** drafts are generated  
+**Then** each draft should display with:
+- **Copy Button**: Copies draft body to clipboard for manual pasting
+- **Create Draft Button**: Opens reply compose window in Gmail/Outlook and fills it with draft content ready to send
+- **Accordion UI**: Expandable/collapsible sections for viewing draft content
+- **Visual Feedback**: Loading indicators show progress during generation
+
 **Reference**: See [AGENTS.md](../AGENTS.md) for validation utilities
 
 ### Tone Selection and Regeneration  
@@ -110,6 +117,52 @@ This project builds a Chrome extension for inbox triage that summarises email th
 **Then** the draft body text should be copied to the clipboard  
 **And** the user should receive visual confirmation of the successful copy  
 **Note:** Subject line is not copied as it follows standard "Re: [original subject]" format
+
+### Draft Creation in Email Client
+**Given** reply drafts are displayed in the side panel  
+**When** the user clicks the "Create Draft" button for any draft  
+**Then** the extension should:
+- Detect if the user is on Gmail or Outlook
+- Find and click the Reply button in the email client
+- Wait for the compose window to open
+- Insert the draft body text into the compose editor
+- Trigger input events so the email client recognizes the content
+- Provide visual feedback (button shows "Creating...", then "Created!" or "Failed")
+**And** the draft should be ready to send in the email client  
+**And** errors should be handled gracefully with user-friendly messages
+
+### State Persistence
+**Given** a user has extracted a thread, generated a summary, or created drafts  
+**When** they navigate away from the browser/tab or close the extension  
+**Then** the extension should automatically save:
+- Current thread data
+- Summary and key points
+- Generated drafts
+- Thread URL for matching
+**When** the user returns to the same thread URL  
+**Then** the extension should automatically restore:
+- Extracted thread
+- Summary and key points
+- Generated drafts
+- Attachment information
+**And** display a "Restored previous analysis" success message  
+**And** the UI should reflect the restored state  
+**Note:** State is only restored if the URL matches the saved thread URL (handles Gmail/Outlook URL variations)
+
+### Loading Indicators and Visual Feedback
+**Given** any AI operation is in progress (extraction, summarization, draft generation)  
+**When** the operation is active  
+**Then** the status bar should display:
+- Animated loading indicator (spinner for long operations, pulsing dots for short operations)
+- Shimmer effect on the status bar background
+- Animated progress bar at the bottom of the status bar
+- Clear status message describing the current operation
+**And** buttons should show:
+- Animated gradient background when disabled during operations
+- Subtle pulse animation
+- Spinner overlay for secondary buttons
+**And** all animations should be smooth and visually appealing  
+**And** loading states should automatically clear when operations complete
 
 ### Attachment Detection and Analysis
 **Given** a user is viewing an email thread containing attachments in Gmail or Outlook  

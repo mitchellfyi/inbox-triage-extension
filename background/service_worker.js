@@ -110,13 +110,27 @@ class InboxTriageServiceWorker {
                     };
                     console.log('Summarizer API available:', summarizerAvailability);
                     
+                    // Log more details if unavailable
+                    if (summarizerAvailability === 'no' || summarizerAvailability === 'unavailable') {
+                        console.warn('Summarizer API exists but returns "no". This may indicate:');
+                        console.warn('  - Flags not properly enabled (check chrome://flags)');
+                        console.warn('  - Chrome version too old (need 138+)');
+                        console.warn('  - Extension needs reload after flag changes');
+                        console.warn('  - Chrome needs full restart (not just reload)');
+                    }
+                    
                     // Broadcast initial model status to side panel if it's open
                     this.statusBroadcaster('summarizer', this.aiCapabilities.summarizer);
                 } catch (error) {
                     console.error('Error checking Summarizer availability:', error);
+                    // Store error for debugging
+                    this.aiCapabilities.summarizer = {
+                        available: 'error',
+                        error: error.message
+                    };
                 }
             } else {
-                console.log('Summarizer API not available');
+                console.log('Summarizer API not available (not in self)');
             }
             
             // Check Language Model API (Prompt API)
@@ -131,13 +145,27 @@ class InboxTriageServiceWorker {
                     };
                     console.log('Language Model API (Prompt API) available:', languageModelAvailability);
                     
+                    // Log more details if unavailable
+                    if (languageModelAvailability === 'no' || languageModelAvailability === 'unavailable') {
+                        console.warn('LanguageModel API exists but returns "no". This may indicate:');
+                        console.warn('  - Flags not properly enabled (check chrome://flags)');
+                        console.warn('  - Chrome version too old (need 138+)');
+                        console.warn('  - Extension needs reload after flag changes');
+                        console.warn('  - Chrome needs full restart (not just reload)');
+                    }
+                    
                     // Broadcast initial model status to side panel if it's open
                     this.statusBroadcaster('promptApi', this.aiCapabilities.promptApi);
                 } catch (error) {
                     console.error('Error checking LanguageModel availability:', error);
+                    // Store error for debugging
+                    this.aiCapabilities.promptApi = {
+                        available: 'error',
+                        error: error.message
+                    };
                 }
             } else {
-                console.log('Language Model API (Prompt API) not available');
+                console.log('Language Model API (Prompt API) not available (not in self)');
             }
             
             // Check Translator API
@@ -206,9 +234,11 @@ class InboxTriageServiceWorker {
     startPeriodicModelCheck() {
         // Only check if we have at least one model that might become available
         const shouldCheck = (!this.aiCapabilities.summarizer || 
-                            this.aiCapabilities.summarizer?.available !== 'readily') ||
+                            (this.aiCapabilities.summarizer?.available !== 'readily' && 
+                             this.aiCapabilities.summarizer?.available !== 'available')) ||
                            (!this.aiCapabilities.promptApi || 
-                            this.aiCapabilities.promptApi?.available !== 'readily');
+                            (this.aiCapabilities.promptApi?.available !== 'readily' && 
+                             this.aiCapabilities.promptApi?.available !== 'available'));
         
         if (!shouldCheck) {
             return;
@@ -292,8 +322,10 @@ class InboxTriageServiceWorker {
             }
             
             // Stop periodic checking if both models are ready
-            if (this.aiCapabilities.summarizer?.available === 'readily' && 
-                this.aiCapabilities.promptApi?.available === 'readily') {
+            if ((this.aiCapabilities.summarizer?.available === 'readily' || 
+                 this.aiCapabilities.summarizer?.available === 'available') && 
+                (this.aiCapabilities.promptApi?.available === 'readily' || 
+                 this.aiCapabilities.promptApi?.available === 'available')) {
                 this.stopPeriodicModelCheck();
             }
             
@@ -343,13 +375,16 @@ class InboxTriageServiceWorker {
     
     async handleMessage(message, sender, sendResponse) {
         try {
+            console.log('Service worker received message:', message.action);
             switch (message.action) {
                 case 'generateSummary':
                     await this.generateSummary(message.thread, sendResponse, message.userSettings);
                     break;
                     
                 case 'generateDrafts':
+                    console.log('Service worker: Starting draft generation');
                     await this.generateReplyDrafts(message.thread, message.tone, message.guidance, sendResponse, message.userSettings);
+                    console.log('Service worker: Draft generation completed');
                     break;
                     
                 case 'processAttachment':

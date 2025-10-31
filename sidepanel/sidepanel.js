@@ -25,6 +25,7 @@ class InboxTriageSidePanel {
         };
         this.isVisible = document.visibilityState === 'visible';
         this.isExtracting = false; // Track if extraction is in progress
+        this.isGenerating = false; // Track if draft generation is in progress
         
         this.initializeElements();
         
@@ -115,8 +116,8 @@ class InboxTriageSidePanel {
             console.error('Unhandled promise rejection:', event.reason);
             this.updateStatus(`Unexpected error: ${event.reason?.message || event.reason || 'Unknown error'}`, 'error');
             
-            // Re-enable extract button if it's disabled (but not if extraction is in progress)
-            if (this.elements.extractBtn && this.elements.extractBtn.disabled && !this.isExtracting) {
+            // Re-enable extract button if it's disabled (but not if extraction or generation is in progress)
+            if (this.elements.extractBtn && this.elements.extractBtn.disabled && !this.isExtracting && !this.isGenerating) {
                 this.elements.extractBtn.disabled = false;
                 console.log('Extract button re-enabled after unhandled error');
             }
@@ -130,8 +131,8 @@ class InboxTriageSidePanel {
             console.error('Uncaught error:', event.error);
             this.updateStatus(`System error: ${event.error?.message || event.message || 'Unknown error'}`, 'error');
             
-            // Re-enable extract button if it's disabled (but not if extraction is in progress)
-            if (this.elements.extractBtn && this.elements.extractBtn.disabled && !this.isExtracting) {
+            // Re-enable extract button if it's disabled (but not if extraction or generation is in progress)
+            if (this.elements.extractBtn && this.elements.extractBtn.disabled && !this.isExtracting && !this.isGenerating) {
                 this.elements.extractBtn.disabled = false;
                 console.log('Extract button re-enabled after uncaught error');
             }
@@ -195,8 +196,8 @@ class InboxTriageSidePanel {
         }
         
         if (this.currentContext.isOnEmailThread) {
-            // Only enable button if extraction is not in progress
-            if (!this.isExtracting) {
+            // Only enable button if extraction is not in progress and generation is not in progress
+            if (!this.isExtracting && !this.isGenerating) {
                 extractBtn.disabled = false;
             }
             // Show extract section if it was hidden due to successful extraction
@@ -335,9 +336,13 @@ class InboxTriageSidePanel {
 
         // Extract thread/conversation IDs from URLs
         const extractThreadId = (url) => {
-            // Gmail: https://mail.google.com/mail/u/0/#inbox/thread-id or ?th=thread-id
-            const gmailMatch = url.match(/[#?]th=([^&]+)/);
-            if (gmailMatch) return gmailMatch[1];
+            // Gmail: https://mail.google.com/mail/u/0/#inbox/th123 or ?th=thread-id
+            // Pattern: #inbox/th{id} or ?th={id}
+            const gmailHashMatch = url.match(/#inbox\/th([^&/?#]+)/);
+            if (gmailHashMatch) return gmailHashMatch[1];
+            
+            const gmailQueryMatch = url.match(/[?&]th=([^&]+)/);
+            if (gmailQueryMatch) return gmailQueryMatch[1];
 
             // Outlook: https://outlook.live.com/mail/0/inbox/conversation-id or /mail/id/...
             const outlookMatch = url.match(/\/(?:conversation|id)\/([^/?#]+)/);
@@ -384,9 +389,9 @@ class InboxTriageSidePanel {
             });
         }
         
-        // Show extract button again (but keep disabled if extraction is in progress)
+        // Show extract button again (but keep disabled if extraction or generation is in progress)
         this.showSection(this.elements.extractSection, false);
-        if (!this.isExtracting) {
+        if (!this.isExtracting && !this.isGenerating) {
             this.elements.extractBtn.disabled = false;
         }
         
@@ -431,13 +436,46 @@ class InboxTriageSidePanel {
                 return;
             }
             
-            // Request current AI status from background script
-            const response = await chrome.runtime.sendMessage({
-                action: 'checkAIStatus'
-            });
+            // Request current AI status from background script with retry
+            // Sometimes the service worker needs a moment to initialize
+            let response;
+            let retries = 0;
+            const maxRetries = 3;
+            
+            while (retries < maxRetries) {
+                try {
+                    response = await chrome.runtime.sendMessage({
+                        action: 'checkAIStatus'
+                    });
+                    
+                    if (response && response.success) {
+                        break;
+                    }
+                } catch (error) {
+                    console.log(`AI status check attempt ${retries + 1} failed:`, error);
+                    if (retries < maxRetries - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    }
+                }
+                retries++;
+            }
+            
+            if (!response) {
+                this.updateStatus('Unable to connect to service worker. Try reloading the extension.', 'error');
+                return;
+            }
             
             if (response && response.success) {
                 const { summarizer, promptApi, available } = response.capabilities;
+                
+                // Log detailed status for debugging
+                console.log('AI Capabilities Status:', {
+                    available,
+                    summarizer: summarizer?.available,
+                    promptApi: promptApi?.available,
+                    hasSummarizer: !!summarizer,
+                    hasPromptApi: !!promptApi
+                });
                 
                 if (available) {
                     // Check individual model status
@@ -446,21 +484,31 @@ class InboxTriageSidePanel {
                     let unavailableModels = [];
                     
                     if (summarizer) {
-                        if (summarizer.available === 'readily') {
+                        if (summarizer.available === 'readily' || summarizer.available === 'available') {
                             readyModels.push('Summarization');
                         } else if (summarizer.available === 'after-download') {
                             downloadingModels.push('Summarization');
+                        } else if (summarizer.available === 'no' || summarizer.available === 'unavailable') {
+                            // API exists but models not available - might need flags or download
+                            unavailableModels.push('Summarization');
                         } else {
+                            // Unknown status - treat as unavailable but log it
+                            console.warn('Unknown Summarizer availability status:', summarizer.available);
                             unavailableModels.push('Summarization');
                         }
                     }
                     
                     if (promptApi) {
-                        if (promptApi.available === 'readily') {
+                        if (promptApi.available === 'readily' || promptApi.available === 'available') {
                             readyModels.push('Reply Drafting');
                         } else if (promptApi.available === 'after-download') {
                             downloadingModels.push('Reply Drafting');
+                        } else if (promptApi.available === 'no' || promptApi.available === 'unavailable') {
+                            // API exists but models not available - might need flags or download
+                            unavailableModels.push('Reply Drafting');
                         } else {
+                            // Unknown status - treat as unavailable but log it
+                            console.warn('Unknown Prompt API availability status:', promptApi.available);
                             unavailableModels.push('Reply Drafting');
                         }
                     }
@@ -471,12 +519,56 @@ class InboxTriageSidePanel {
                     } else if (downloadingModels.length > 0) {
                         this.updateStatus(`AI models downloading: ${downloadingModels.join(', ')}. This may take several minutes...`, 'loading');
                     } else if (unavailableModels.length > 0) {
-                        this.updateStatus('Some AI features are not available. Please enable Chrome AI features in Settings > Privacy and security > Experimental AI.', 'error');
+                        // More helpful error message with debugging info
+                        const hasApis = (summarizer !== null) || (promptApi !== null);
+                        const summarizerStatus = summarizer?.available || 'unknown';
+                        const promptApiStatus = promptApi?.available || 'unknown';
+                        
+                        if (hasApis) {
+                            // APIs exist but models unavailable
+                            // Check if it's "no" which might mean flags not fully enabled or models need download trigger
+                            const needsDownload = summarizerStatus === 'after-download' || promptApiStatus === 'after-download';
+                            const isNo = summarizerStatus === 'no' || promptApiStatus === 'no';
+                            
+                            if (needsDownload) {
+                                this.updateStatus(`AI models downloading: ${downloadingModels.join(', ')}. This may take several minutes...`, 'loading');
+                            } else if (isNo) {
+                                // APIs exist but return "no" - likely flag or configuration issue
+                                console.warn('AI APIs exist but return "no":', {
+                                    summarizer: summarizerStatus,
+                                    promptApi: promptApiStatus,
+                                    chromeVersion: navigator.userAgent.match(/Chrome\/(\d+)/)?.[1] || 'unknown'
+                                });
+                                
+                                // Provide actionable troubleshooting steps
+                                const troubleshootingSteps = [
+                                    '1) Ensure Chrome 138+ (check chrome://version)',
+                                    '2) Verify flags enabled: chrome://flags/#optimization-guide-on-device-model, #prompt-api-for-gemini-nano, #summarization-api-for-gemini-nano',
+                                    '3) Reload extension: chrome://extensions → click reload',
+                                    '4) Fully restart Chrome (not just reload)',
+                                    '5) Check Chrome AI settings: Settings > Privacy and security > Experimental AI'
+                                ];
+                                
+                                console.log('Troubleshooting steps:', troubleshootingSteps);
+                                
+                                this.updateStatus(
+                                    'AI models return "no" status. Check browser console (F12) for detailed troubleshooting steps. Common fix: Reload extension after enabling flags.',
+                                    'error'
+                                );
+                            } else {
+                                // Unknown status
+                                this.updateStatus(`AI models unavailable (Summarizer: ${summarizerStatus}, Prompt API: ${promptApiStatus}). Check chrome://flags and reload extension.`, 'error');
+                            }
+                        } else {
+                            // APIs don't exist at all
+                            this.updateStatus('Chrome AI APIs not detected. Please enable Chrome AI features in Settings > Privacy and security > Experimental AI, and ensure required flags are enabled.', 'error');
+                        }
                     } else {
                         this.updateStatus('Ready to analyze email threads', 'success');
                     }
                 } else {
-                    this.updateStatus('AI features not available. Please use Chrome 120+ with experimental AI enabled.', 'error');
+                    // No APIs detected at all
+                    this.updateStatus('AI features not available. Please use Chrome 138+ with experimental AI enabled. Check chrome://flags for AI-related flags.', 'error');
                 }
             } else {
                 this.updateStatus('Unable to check AI model status. Ready to analyze email threads.', 'info');
@@ -1007,7 +1099,10 @@ class InboxTriageSidePanel {
                 
                 // Show reply drafts controls now that we have a thread
                 this.showSection(this.elements.replyDraftsControlsSection, false);
-                this.elements.generateDraftsBtn.disabled = false;
+                // Only enable generate button if not currently generating
+                if (!this.isGenerating) {
+                    this.elements.generateDraftsBtn.disabled = false;
+                }
                 
                 // Hide extract button now that thread is extracted
                 this.hideSection(this.elements.extractSection);
@@ -1036,14 +1131,19 @@ class InboxTriageSidePanel {
             
             // Button state management:
             // - If extraction succeeded: button stays disabled and section is hidden
-            // - If extraction failed: re-enable button so user can try again
+            // - If extraction failed: re-enable button so user can try again (unless generation is in progress)
             if (!extractionSucceeded) {
-                this.elements.extractBtn.disabled = false;
-                // Make sure section is visible for retry
-                if (this.elements.extractSection.classList.contains('hidden')) {
-                    this.showSection(this.elements.extractSection, false);
+                // Only re-enable if generation is not in progress
+                if (!this.isGenerating) {
+                    this.elements.extractBtn.disabled = false;
+                    // Make sure section is visible for retry
+                    if (this.elements.extractSection.classList.contains('hidden')) {
+                        this.showSection(this.elements.extractSection, false);
+                    }
+                    console.log('Extract button re-enabled after error');
+                } else {
+                    console.log('Extract button remains disabled because generation is in progress');
                 }
-                console.log('Extract button re-enabled after error');
             } else {
                 console.log('Extract button remains disabled after successful extraction');
             }
@@ -1197,11 +1297,24 @@ class InboxTriageSidePanel {
     }
     
     async generateReplyDrafts() {
-        if (!this.currentThread) return;
+        if (!this.currentThread || this.isGenerating) return;
+        
+        let generationSucceeded = false;
+        this.isGenerating = true; // Mark generation as in progress
         
         try {
             this.updateStatus('Preparing draft request...', 'loading');
             this.elements.generateDraftsBtn.disabled = true;
+            // Also disable extract button during generation
+            this.elements.extractBtn.disabled = true;
+            
+            // Ensure buttons stay disabled throughout generation
+            const ensureButtonDisabled = () => {
+                if (this.isGenerating && !generationSucceeded) {
+                    this.elements.generateDraftsBtn.disabled = true;
+                    this.elements.extractBtn.disabled = true;
+                }
+            };
             
             // Check if we're in an extension context
             if (!chrome?.runtime?.sendMessage) {
@@ -1213,36 +1326,62 @@ class InboxTriageSidePanel {
             
             const userSettings = this.settingsManager.getSettings();
             
+            console.log('Starting draft generation:', { tone, guidanceLength: guidance.length, hasThread: !!this.currentThread });
             this.updateStatus(`Composing ${tone} replies...`, 'loading');
+            ensureButtonDisabled(); // Ensure button stays disabled
             
-            const response = await chrome.runtime.sendMessage({
-                action: 'generateDrafts',
-                thread: this.currentThread,
-                tone: tone,
-                guidance: guidance,
-                userSettings
-            });
+            // Add timeout to prevent hanging (draft generation can take 30-60 seconds)
+            const response = await Promise.race([
+                chrome.runtime.sendMessage({
+                    action: 'generateDrafts',
+                    thread: this.currentThread,
+                    tone: tone,
+                    guidance: guidance,
+                    userSettings
+                }),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Draft generation timed out after 90 seconds. Please try again.')), 90000)
+                )
+            ]);
+            
+            console.log('Draft generation response received:', response?.success ? 'success' : 'error');
+            ensureButtonDisabled(); // Ensure button stays disabled after async call
             
             if (response && response.success) {
-                this.updateStatus('Validating draft quality...', 'loading');
+                ensureButtonDisabled(); // Ensure button stays disabled
                 
-                this.currentDrafts = response.drafts;
+                const drafts = response.drafts || [];
+                this.currentDrafts = drafts;
+                
+                // Calculate draft count before any operations that might fail
+                const draftCount = drafts.length;
                 
                 // Hide the controls panel before displaying drafts
                 this.hideSection(this.elements.replyDraftsControlsSection);
                 
                 // Display drafts (which will scroll to them after rendering)
-                this.displayReplyDrafts(response.drafts);
-                this.addProcessingIndicator('drafting', response.usedFallback || false);
-                
-                // Show final status with count
-                const draftCount = response.drafts?.length || 0;
-                
-                if (response.warning) {
-                    this.updateStatus(`✓ ${draftCount} draft${draftCount !== 1 ? 's' : ''} generated: ${response.warning}`, 'success');
-                } else {
-                    this.updateStatus(`✓ ${draftCount} ${tone} draft${draftCount !== 1 ? 's' : ''} ready`, 'success');
+                try {
+                    if (drafts.length > 0) {
+                        this.displayReplyDrafts(drafts);
+                        this.addProcessingIndicator('drafting', response.usedFallback || false);
+                    }
+                } catch (displayError) {
+                    console.error('Error displaying drafts:', displayError);
+                    // Continue even if display fails - drafts are still generated
                 }
+                
+                // Always update status to success message, regardless of display success
+                // Use setTimeout to ensure status update happens after any synchronous operations
+                setTimeout(() => {
+                    if (response.warning) {
+                        this.updateStatus(`✓ ${draftCount} draft${draftCount !== 1 ? 's' : ''} generated: ${response.warning}`, 'success');
+                    } else {
+                        this.updateStatus(`✓ ${draftCount} ${tone} draft${draftCount !== 1 ? 's' : ''} ready`, 'success');
+                    }
+                }, 0);
+                
+                // Mark generation as successful
+                generationSucceeded = true;
             } else {
                 // Error message is already sanitized by the service worker
                 throw new Error(response?.error || 'Failed to generate drafts');
@@ -1252,8 +1391,26 @@ class InboxTriageSidePanel {
             
             // Display the sanitized error message from the service worker
             this.updateStatus(`Draft error: ${error.message}`, 'error');
+            generationSucceeded = false;
         } finally {
-            this.elements.generateDraftsBtn.disabled = false;
+            // Mark generation as complete
+            this.isGenerating = false;
+            
+            // Button state management:
+            // - If generation succeeded: generate button stays disabled (drafts are already generated)
+            // - If generation failed: re-enable generate button so user can try again
+            // - Extract button: re-enable if generation failed, keep disabled if succeeded (thread already extracted)
+            if (!generationSucceeded) {
+                this.elements.generateDraftsBtn.disabled = false;
+                // Re-enable extract button only if not currently extracting
+                if (!this.isExtracting) {
+                    this.elements.extractBtn.disabled = false;
+                }
+                console.log('Generate drafts button re-enabled after error');
+            } else {
+                // Generation succeeded - extract button should stay disabled since thread is already extracted
+                console.log('Generate drafts button remains disabled after successful generation');
+            }
         }
     }
     
@@ -1479,8 +1636,8 @@ class InboxTriageSidePanel {
                 this.elements.extractBtn.title = 'Please wait for model download to complete';
             }
         } else {
-            // Re-enable extract button after download completes
-            if (this.elements.extractBtn && this.currentContext.isOnEmailThread) {
+            // Re-enable extract button after download completes (unless extraction or generation is in progress)
+            if (this.elements.extractBtn && this.currentContext.isOnEmailThread && !this.isExtracting && !this.isGenerating) {
                 this.elements.extractBtn.disabled = false;
                 this.elements.extractBtn.title = '';
             }
@@ -1579,7 +1736,8 @@ class InboxTriageSidePanel {
      */
     updateDraftButtonState() {
         // Check if we have at least one AI model available
-        if (this.elements.generateDraftsBtn) {
+        // Don't enable if generation is in progress
+        if (this.elements.generateDraftsBtn && !this.isGenerating) {
             this.elements.generateDraftsBtn.disabled = false;
             this.elements.generateDraftsBtn.textContent = 'Generate Drafts';
             this.elements.generateDraftsBtn.title = '';

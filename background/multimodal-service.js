@@ -20,7 +20,9 @@ export class MultimodalAnalysisService {
                 console.log('Language Model capabilities:', this.availability);
                 
                 // Check if available and supports images
-                if (this.availability.available === 'readily' || this.availability.available === 'after-download') {
+                if (this.availability.available === 'readily' || 
+                    this.availability.available === 'available' || 
+                    this.availability.available === 'after-download') {
                     // Note: Image support detection may vary by Chrome version
                     // For now, we'll attempt to use it if language model is available
                     this.supportsImages = true;

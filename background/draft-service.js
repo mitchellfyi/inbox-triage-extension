@@ -75,18 +75,29 @@ export class DraftService {
             
             // Check if model is ready
             const capabilities = this.aiCapabilities.promptApi;
-            if (capabilities.available === 'after-download') {
+            const availability = capabilities.available;
+            
+            // Handle 'available' status same as 'readily' (both mean ready to use)
+            if (availability === 'after-download') {
                 if (processingMode === 'hybrid') {
                     throw new Error('AI model is downloading. Cloud fallback is not implemented to maintain privacy guarantees. Please wait for download to complete.');
                 } else {
                     throw new Error('AI model is downloading. This may take a few minutes. Please try again later.');
                 }
-            } else if (capabilities.available === 'no') {
+            } else if (availability === 'no' || availability === 'unavailable') {
                 if (processingMode === 'hybrid') {
                     throw new Error('Language Model API is not available. Cloud fallback is not implemented to maintain privacy guarantees. Please enable Chrome AI features in Settings > Privacy and security > Experimental AI.');
                 } else {
                     throw new Error('Language Model API is not available. Please enable Chrome AI features in Settings > Privacy and security > Experimental AI.');
                 }
+            } else if (availability === 'error') {
+                const errorMsg = capabilities.error || 'Unknown error';
+                throw new Error(`Language Model API error: ${errorMsg}. Please reload the extension and try again.`);
+            } else if (availability !== 'readily' && availability !== 'available') {
+                // Unknown status - log it but try to proceed if it's not clearly unavailable
+                console.warn('Unknown Prompt API availability status:', availability);
+                // Don't throw error for unknown statuses - let it try to use the API
+                // The API call itself will fail if it's truly unavailable
             }
             
             const fullText = this.summaryService.combineThreadMessages(thread);
@@ -103,65 +114,80 @@ export class DraftService {
             // Following same pattern as Summarizer API
             // Reference: https://developer.chrome.com/docs/ai/prompt-api
             // Example: const session = await LanguageModel.create({...})
-            const session = await LanguageModel.create({
-                initialPrompts: [
-                    { role: 'system', content: createSystemPrompt(tone) }
-                ],
-                temperature: 0.7,
-                topK: 3
-            });
-            
-            // Generate drafts using structured prompt with context preservation
-            const prompt = createReplyPrompt(fullText, subject, tone, guidance, context);
-            const response = await session.prompt(prompt);
-            
-            // Clean up session immediately
-            session.destroy();
-            
-            // Parse and validate JSON response
-            let drafts;
+            let session = null;
             try {
-                // Clean the response - remove any non-JSON text
-                const cleanedResponse = this.cleanJsonResponse(response);
-                drafts = JSON.parse(cleanedResponse);
+                session = await LanguageModel.create({
+                    initialPrompts: [
+                        { role: 'system', content: createSystemPrompt(tone) }
+                    ],
+                    temperature: 0.7,
+                    topK: 3
+                });
                 
-                // Validate against schema
-                const validation = validateDraftsSchema(drafts);
-                if (!validation.isValid) {
-                    console.warn('Schema validation failed:', validation.errors);
-                    throw new Error(`Invalid response format: ${validation.errors.join(', ')}`);
+                // Generate drafts using structured prompt with context preservation
+                const prompt = createReplyPrompt(fullText, subject, tone, guidance, context);
+                const response = await session.prompt(prompt);
+                
+                // Clean up session immediately
+                session.destroy();
+                session = null;
+                
+                // Parse and validate JSON response
+                let drafts;
+                try {
+                    // Clean the response - remove any non-JSON text
+                    const cleanedResponse = this.cleanJsonResponse(response);
+                    drafts = JSON.parse(cleanedResponse);
+                    
+                    // Validate against schema
+                    const validation = validateDraftsSchema(drafts);
+                    if (!validation.isValid) {
+                        console.warn('Schema validation failed:', validation.errors);
+                        throw new Error(`Invalid response format: ${validation.errors.join(', ')}`);
+                    }
+                    
+                } catch (parseError) {
+                    console.warn('JSON parsing failed, using fallback:', parseError.message);
+                    // Enhanced fallback with original response
+                    drafts = this.createFallbackDrafts(response, subject, tone);
                 }
                 
-            } catch (parseError) {
-                console.warn('JSON parsing failed, using fallback:', parseError.message);
-                // Enhanced fallback with original response
-                drafts = this.createFallbackDrafts(response, subject, tone);
-            }
-            
-            // Validate and format drafts
-            const signature = userSettings?.signature || '';
-            const formattedDrafts = validateAndFormatDrafts(drafts, subject, signature);
-            
-            // Ensure we always have exactly 3 drafts
-            if (formattedDrafts.length !== 3) {
-                console.warn(`Expected 3 drafts, got ${formattedDrafts.length}, using fallback`);
-                const fallback = this.createFallbackDrafts('', subject, tone);
-                const fallbackFormatted = validateAndFormatDrafts(fallback, subject, signature);
+                // Validate and format drafts
+                const signature = userSettings?.signature || '';
+                const formattedDrafts = validateAndFormatDrafts(drafts, subject, signature);
+                
+                // Ensure we always have exactly 3 drafts
+                if (formattedDrafts.length !== 3) {
+                    console.warn(`Expected 3 drafts, got ${formattedDrafts.length}, using fallback`);
+                    const fallback = this.createFallbackDrafts('', subject, tone);
+                    const fallbackFormatted = validateAndFormatDrafts(fallback, subject, signature);
+                    
+                    sendResponse(createSuccessResponse(
+                        { drafts: fallbackFormatted },
+                        { 
+                            warning: 'AI response was incomplete, using fallback drafts',
+                            usedFallback: usedFallback
+                        }
+                    ));
+                    return;
+                }
                 
                 sendResponse(createSuccessResponse(
-                    { drafts: fallbackFormatted },
-                    { 
-                        warning: 'AI response was incomplete, using fallback drafts',
-                        usedFallback: usedFallback
-                    }
+                    { drafts: formattedDrafts },
+                    { usedFallback: usedFallback }
                 ));
-                return;
+            } catch (apiError) {
+                // Ensure session is destroyed even on error
+                if (session) {
+                    try {
+                        session.destroy();
+                    } catch (destroyError) {
+                        console.warn('Error destroying session:', destroyError);
+                    }
+                }
+                // Re-throw to be caught by outer catch block
+                throw apiError;
             }
-            
-            sendResponse(createSuccessResponse(
-                { drafts: formattedDrafts },
-                { usedFallback: usedFallback }
-            ));
             
         } catch (error) {
             console.error('Draft generation error:', error);

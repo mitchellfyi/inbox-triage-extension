@@ -68,7 +68,8 @@ export class AttachmentService {
                                     processedContent.length > 100 && 
                                     processedContent.startsWith('Extracted text from');
             
-            if (hasExtractedText && this.aiCapabilities.summarizer?.available === 'readily') {
+            if (hasExtractedText && (this.aiCapabilities.summarizer?.available === 'readily' || 
+                                     this.aiCapabilities.summarizer?.available === 'available')) {
                 // Extract just the text portion (remove the "Extracted text from..." prefix)
                 const textMatch = processedContent.match(/Extracted text from .+:\n\n(.+)/s);
                 const textContent = textMatch ? textMatch[1] : processedContent;
