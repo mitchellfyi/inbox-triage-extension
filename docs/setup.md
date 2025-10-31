@@ -133,9 +133,9 @@ After enabling flags and restarting Chrome:
    - Go to **Console** tab
    - Paste this command:
      ```javascript
-     (await ai.languageModel.capabilities()).available
+     'LanguageModel' in self && (await LanguageModel.availability())
      ```
-   - Expected result: **"readily"**
+   - Expected result: **"readily"**, **"after-download"**, or **"no"**
    - If you get an error, models aren't ready yet
 
 3. **Check Model Download Progress:**
@@ -391,7 +391,7 @@ chrome://flags
 chrome://components
 
 # Test AI availability (in DevTools console)
-(await ai.languageModel.capabilities()).available
+'LanguageModel' in self && (await LanguageModel.availability())
 ```
 
 ### Extension Management:

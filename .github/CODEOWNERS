@@ -1,21 +1,34 @@
 # Global owner for the repository
+# All changes require review from the repository owner
 * @mitchellfyi
 
-# Documentation files require review for consistency
+# Documentation files require review for consistency and accuracy
 *.md @mitchellfyi
-SPEC.md @mitchellfyi
-AGENTS.md @mitchellfyi
-TODO.md @mitchellfyi
+docs/ @mitchellfyi
 
-# Core extension architecture 
+# Core extension architecture - critical files
 manifest.json @mitchellfyi
 background/ @mitchellfyi
-
-# GitHub configuration and templates
-.github/ @mitchellfyi
 
 # Content scripts for email extraction
 content/ @mitchellfyi
 
 # Side panel UI and user experience
 sidepanel/ @mitchellfyi
+
+# Utility modules
+utils/ @mitchellfyi
+
+# Test infrastructure
+tests/ @mitchellfyi
+playwright.config.ts @mitchellfyi
+
+# GitHub configuration and templates
+.github/ @mitchellfyi
+
+# Project configuration
+package.json @mitchellfyi
+package-lock.json @mitchellfyi
+
+# Assets and icons
+assets/ @mitchellfyi

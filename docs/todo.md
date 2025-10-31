@@ -25,22 +25,10 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 
 ## Documentation
 
-### Post-Feature Documentation Updates
-- `[todo]` [spec.md](./spec.md) improvements - Acceptance criteria format, explicit API boundaries, browser support notes
-- `[todo]` [README.md](../README.md) feature integration - Update overview and quickstart sections after each major feature completion
-- `[todo]` Link validation sweep - Verify all internal documentation links work correctly
-- `[todo]` Code example updates - Ensure all documentation code snippets reflect current implementation
-
-### GitHub Templates
-- `[todo]` PR template - What/Why/How/Tests/Docs sections
-- `[todo]` Issue templates - Feature and bug report templates
-- `[todo]` CODEOWNERS - Assign reviewers for docs and extension areas
-
 ## Extension Core
 
 ### Enhancement Opportunities
 - `[todo]` Nested thread handling - Improve handling of complex reply chains
-- `[todo]` Draft message filtering - Exclude unsent drafts from analysis
 - `[todo]` Dynamic content handling - MutationObserver for SPA updates
 - `[todo]` Multiple conversation views - Different Gmail layouts and themes (dark mode, compact view)
 - `[todo]` Outlook version variations - Office 365, Outlook.com differences
@@ -49,18 +37,16 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 ## Attachment Processing
 
 ### File Processing
-- `[done]` ✅ PDF text extraction - Basic text extraction implemented using native APIs (limited success for complex PDFs; full PDF.js integration blocked by "no external dependencies" constraint)
-- `[done]` ✅ DOCX text extraction - Implementation structure complete; documents mammoth.js requirement (blocked by "no external dependencies" constraint)
-- `[done]` ✅ XLSX data extraction - Implementation structure complete; documents SheetJS requirement (blocked by "no external dependencies" constraint)
-- `[done]` ✅ Image analysis - Multimodal Prompt API for image description, OCR, and chart analysis
-- `[done]` ✅ File fetching - Proper download URL fetching with error handling
-- `[done]` ✅ Content validation - Size limits and content validation implemented
+- `[todo]` PDF text extraction - Basic implementation exists but limited success (full PDF.js integration blocked by "no external dependencies" constraint)
+- `[todo]` DOCX text extraction - Currently returns placeholder message only; requires mammoth.js library (blocked by "no external dependencies" constraint)
+- `[todo]` XLSX data extraction - Currently returns placeholder message only; requires SheetJS library (blocked by "no external dependencies" constraint)
 - `[todo]` Full PDF parsing - Integrate PDF.js when dependency constraints allow (see background/attachment-service.js for implementation notes)
 - `[todo]` Full DOCX parsing - Integrate mammoth.js when dependency constraints allow (see background/attachment-service.js for implementation notes)
 - `[todo]` Full XLSX parsing - Integrate SheetJS when dependency constraints allow (see background/attachment-service.js for implementation notes)
 
+**Note:** Basic PDF extraction attempts exist but DOCX/XLSX are currently placeholders only. File fetching and content validation are implemented.
+
 ### Advanced Features
-- `[todo]` Detailed view modal - Full content display and comprehensive analysis
 - `[todo]` Large file handling - Size limits and progressive processing
 
 ## Reply Drafting
@@ -72,13 +58,11 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 ## Side Panel UI (Complete)
 
 ### Enhancement Opportunities
-- `[todo]` Screen reader testing - Validate with actual assistive technologies (NVDA, JAWS, VoiceOver)
+- `[todo]` Screen reader testing - Validate with actual assistive technologies (NVDA, JAWS, VoiceOver) (ARIA labels and keyboard navigation implemented, but not tested with actual screen readers)
 
 ## Quality Assurance
 
 ### Testing Gaps
-- `[todo]` Content script tests - Test email extraction logic for Gmail and Outlook
-- `[todo]` Cross-component tests - Test message passing and integration between extension parts
 - `[todo]` Manual test plan - Comprehensive testing checklist
 - `[todo]` Email format testing - Various email types and lengths
 - `[todo]` AI model state testing - Available, downloading, unavailable scenarios
@@ -90,7 +74,7 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 
 ### Documentation Testing
 - `[todo]` Installation instructions verification - Test setup process works from scratch
-- `[todo]` Link validation - All internal documentation links work
+- `[todo]` Link validation sweep - Comprehensive verification of all internal documentation links (partially done - broken links fixed)
 - `[todo]` Code examples validation - Ensure code snippets are accurate and current
 
 ---
@@ -116,8 +100,6 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 - `[todo]` [Task 008: Performance Metrics Display](../todo/008_performance_metrics_display.md) - Monitoring dashboard (2-3h)
 - `[todo]` [Task 010: System Status Dashboard](../todo/010_system_status_dashboard.md) - Health indicators (2-3h)
 
-**Total Effort**: 30-43 hours for complete implementation  
-**Minimum Viable**: Tasks 000, 006, 007 = 7-11 hours (Tasks 001 ✅ and 005 ✅ completed)  
 **See**: [`/todo/README.md`](../todo/README.md) for detailed timeline and prioritization
 
 ---
@@ -130,31 +112,3 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 - Add estimated effort or priority labels if helpful
 - Archive completed sections to keep the file manageable
 - **For hackathon tasks**: Follow detailed implementation guides in `/todo` directory
-
----
-
-## Recently Completed
-
-### Latest Milestones
-- ✅ **Multimodal image analysis** - AI-powered image understanding and OCR text extraction using Prompt API
-- ✅ **Translator API integration** - Multilingual support for 15+ languages with on-device translation
-- ✅ **Modular architecture** - Split large files into focused modules (voice, settings, drafts, translation)
-- ✅ Complete side panel UI with accessibility features
-- ✅ Voice dictation for guidance input
-- ✅ Hybrid processing mode with privacy controls
-- ✅ Custom API key configuration (OpenAI, Anthropic, Google)
-- ✅ Comprehensive error handling and sanitization
-- ✅ Model availability detection with periodic monitoring
-- ✅ Attachment detection and basic UI
-- ✅ Playwright test infrastructure
-- ✅ Processing mode settings with privacy notices
-- ✅ Deep-link URL generation with proper encoding
-- ✅ **Documentation reorganization** - All docs moved to `/docs` with consistent naming and cross-links
-
-### Next Focus Areas
-1. **Hackathon Preparation** - Create demo video and enhance documentation
-2. **File Processing** - Complete attachment analysis (PDF, DOCX, XLSX)
-3. **Testing Coverage** - Add content script tests and cross-component integration tests
-4. **Documentation** - Polish README with API showcase and feature highlights
-5. **Release Preparation** - Prepare for Chrome Web Store submission after hackathon
-
