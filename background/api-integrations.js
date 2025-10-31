@@ -38,6 +38,85 @@ Each draft must have exactly these three fields: type, subject, body. Generate e
 }
 
 /**
+ * Extract context from email thread text
+ * Identifies key points, questions, action items, and decisions for better reply drafting
+ * 
+ * @param {string} threadText - The email thread content
+ * @returns {Object} Context object with keyPoints, questions, actionItems, and decisions arrays
+ */
+export function extractThreadContext(threadText) {
+    if (!threadText || typeof threadText !== 'string') {
+        return { keyPoints: [], questions: [], actionItems: [], decisions: [] };
+    }
+    
+    const keyPoints = [];
+    const questions = [];
+    const actionItems = [];
+    const decisions = [];
+    
+    // Extract questions (sentences ending with ?)
+    const questionPattern = /[^.!?]*\?/g;
+    const questionsFound = threadText.match(questionPattern);
+    if (questionsFound) {
+        questions.push(...questionsFound
+            .map(q => q.trim())
+            .filter(q => q.length > 10 && q.length < 200)
+            .slice(0, 5));
+    }
+    
+    // Extract action items and deadlines
+    const actionPatterns = [
+        /\b(?:please|need|should|must|will|deadline|todo|task|action)\b[^.!?]*/gi,
+        /\b(?:deadline|due|by|before)\s+\d+/gi,
+        /\b(?:complete|finish|submit|send|provide|deliver)\b[^.!?]*/gi
+    ];
+    
+    actionPatterns.forEach(pattern => {
+        const matches = threadText.match(pattern);
+        if (matches) {
+            actionItems.push(...matches
+                .map(a => a.trim())
+                .filter(a => a.length > 10 && a.length < 200)
+                .slice(0, 5));
+        }
+    });
+    
+    // Extract key points (sentences with important keywords)
+    const keyPointKeywords = ['important', 'critical', 'key', 'main', 'primary', 'essential', 'priority', 'urgent'];
+    const sentences = threadText.split(/[.!?]\s+/);
+    keyPoints.push(...sentences
+        .filter(sentence => {
+            const lower = sentence.toLowerCase();
+            return keyPointKeywords.some(keyword => lower.includes(keyword)) &&
+                   sentence.length > 20 && sentence.length < 300;
+        })
+        .slice(0, 5));
+    
+    // Extract decisions (agreements, approvals, choices)
+    const decisionPatterns = [
+        /\b(?:agreed|decided|approved|chosen|selected|confirmed|finalized)\b[^.!?]*/gi,
+        /\b(?:will|going to|plan to|intend to)\b[^.!?]*/gi
+    ];
+    
+    decisionPatterns.forEach(pattern => {
+        const matches = threadText.match(pattern);
+        if (matches) {
+            decisions.push(...matches
+                .map(d => d.trim())
+                .filter(d => d.length > 10 && d.length < 200)
+                .slice(0, 5));
+        }
+    });
+    
+    return {
+        keyPoints: [...new Set(keyPoints)], // Remove duplicates
+        questions: [...new Set(questions)],
+        actionItems: [...new Set(actionItems)],
+        decisions: [...new Set(decisions)]
+    };
+}
+
+/**
  * Create a structured prompt for reply generation with JSON schema specification
  * 
  * Reference: docs/spec.md - Reply Draft Generation requirements
@@ -46,23 +125,50 @@ Each draft must have exactly these three fields: type, subject, body. Generate e
  * @param {string} originalSubject - The original email subject
  * @param {string} tone - The tone to use for replies
  * @param {string} guidance - Optional user guidance for customizing drafts
+ * @param {Object} context - Optional context object with keyPoints, questions, actionItems, decisions
  * @returns {string} Structured prompt with JSON requirements
  */
-export function createReplyPrompt(threadText, originalSubject, tone, guidance = '') {
+export function createReplyPrompt(threadText, originalSubject, tone, guidance = '', context = null) {
     const guidanceSection = guidance ? `\nUSER GUIDANCE:\n${guidance}\n` : '';
+    
+    // Build context section if context is provided
+    let contextSection = '';
+    if (context && (context.keyPoints?.length > 0 || context.questions?.length > 0 || 
+        context.actionItems?.length > 0 || context.decisions?.length > 0)) {
+        contextSection = '\n\nCONTEXT FROM THREAD:\n';
+        
+        if (context.keyPoints && context.keyPoints.length > 0) {
+            contextSection += `Key Points:\n${context.keyPoints.map(kp => `- ${kp}`).join('\n')}\n\n`;
+        }
+        
+        if (context.questions && context.questions.length > 0) {
+            contextSection += `Questions to Address:\n${context.questions.map(q => `- ${q}`).join('\n')}\n\n`;
+        }
+        
+        if (context.actionItems && context.actionItems.length > 0) {
+            contextSection += `Action Items:\n${context.actionItems.map(ai => `- ${ai}`).join('\n')}\n\n`;
+        }
+        
+        if (context.decisions && context.decisions.length > 0) {
+            contextSection += `Decisions Made:\n${context.decisions.map(d => `- ${d}`).join('\n')}\n\n`;
+        }
+        
+        contextSection += 'Reference these context elements in your replies where relevant.\n';
+    }
     
     return `Based on this email thread, generate 3 different reply drafts in ${tone} tone.
 
 THREAD:
 ${threadText}
 
-ORIGINAL SUBJECT: ${originalSubject}${guidanceSection}
+ORIGINAL SUBJECT: ${originalSubject}${guidanceSection}${contextSection}
 
 Generate exactly 3 reply drafts with these characteristics:
 1. SHORT RESPONSE: Quick acknowledgment (1-2 sentences, max 500 chars body)
 2. MEDIUM RESPONSE: Detailed with clarifications (2-3 paragraphs, max 1000 chars body) 
 3. COMPREHENSIVE RESPONSE: Complete with next steps (3-4 paragraphs, max 1500 chars body)
 ${guidance ? '\nIncorporate the user guidance above into all three drafts where relevant.\n' : ''}
+${contextSection ? '\nMake sure to reference the key points, questions, and action items from the context section.\n' : ''}
 Respond with ONLY the following JSON format (no other text):
 {
   "drafts": [

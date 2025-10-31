@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Outlook - Test Page</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f3f2f1;
+        }
+        .thread-container {
+            background: white;
+            border-radius: 4px;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        [data-convid] {
+            border-bottom: 1px solid #edebe9;
+            padding: 16px 0;
+        }
+        [data-convid]:last-child {
+            border-bottom: none;
+        }
+        [role="listitem"] {
+            margin: 16px 0;
+            padding: 12px;
+            background: #faf9f8;
+            border-left: 3px solid #0078d4;
+        }
+        h2 {
+            margin: 0 0 16px 0;
+            color: #323130;
+            font-size: 20px;
+        }
+        [data-testid="message-sender"] {
+            font-weight: 600;
+            color: #323130;
+            margin-bottom: 8px;
+        }
+        [data-testid="message-timestamp"] {
+            color: #605e5c;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+        [data-testid="message-body-content"] {
+            color: #323130;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="thread-container">
+        <div data-convid="test-conv-123">
+            <h2>Test Email Thread - Project Update</h2>
+            
+            <div role="listitem" data-testid="message-item" data-message-id="msg-1">
+                <div data-testid="message-sender">Alice Smith &lt;alice@example.com&gt;</div>
+                <div data-testid="message-timestamp" title="2024-01-15T10:00:00Z">Mon 1/15/2024 10:00 AM</div>
+                <div data-testid="message-body-content" aria-label="Message body" class="allowTextSelection">
+                    Hi team,<br><br>
+                    This is an important update about the project. We need to complete the task by Friday. The deadline is critical.<br><br>
+                    Can you please review the requirements and let me know if you have any questions?<br><br>
+                    Best regards,<br>
+                    Alice
+                </div>
+            </div>
+            
+            <div role="listitem" data-testid="message-item" data-message-id="msg-2">
+                <div data-testid="message-sender">Bob Johnson &lt;bob@example.com&gt;</div>
+                <div data-testid="message-timestamp" title="2024-01-15T11:30:00Z">Mon 1/15/2024 11:30 AM</div>
+                <div data-testid="message-body-content" aria-label="Message body" class="allowTextSelection">
+                    Hi Alice,<br><br>
+                    I have a question about the requirements. Can you clarify the scope? What are the next steps?<br><br>
+                    Also, what's the budget for this project?<br><br>
+                    Thanks,<br>
+                    Bob
+                </div>
+            </div>
+            
+            <div role="listitem" data-testid="message-item" data-message-id="msg-3">
+                <div data-testid="message-sender">Charlie Brown &lt;charlie@example.com&gt;</div>
+                <div data-testid="message-timestamp" title="2024-01-15T14:00:00Z">Mon 1/15/2024 2:00 PM</div>
+                <div data-testid="message-body-content" aria-label="Message body" class="allowTextSelection">
+                    Thanks for the update. I agree we should finalize this by Friday.<br><br>
+                    I've reviewed the requirements and they look good. Let's proceed with the implementation.<br><br>
+                    Best,<br>
+                    Charlie
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+

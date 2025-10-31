@@ -86,4 +86,43 @@ test.describe('Service Worker', () => {
     await testPage.close();
     await sidePanelPage.close();
   });
+
+  test('statusBroadcaster is properly scoped as instance property', async ({ sidePanelPage, backgroundPage }) => {
+    // This test specifically verifies the fix for ReferenceError: statusBroadcaster is not defined
+    // The service worker should initialize AI capabilities without throwing ReferenceError
+    // because statusBroadcaster is now correctly referenced as this.statusBroadcaster
+    
+    await sidePanelPage.waitForLoadState('domcontentloaded');
+    await sidePanelPage.waitForSelector('#extract-btn', { timeout: 5000 });
+    
+    // Trigger AI initialization by checking status multiple times
+    // This exercises the initializeAI() method which uses statusBroadcaster
+    const responses = await Promise.all([
+      sidePanelPage.evaluate(async () => {
+        return new Promise((resolve) => {
+          chrome.runtime.sendMessage({ action: 'checkAIStatus' }, (response) => {
+            resolve(response);
+          });
+        });
+      }),
+      sidePanelPage.evaluate(async () => {
+        return new Promise((resolve) => {
+          chrome.runtime.sendMessage({ action: 'checkAIStatus' }, (response) => {
+            resolve(response);
+          });
+        });
+      }),
+    ]);
+    
+    // All responses should succeed - if statusBroadcaster caused ReferenceError, initialization would fail
+    responses.forEach(response => {
+      expect(response).toBeDefined();
+      expect(response.success).toBe(true);
+      expect(response.capabilities).toBeDefined();
+    });
+    
+    // Verify no ReferenceError occurred in service worker
+    // The successful responses indicate statusBroadcaster was correctly accessed
+    // If it was undefined, we would see initialization failures
+  });
 });

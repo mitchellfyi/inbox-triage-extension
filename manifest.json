@@ -58,5 +58,19 @@
     "128": "assets/icons/android-icon-144x144.png",
     "144": "assets/icons/android-icon-144x144.png",
     "192": "assets/icons/android-icon-192x192.png"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "utils/*.js",
+        "content/*.js"
+      ],
+      "matches": [
+        "https://mail.google.com/*",
+        "https://outlook.live.com/*",
+        "https://outlook.office.com/*",
+        "https://outlook.office365.com/*"
+      ]
+    }
+  ]
 }

@@ -96,6 +96,13 @@ export class DraftRenderer {
         copyBtn.textContent = 'Copy';
         copyBtn.setAttribute('aria-describedby', `copy-help-${index}`);
 
+        // Create Draft button
+        const createDraftBtn = document.createElement('button');
+        createDraftBtn.type = 'button';
+        createDraftBtn.className = 'create-draft-btn';
+        createDraftBtn.textContent = 'Create Draft';
+        createDraftBtn.setAttribute('aria-describedby', `create-draft-help-${index}`);
+
         // Toggle indicator
         const toggleSpan = document.createElement('span');
         toggleSpan.className = 'draft-toggle';
@@ -108,12 +115,19 @@ export class DraftRenderer {
         helpSpan.className = 'sr-only';
         helpSpan.textContent = 'Copy this reply draft to clipboard';
 
+        const createDraftHelpSpan = document.createElement('span');
+        createDraftHelpSpan.id = `create-draft-help-${index}`;
+        createDraftHelpSpan.className = 'sr-only';
+        createDraftHelpSpan.textContent = 'Create draft in email client';
+
         // Assemble header
         actionsDiv.appendChild(copyBtn);
+        actionsDiv.appendChild(createDraftBtn);
         actionsDiv.appendChild(toggleSpan);
         header.appendChild(title);
         header.appendChild(actionsDiv);
         header.appendChild(helpSpan);
+        header.appendChild(createDraftHelpSpan);
 
         return header;
     }
@@ -156,8 +170,9 @@ export class DraftRenderer {
 
         // Click to toggle
         header.addEventListener('click', (e) => {
-            // Don't toggle if clicking the copy button
-            if (e.target.classList.contains('copy-draft-btn') || e.target.closest('.copy-draft-btn')) {
+            // Don't toggle if clicking the copy or create draft button
+            if (e.target.classList.contains('copy-draft-btn') || e.target.closest('.copy-draft-btn') ||
+                e.target.classList.contains('create-draft-btn') || e.target.closest('.create-draft-btn')) {
                 return;
             }
             toggle();
@@ -178,6 +193,95 @@ export class DraftRenderer {
                 e.stopPropagation();
                 this.copyDraftToClipboard(draftDiv._draftData, copyBtn);
             });
+        }
+
+        // Create Draft button handler
+        const createDraftBtn = header.querySelector('.create-draft-btn');
+        if (createDraftBtn) {
+            createDraftBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.createDraftInEmailUI(draftDiv._draftData, createDraftBtn);
+            });
+        }
+    }
+
+    /**
+     * Create draft in email client (Gmail/Outlook)
+     * @param {Object} draft - Draft object
+     * @param {HTMLElement} buttonElement - Create Draft button element
+     */
+    async createDraftInEmailUI(draft, buttonElement) {
+        try {
+            // Get current tab
+            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (!tabs[0]) {
+                throw new Error('No active tab found');
+            }
+
+            const tabId = tabs[0].id;
+            const url = tabs[0].url || '';
+
+            // Check if we're on Gmail or Outlook
+            const isGmail = url.includes('mail.google.com');
+            const isOutlook = url.includes('outlook.live.com') || 
+                             url.includes('outlook.office.com') || 
+                             url.includes('outlook.office365.com');
+
+            if (!isGmail && !isOutlook) {
+                throw new Error('Please navigate to Gmail or Outlook to create a draft');
+            }
+
+            // Update button state
+            if (buttonElement) {
+                const originalText = buttonElement.textContent;
+                buttonElement.textContent = 'Creating...';
+                buttonElement.disabled = true;
+                buttonElement.setAttribute('aria-label', 'Creating draft in email client...');
+            }
+
+            // Send message to content script to create draft
+            const response = await chrome.tabs.sendMessage(tabId, {
+                action: 'createDraft',
+                draftBody: draft.body
+            });
+
+            if (response && response.success) {
+                if (buttonElement) {
+                    const originalText = buttonElement.textContent;
+                    buttonElement.textContent = 'Created!';
+                    buttonElement.classList.add('create-success');
+                    buttonElement.setAttribute('aria-label', 'Draft created successfully');
+
+                    setTimeout(() => {
+                        buttonElement.textContent = originalText;
+                        buttonElement.classList.remove('create-success');
+                        buttonElement.disabled = false;
+                        buttonElement.setAttribute('aria-label', 'Create draft in email client');
+                    }, 2000);
+                }
+
+                this.updateStatus('✓ Draft created in email client', 'success');
+            } else {
+                throw new Error(response?.error || 'Failed to create draft');
+            }
+        } catch (error) {
+            console.error('Failed to create draft:', error);
+
+            if (buttonElement) {
+                const originalText = buttonElement.textContent;
+                buttonElement.textContent = 'Failed';
+                buttonElement.classList.add('create-error');
+                buttonElement.setAttribute('aria-label', 'Failed to create draft');
+
+                setTimeout(() => {
+                    buttonElement.textContent = originalText;
+                    buttonElement.classList.remove('create-error');
+                    buttonElement.disabled = false;
+                    buttonElement.setAttribute('aria-label', 'Create draft in email client');
+                }, 2000);
+            }
+
+            this.updateStatus(`Failed to create draft: ${error.message}`, 'error');
         }
     }
 

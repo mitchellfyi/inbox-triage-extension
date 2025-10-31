@@ -24,6 +24,7 @@ class InboxTriageSidePanel {
             url: ''
         };
         this.isVisible = document.visibilityState === 'visible';
+        this.isExtracting = false; // Track if extraction is in progress
         
         this.initializeElements();
         
@@ -66,15 +67,19 @@ class InboxTriageSidePanel {
         
         this.bindEvents();
         this.loadUserSettings();
-        this.checkCurrentContext();
-        this.checkInitialStatus();
+        this.checkCurrentContext().then(() => {
+            // Try to restore persisted state after checking context
+            return this.restoreState();
+        }).then(() => {
+            this.checkInitialStatus();
+        });
         
         // Poll for URL changes every 2 seconds
         setInterval(() => {
             this.checkCurrentContext();
         }, 2000);
         
-        // Set up visibility change detection to reset state when panel reopens
+        // Set up visibility change detection to restore state when panel reopens
         this.setupVisibilityTracking();
         
         // Set up global error handlers
@@ -83,7 +88,7 @@ class InboxTriageSidePanel {
     
     /**
      * Setup visibility tracking to detect when side panel is reopened
-     * This allows us to reset state when the extension is closed and reopened
+     * This allows us to restore state when the extension is closed and reopened
      */
     setupVisibilityTracking() {
         document.addEventListener('visibilitychange', () => {
@@ -92,9 +97,11 @@ class InboxTriageSidePanel {
             
             // If the panel was hidden and is now visible (reopened)
             if (wasHidden && this.isVisible) {
-                console.log('Side panel reopened - resetting extraction state');
-                this.resetExtractionState();
-                this.checkCurrentContext();
+                console.log('Side panel reopened - checking for persisted state');
+                this.checkCurrentContext().then(() => {
+                    // Try to restore persisted state
+                    this.restoreState();
+                });
             }
         });
     }
@@ -108,8 +115,8 @@ class InboxTriageSidePanel {
             console.error('Unhandled promise rejection:', event.reason);
             this.updateStatus(`Unexpected error: ${event.reason?.message || event.reason || 'Unknown error'}`, 'error');
             
-            // Re-enable extract button if it's disabled
-            if (this.elements.extractBtn && this.elements.extractBtn.disabled) {
+            // Re-enable extract button if it's disabled (but not if extraction is in progress)
+            if (this.elements.extractBtn && this.elements.extractBtn.disabled && !this.isExtracting) {
                 this.elements.extractBtn.disabled = false;
                 console.log('Extract button re-enabled after unhandled error');
             }
@@ -123,8 +130,8 @@ class InboxTriageSidePanel {
             console.error('Uncaught error:', event.error);
             this.updateStatus(`System error: ${event.error?.message || event.message || 'Unknown error'}`, 'error');
             
-            // Re-enable extract button if it's disabled
-            if (this.elements.extractBtn && this.elements.extractBtn.disabled) {
+            // Re-enable extract button if it's disabled (but not if extraction is in progress)
+            if (this.elements.extractBtn && this.elements.extractBtn.disabled && !this.isExtracting) {
                 this.elements.extractBtn.disabled = false;
                 console.log('Extract button re-enabled after uncaught error');
             }
@@ -188,7 +195,10 @@ class InboxTriageSidePanel {
         }
         
         if (this.currentContext.isOnEmailThread) {
-            extractBtn.disabled = false;
+            // Only enable button if extraction is not in progress
+            if (!this.isExtracting) {
+                extractBtn.disabled = false;
+            }
             // Show extract section if it was hidden due to successful extraction
             if (this.elements.extractSection.classList.contains('hidden') && !this.currentThread) {
                 this.showSection(this.elements.extractSection, false);
@@ -203,15 +213,182 @@ class InboxTriageSidePanel {
      * Reset extraction state and UI to initial state
      * Called when URL changes or panel is reopened
      */
+    /**
+     * Save current state to chrome.storage.local for persistence
+     */
+    async saveState() {
+        try {
+            if (!chrome?.storage?.local) {
+                console.warn('Chrome storage API not available');
+                return;
+            }
+
+            // Only save if we have data to persist
+            if (!this.currentThread && !this.currentSummary && (!this.currentDrafts || this.currentDrafts.length === 0)) {
+                return;
+            }
+
+            const stateToSave = {
+                threadUrl: this.currentContext.url || '',
+                thread: this.currentThread,
+                summary: this.currentSummary,
+                drafts: this.currentDrafts,
+                timestamp: Date.now()
+            };
+
+            await chrome.storage.local.set({ inboxTriageState: stateToSave });
+            console.log('State saved to storage');
+        } catch (error) {
+            console.error('Error saving state:', error);
+        }
+    }
+
+    /**
+     * Restore persisted state from chrome.storage.local if URL matches
+     */
+    async restoreState() {
+        try {
+            if (!chrome?.storage?.local) {
+                console.warn('Chrome storage API not available');
+                return false;
+            }
+
+            // Get current URL
+            const currentUrl = this.currentContext.url || '';
+            
+            // Only restore if we're on an email thread page
+            if (!this.currentContext.isOnEmailThread || !currentUrl) {
+                return false;
+            }
+
+            // Get saved state
+            const result = await chrome.storage.local.get('inboxTriageState');
+            const savedState = result.inboxTriageState;
+
+            if (!savedState) {
+                console.log('No saved state found');
+                return false;
+            }
+
+            // Check if saved state is for the current URL
+            // For Gmail and Outlook, URLs can change slightly (hash, query params) but still be the same thread
+            // We'll match by checking if the thread ID or conversation ID is in the URL
+            const savedUrl = savedState.threadUrl || '';
+            const urlMatches = this.urlsMatch(savedUrl, currentUrl);
+
+            if (!urlMatches) {
+                console.log('Saved state URL does not match current URL - not restoring');
+                return false;
+            }
+
+            // Restore state
+            if (savedState.thread) {
+                this.currentThread = savedState.thread;
+            }
+
+            if (savedState.summary) {
+                this.currentSummary = savedState.summary;
+                
+                // Restore summary display
+                const keyPoints = savedState.thread?.keyPoints || [];
+                this.displaySummary(savedState.summary, keyPoints);
+            }
+
+            if (savedState.drafts && savedState.drafts.length > 0) {
+                this.currentDrafts = savedState.drafts;
+                
+                // Restore drafts display
+                this.displayReplyDrafts(savedState.drafts, true); // Skip translation on restore
+                
+                // Hide controls section since drafts are already generated
+                this.hideSection(this.elements.replyDraftsControlsSection);
+            }
+
+            // Restore attachments if thread was restored
+            if (this.currentThread) {
+                this.displayAttachments();
+            }
+
+            // Update UI to reflect restored state
+            if (this.currentThread) {
+                this.showSection(this.elements.extractSection, false);
+                this.elements.extractBtn.disabled = true; // Disable since thread is already extracted
+            }
+
+            console.log('State restored from storage');
+            this.updateStatus('Restored previous analysis', 'success');
+            
+            return true;
+        } catch (error) {
+            console.error('Error restoring state:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Check if two URLs match (same thread/conversation)
+     * Handles Gmail and Outlook URL variations
+     */
+    urlsMatch(url1, url2) {
+        if (!url1 || !url2) return false;
+        if (url1 === url2) return true;
+
+        // Extract thread/conversation IDs from URLs
+        const extractThreadId = (url) => {
+            // Gmail: https://mail.google.com/mail/u/0/#inbox/thread-id or ?th=thread-id
+            const gmailMatch = url.match(/[#?]th=([^&]+)/);
+            if (gmailMatch) return gmailMatch[1];
+
+            // Outlook: https://outlook.live.com/mail/0/inbox/conversation-id or /mail/id/...
+            const outlookMatch = url.match(/\/(?:conversation|id)\/([^/?#]+)/);
+            if (outlookMatch) return outlookMatch[1];
+
+            return null;
+        };
+
+        const id1 = extractThreadId(url1);
+        const id2 = extractThreadId(url2);
+
+        if (id1 && id2) {
+            return id1 === id2;
+        }
+
+        // Fallback: compare normalized URLs (remove hash, some query params)
+        try {
+            const u1 = new URL(url1);
+            const u2 = new URL(url2);
+            
+            // Remove common query params that don't affect thread identity
+            const paramsToIgnore = ['tab', 'view', 'refreshed'];
+            paramsToIgnore.forEach(param => {
+                u1.searchParams.delete(param);
+                u2.searchParams.delete(param);
+            });
+
+            return u1.origin + u1.pathname + u1.search === u2.origin + u2.pathname + u2.search;
+        } catch {
+            return false;
+        }
+    }
+
     resetExtractionState() {
         // Reset state variables
         this.currentThread = null;
         this.currentDrafts = [];
         this.currentSummary = null;
         
-        // Show extract button again
+        // Clear saved state
+        if (chrome?.storage?.local) {
+            chrome.storage.local.remove('inboxTriageState').catch(err => {
+                console.error('Error clearing saved state:', err);
+            });
+        }
+        
+        // Show extract button again (but keep disabled if extraction is in progress)
         this.showSection(this.elements.extractSection, false);
-        this.elements.extractBtn.disabled = false;
+        if (!this.isExtracting) {
+            this.elements.extractBtn.disabled = false;
+        }
         
         // Hide all result sections
         this.hideSection(this.elements.summarySection);
@@ -492,41 +669,142 @@ class InboxTriageSidePanel {
      * @param {number} tabId - The tab ID to check
      */
     async ensureContentScriptLoaded(tabId) {
-        try {
-            // Try to ping the content script to see if it's loaded
-            const pingResponse = await Promise.race([
-                chrome.tabs.sendMessage(tabId, { action: 'ping' }),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1000))
-            ]);
-            
-            // If we get a response, content script is loaded
-            if (pingResponse) {
-                console.log('Content script already loaded');
-                return;
-            }
-        } catch (error) {
-            // Content script not loaded or not responding, inject it
-            console.log('Content script not responding, injecting...', error.message);
-            
+        // Helper function to ping content script with timeout
+        const pingContentScript = async (timeout = 2000) => {
             try {
-                // Inject the content scripts in order
-                await chrome.scripting.executeScript({
-                    target: { tabId: tabId },
-                    files: ['content/selectors.js']
-                });
+                const response = await Promise.race([
+                    chrome.tabs.sendMessage(tabId, { action: 'ping' }),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeout))
+                ]);
+                return response;
+            } catch (error) {
+                // Return null for any error (timeout, no listener, etc.)
+                return null;
+            }
+        };
+        
+        // First, try to ping existing content script (loaded from manifest)
+        console.log('Checking if content script is loaded...');
+        const existingPing = await pingContentScript(1500);
+        if (existingPing && existingPing.success) {
+            console.log('Content script already loaded and responding');
+            return { reloaded: false };
+        }
+        
+        // Content script not responding - try to reload it
+        console.log('Content script not responding. Attempting to reload content scripts...');
+        
+        try {
+            // Get tab info to check URL
+            const tab = await chrome.tabs.get(tabId);
+            const url = tab.url || '';
+            
+            // Verify we're on a supported email provider
+            const isSupportedEmail = url.includes('mail.google.com') || 
+                                   url.includes('outlook.live.com') || 
+                                   url.includes('outlook.office.com') || 
+                                   url.includes('outlook.office365.com');
+            
+            if (!isSupportedEmail) {
+                throw new Error('Please navigate to Gmail or Outlook to use this extension.');
+            }
+            
+            // Try to reload the content scripts by reloading the page
+            // This is the most reliable way to ensure content scripts are loaded
+            // Note: For Gmail/Outlook web apps, reloading is safe as they preserve state
+            console.log('Reloading page to inject content scripts...');
+            
+            // Update status to inform user about reload
+            // Note: This will only work if updateStatus is available (it should be)
+            if (typeof this.updateStatus === 'function') {
+                this.updateStatus('Reloading page to connect...', 'loading');
+            }
+            
+            await chrome.tabs.reload(tabId);
+            
+            // Wait for page to reload and content script to initialize
+            // Give it time for the page to reload and scripts to load
+            console.log('Waiting for page reload and content script initialization...');
+            
+            // Update status during wait
+            if (typeof this.updateStatus === 'function') {
+                this.updateStatus('Waiting for page to reload...', 'loading');
+            }
+            
+            let pingSuccess = false;
+            const maxAttempts = 12; // More attempts since we need to wait for page reload
+            for (let attempt = 0; attempt < maxAttempts; attempt++) {
+                // Wait longer on first attempt to allow page reload
+                const delay = attempt === 0 ? 2000 : 500 + (attempt * 300);
+                if (attempt > 0) {
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
                 
-                await chrome.scripting.executeScript({
-                    target: { tabId: tabId },
-                    files: ['content/content.js']
-                });
+                try {
+                    const pingResponse = await pingContentScript(2000);
+                    if (pingResponse && pingResponse.success) {
+                        console.log(`Content script verified ready after reload and ${attempt + 1} attempt(s)`);
+                        pingSuccess = true;
+                        break;
+                    }
+                } catch (error) {
+                    // Page might still be reloading, continue waiting
+                    console.log(`Page still reloading or content script initializing (attempt ${attempt + 1})...`);
+                    
+                    // Update status periodically during wait
+                    if (typeof this.updateStatus === 'function' && attempt % 2 === 0) {
+                        this.updateStatus(`Connecting... (attempt ${attempt + 1})`, 'loading');
+                    }
+                }
                 
-                // Wait a bit for initialization
-                await new Promise(resolve => setTimeout(resolve, 500));
+                if (attempt < maxAttempts - 1) {
+                    console.log(`Content script ping attempt ${attempt + 1} failed, waiting and retrying...`);
+                }
+            }
+            
+            if (!pingSuccess) {
+                // Even after reload, content script isn't responding
+                // This is unusual - might be a configuration issue
+                throw new Error('Content script not responding after reload. Please try refreshing the page manually.');
+            }
+            
+            console.log('Content script verified and ready after reload');
+            return { reloaded: true };
+        } catch (error) {
+            console.error('Failed to ensure content script is loaded:', error);
+            
+            // If reload failed (e.g., permission denied), try without reload
+            if (error.message.includes('reload') || error.message.includes('Cannot access')) {
+                console.log('Reload failed, trying to wait for existing content script...');
                 
-                console.log('Content script injected successfully');
-            } catch (injectError) {
-                console.error('Failed to inject content script:', injectError);
-                throw new Error('Could not initialize page connection. Please try refreshing the page.');
+                // Last resort: wait for content script that might be loading
+                let pingSuccess = false;
+                for (let attempt = 0; attempt < 8; attempt++) {
+                    const delay = 500 + (attempt * 400);
+                    if (attempt > 0) {
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                    
+                    const pingResponse = await pingContentScript(2000);
+                    if (pingResponse && pingResponse.success) {
+                        console.log(`Content script verified ready after ${attempt + 1} attempt(s) (no reload)`);
+                        pingSuccess = true;
+                        break;
+                    }
+                    
+                    if (attempt < 7) {
+                        console.log(`Content script ping attempt ${attempt + 1} failed, waiting and retrying...`);
+                    }
+                }
+                
+                if (!pingSuccess) {
+                    throw new Error('Content script not responding. Please refresh the Gmail/Outlook tab and try again.');
+                }
+                
+                return { reloaded: false };
+            } else {
+                // Re-throw the original error
+                throw error;
             }
         }
     }
@@ -543,16 +821,24 @@ class InboxTriageSidePanel {
      */
     async extractCurrentThread() {
         // Prevent multiple simultaneous extractions
-        if (this.elements.extractBtn.disabled) {
+        if (this.elements.extractBtn.disabled || this.isExtracting) {
             return;
         }
         
         let extractionSucceeded = false;
+        this.isExtracting = true; // Mark extraction as in progress
         
         try {
-            // Disable button immediately
+            // Disable button immediately and keep it disabled throughout extraction
             this.elements.extractBtn.disabled = true;
             this.updateStatus('Checking page context...', 'loading');
+            
+            // Ensure button stays disabled (guard against any code that might re-enable it)
+            const ensureButtonDisabled = () => {
+                if (this.isExtracting && !extractionSucceeded) {
+                    this.elements.extractBtn.disabled = true;
+                }
+            };
             
             // Check if we're in an extension context
             if (!chrome?.tabs?.sendMessage) {
@@ -560,6 +846,7 @@ class InboxTriageSidePanel {
             }
             
             this.updateStatus('Locating active email tab...', 'loading');
+            ensureButtonDisabled(); // Ensure button stays disabled
             
             // Get current active tab
             const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -580,11 +867,102 @@ class InboxTriageSidePanel {
             
             const provider = currentUrl.includes('mail.google.com') ? 'Gmail' : 'Outlook';
             this.updateStatus(`Connecting to ${provider}...`, 'loading');
+            ensureButtonDisabled(); // Ensure button stays disabled
             
             console.log('Sending extractThread message to tab:', currentTab.id, 'URL:', currentUrl);
             
             // Ensure content script is loaded before trying to communicate
-            await this.ensureContentScriptLoaded(currentTab.id);
+            // This will automatically reload the page if needed to inject content scripts
+            let connectionResult;
+            try {
+                connectionResult = await this.ensureContentScriptLoaded(currentTab.id);
+                ensureButtonDisabled(); // Ensure button stays disabled after connection
+            } catch (error) {
+                // If connection failed, show helpful error message
+                if (error.message.includes('reload') || error.message.includes('refresh')) {
+                    throw new Error(`${error.message} You can then try extracting the thread again.`);
+                }
+                throw error;
+            }
+            
+            this.updateStatus(`Connected to ${provider}`, 'success');
+            ensureButtonDisabled(); // Ensure button stays disabled
+            
+            // After reload, wait for page to be fully loaded and ready
+            // Only do this if we actually reloaded the page
+            if (connectionResult && connectionResult.reloaded) {
+                this.updateStatus('Waiting for page to finish loading...', 'loading');
+                ensureButtonDisabled(); // Ensure button stays disabled
+                
+                // Wait for tab to finish loading
+                await new Promise((resolve) => {
+                    const checkTabStatus = async () => {
+                        try {
+                            const tab = await chrome.tabs.get(currentTab.id);
+                            if (tab.status === 'complete') {
+                                resolve();
+                            } else {
+                                setTimeout(checkTabStatus, 200);
+                            }
+                        } catch (error) {
+                            // Tab might have been closed or navigated away
+                            resolve(); // Continue anyway
+                        }
+                    };
+                    checkTabStatus();
+                });
+                
+                // Wait a bit more for Gmail/Outlook SPA to initialize
+                this.updateStatus('Waiting for email thread to load...', 'loading');
+                ensureButtonDisabled(); // Ensure button stays disabled
+                await new Promise(resolve => setTimeout(resolve, 1500));
+            }
+            
+            // Verify content script is initialized and page is ready
+            // Retry readiness check multiple times with increasing delays
+            let pageReady = false;
+            const maxReadinessAttempts = 10;
+            
+            for (let attempt = 0; attempt < maxReadinessAttempts; attempt++) {
+                ensureButtonDisabled(); // Ensure button stays disabled during readiness checks
+                
+                try {
+                    const readinessCheck = await chrome.tabs.sendMessage(currentTab.id, { 
+                        action: 'checkPageReady' 
+                    });
+                    
+                    if (readinessCheck && readinessCheck.success && readinessCheck.ready) {
+                        pageReady = true;
+                        console.log(`Page ready after ${attempt + 1} readiness check(s)`);
+                        break;
+                    }
+                    
+                    if (attempt < maxReadinessAttempts - 1) {
+                        // Wait before retrying
+                        const delay = 500 + (attempt * 300);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        
+                        if (typeof this.updateStatus === 'function') {
+                            this.updateStatus(`Waiting for email thread... (${attempt + 1}/${maxReadinessAttempts})`, 'loading');
+                        }
+                    }
+                } catch (readinessError) {
+                    console.log(`Readiness check attempt ${attempt + 1} failed:`, readinessError.message);
+                    
+                    if (attempt < maxReadinessAttempts - 1) {
+                        // Wait before retrying
+                        const delay = 500 + (attempt * 300);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                }
+            }
+            
+            if (!pageReady) {
+                throw new Error('Page is not ready yet. Please wait for the email thread to fully load, then try again.');
+            }
+            
+            this.updateStatus('Page ready, extracting thread...', 'loading');
+            ensureButtonDisabled(); // Ensure button stays disabled
             
             // Send message to content script to extract thread
             let response;
@@ -592,12 +970,14 @@ class InboxTriageSidePanel {
                 response = await chrome.tabs.sendMessage(currentTab.id, { 
                     action: 'extractThread' 
                 });
+                ensureButtonDisabled(); // Ensure button stays disabled during extraction
             } catch (sendError) {
                 console.error('Failed to send message to content script:', sendError);
                 throw new Error('Could not communicate with the page. Try refreshing the Gmail/Outlook tab and try again.');
             }
             
             this.updateStatus('Reading email thread...', 'loading');
+            ensureButtonDisabled(); // Ensure button stays disabled while processing
             console.log('Received response from content script:', response);
             
             if (response && response.success) {
@@ -635,6 +1015,9 @@ class InboxTriageSidePanel {
                 // Mark extraction as successful
                 extractionSucceeded = true;
                 
+                // Save state after successful thread extraction
+                this.saveState();
+                
                 // Show success message (will auto-hide)
                 this.updateStatus('✓ Thread extraction complete', 'success');
             } else {
@@ -648,6 +1031,9 @@ class InboxTriageSidePanel {
             // Ensure button is re-enabled on error
             extractionSucceeded = false;
         } finally {
+            // Mark extraction as complete
+            this.isExtracting = false;
+            
             // Button state management:
             // - If extraction succeeded: button stays disabled and section is hidden
             // - If extraction failed: re-enable button so user can try again
@@ -688,8 +1074,12 @@ class InboxTriageSidePanel {
             
             if (response && response.success) {
                 this.updateStatus('Rendering summary...', 'loading');
+                this.currentSummary = response.summary; // Store summary
                 this.displaySummary(response.summary, response.keyPoints);
                 this.addProcessingIndicator('summarization', response.usedFallback || false);
+                
+                // Save state after displaying summary
+                this.saveState();
                 
                 // Show final status
                 this.updateStatus('✓ Summary generated', 'success');
@@ -709,6 +1099,9 @@ class InboxTriageSidePanel {
         this.elements.summary.textContent = summary;
         this.showSection(this.elements.summarySection);
         
+        // Store summary in instance variable
+        this.currentSummary = summary;
+        
         // Store originals for translation (via TranslationUI module)
         this.translationUI.storeOriginals(summary, keyPoints || []);
         
@@ -723,11 +1116,16 @@ class InboxTriageSidePanel {
                 try {
                     await this.translationUI.translateSummary();
                     await this.translationUI.translateKeyPoints();
+                    // Save state after translation completes
+                    this.saveState();
                 } catch (error) {
                     console.error('Auto-translation failed:', error);
                     // Don't show error to user - just log it
                 }
             }, 100);
+        } else {
+            // Save state if no translation needed
+            this.saveState();
         }
     }
     
@@ -829,6 +1227,11 @@ class InboxTriageSidePanel {
                 this.updateStatus('Validating draft quality...', 'loading');
                 
                 this.currentDrafts = response.drafts;
+                
+                // Hide the controls panel before displaying drafts
+                this.hideSection(this.elements.replyDraftsControlsSection);
+                
+                // Display drafts (which will scroll to them after rendering)
                 this.displayReplyDrafts(response.drafts);
                 this.addProcessingIndicator('drafting', response.usedFallback || false);
                 
@@ -858,8 +1261,21 @@ class InboxTriageSidePanel {
         // Update translation module with current drafts
         this.translationUI.setCurrentDrafts(drafts);
         
+        // Store drafts in instance variable
+        this.currentDrafts = drafts;
+        
         // Render drafts using the draft renderer module
         this.draftRenderer.render(drafts, () => {
+            // Scroll to drafts section after rendering
+            if (this.elements.replyDraftsSection && !this.elements.replyDraftsSection.classList.contains('hidden')) {
+                setTimeout(() => {
+                    this.elements.replyDraftsSection.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'start' 
+                    });
+                }, 50);
+            }
+            
             // Auto-translate if a language is selected (but only on initial render)
             if (!skipTranslation && this.translationUI.translationSettings.targetLanguage !== 'none') {
                 setTimeout(async () => {
@@ -867,11 +1283,16 @@ class InboxTriageSidePanel {
                         await this.translationUI.translateAllDrafts();
                         // Re-render with translated content, but skip further translation
                         this.displayReplyDrafts(drafts, true);
+                        // Save state after translation completes
+                        this.saveState();
                     } catch (error) {
                         console.error('Auto-translation of drafts failed:', error);
                         // Don't show error to user - just log it
                     }
                 }, 100);
+            } else {
+                // Save state if no translation needed or translation was skipped
+                this.saveState();
             }
         });
     }

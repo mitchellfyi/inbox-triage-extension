@@ -115,11 +115,19 @@ npx playwright test && npx playwright show-report
   - Tests service worker initialization
   - Verifies message passing
   - Tests AI capability checks
+  - Verifies statusBroadcaster is properly scoped as instance property (prevents ReferenceError)
   
 - **`tests/content-script.spec.ts`** - Content script and message passing tests
   - Tests content script loading on pages
   - Verifies message passing between components
   - Tests error handling for unknown actions
+  
+- **`tests/extraction-flow.spec.ts`** - Extraction flow improvements and regression tests
+  - Tests service worker initialization without statusBroadcaster ReferenceError
+  - Verifies extract button stays disabled during extraction
+  - Tests content script connection and reload handling
+  - Tests draft panel closing and scrolling after generation
+  - Ensures button disabled state persists through async operations
   
 - **`tests/deeplink.spec.ts`** - Deep-link URL generation tests
   - Tests URL generation with thread metadata
@@ -194,6 +202,32 @@ Check the "Actions" tab in GitHub for CI results and artifacts.
 - Verify extension permissions for headless mode
 - Ensure proper artifact upload configuration
 
+## Regression Testing
+
+The following critical fixes have automated tests to prevent regressions:
+
+### Service Worker Initialization
+- **Issue**: `ReferenceError: statusBroadcaster is not defined` during AI capability initialization
+- **Fix**: Changed `statusBroadcaster` to `this.statusBroadcaster` in `initializeAI()` method
+- **Test**: `tests/service-worker.spec.ts` - "statusBroadcaster is properly scoped as instance property"
+- **Test**: `tests/extraction-flow.spec.ts` - "service worker initializes without statusBroadcaster ReferenceError"
+
+### Extract Button State Management
+- **Issue**: Extract button could be re-enabled during extraction, causing race conditions
+- **Fix**: Added `isExtracting` flag and `ensureButtonDisabled()` helper function
+- **Test**: `tests/extraction-flow.spec.ts` - "extract button stays disabled during entire extraction process"
+- **Test**: `tests/extraction-flow.spec.ts` - "extract button disabled state persists through async operations"
+
+### Content Script Connection
+- **Issue**: Content script not responding, requiring manual page refresh
+- **Fix**: Automatic page reload with retry logic and proper readiness checks
+- **Test**: `tests/extraction-flow.spec.ts` - "content script ping responds immediately even before full initialization"
+
+### Draft Panel Behavior
+- **Issue**: Draft controls panel didn't close after draft generation
+- **Fix**: Hide controls section and scroll to drafts section after generation
+- **Test**: `tests/extraction-flow.spec.ts` - "draft controls panel closes and scrolls to drafts after generation"
+
 ## Contributing Test Changes
 
 When adding new features or modifying existing ones:
@@ -203,3 +237,4 @@ When adding new features or modifying existing ones:
 3. **Update documentation** - Modify this guide if testing process changes
 4. **Test accessibility** - Include keyboard and screen reader tests
 5. **Check CI** - Verify tests pass in automated environment
+6. **Add regression tests** - When fixing bugs, add tests to prevent regressions

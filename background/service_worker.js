@@ -111,7 +111,7 @@ class InboxTriageServiceWorker {
                     console.log('Summarizer API available:', summarizerAvailability);
                     
                     // Broadcast initial model status to side panel if it's open
-                    statusBroadcaster('summarizer', this.aiCapabilities.summarizer);
+                    this.statusBroadcaster('summarizer', this.aiCapabilities.summarizer);
                 } catch (error) {
                     console.error('Error checking Summarizer availability:', error);
                 }
@@ -132,7 +132,7 @@ class InboxTriageServiceWorker {
                     console.log('Language Model API (Prompt API) available:', languageModelAvailability);
                     
                     // Broadcast initial model status to side panel if it's open
-                    statusBroadcaster('promptApi', this.aiCapabilities.promptApi);
+                    this.statusBroadcaster('promptApi', this.aiCapabilities.promptApi);
                 } catch (error) {
                     console.error('Error checking LanguageModel availability:', error);
                 }
@@ -161,7 +161,7 @@ class InboxTriageServiceWorker {
                     }
                     
                     // Broadcast initial model status to side panel if it's open
-                    statusBroadcaster('translator', this.aiCapabilities.translator);
+                    this.statusBroadcaster('translator', this.aiCapabilities.translator);
                 } catch (error) {
                     console.error('Error checking Translator availability:', error);
                 }
@@ -188,11 +188,11 @@ class InboxTriageServiceWorker {
                 console.log('  - chrome://flags/#prompt-api-for-gemini-nano');
                 console.log('  - chrome://flags/#summarization-api-for-gemini-nano');
                 console.log('  - chrome://flags/#translation-api');
-                statusBroadcaster('none', null);
+                this.statusBroadcaster('none', null);
             }
         } catch (error) {
             console.error('Error initializing AI capabilities:', error);
-            statusBroadcaster('error', { error: sanitizeErrorMessage(error.message) });
+            this.statusBroadcaster('error', { error: sanitizeErrorMessage(error.message) });
         }
         
         // Start periodic checks for model availability

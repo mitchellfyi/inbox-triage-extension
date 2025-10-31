@@ -23,10 +23,6 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 - `[blocked]` - Waiting on dependencies or decisions
 - `[done]` - Completed
 
-## Documentation
-
-## Extension Core
-
 ## Attachment Processing
 
 ### File Processing
@@ -45,10 +41,10 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 ## Reply Drafting
 
 ### Enhancement Opportunities
-- `[todo]` Context preservation - Better reference to key points from original thread
-- `[todo]` Customizable signatures - User signature integration options
+- `[done]` ✅ Context preservation - Better reference to key points from original thread (Implemented in `background/api-integrations.js` - `extractThreadContext()` function extracts key points, questions, action items, and decisions; integrated into `createReplyPrompt()` for all AI providers)
+- `[done]` ✅ Customizable signatures - User signature integration options (Implemented in `sidepanel/settings-manager.js` and `utils/validation.js` - Signature input in settings panel, saved to Chrome storage, automatically appended to all generated drafts with proper formatting)
 
-## Side Panel UI (Complete)
+## Side Panel UI
 
 ### Enhancement Opportunities
 - `[todo]` Screen reader testing - Validate with actual assistive technologies (NVDA, JAWS, VoiceOver) (ARIA labels and keyboard navigation implemented, but not tested with actual screen readers)
@@ -64,11 +60,6 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 - `[todo]` Privacy audit - Verify no external network calls (except when using custom API keys)
 
 **Reference**: See [testing.md](./testing.md) for testing guidelines
-
-### Documentation Testing
-- `[todo]` Installation instructions verification - Test setup process works from scratch
-- `[todo]` Link validation sweep - Comprehensive verification of all internal documentation links (partially done - broken links fixed)
-- `[todo]` Code examples validation - Ensure code snippets are accurate and current
 
 ---
 

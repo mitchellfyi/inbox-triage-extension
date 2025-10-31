@@ -204,7 +204,8 @@ const UTILITY_SELECTORS = {
     ]
 };
 
-// Export for use in content script
-if (typeof module !== 'undefined') {
-    module.exports = { EMAIL_SELECTORS, getSelectorsForCurrentSite, UTILITY_SELECTORS };
-}
+// Expose globally for use in content script
+// (content.js uses getSelectorsForCurrentSite as a global)
+window.getSelectorsForCurrentSite = getSelectorsForCurrentSite;
+window.EMAIL_SELECTORS = EMAIL_SELECTORS;
+window.UTILITY_SELECTORS = UTILITY_SELECTORS;

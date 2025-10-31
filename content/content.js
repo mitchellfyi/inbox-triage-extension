@@ -6,35 +6,108 @@
  * Reference: AGENTS.md - Content Script Layer architecture
  */
 
-import { cleanText, extractEmailFromText } from '../utils/text-cleaner.js';
-import { parseTimestamp, normalizeTimestamp, parseRelativeTime } from '../utils/timestamp-parser.js';
-import { createThreadObserver } from './mutation-observer.js';
-import { setupUrlChangeMonitor } from './url-monitor.js';
-import { detectUITheme } from '../utils/ui-theme-detector.js';
+console.log('Inbox Triage: Content script starting to load...');
+
+// Content scripts in MV3 can't use ES modules, so we use dynamic imports
+let cleanText, extractEmailFromText, parseTimestamp, normalizeTimestamp, parseRelativeTime;
+let createThreadObserver, setupUrlChangeMonitor, detectUITheme;
+
+// Global instance reference - set up immediately so message listener can access it
+let globalExtractorInstance = null;
+
+// Set up message listener IMMEDIATELY so ping works even before initialization
+// This is critical for the side panel to detect content script presence
+try {
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        console.log('Inbox Triage: Message received:', message.action);
+        
+        // Handle ping immediately, even if extractor not initialized
+        if (message.action === 'ping') {
+            console.log('Inbox Triage: Ping received, responding immediately');
+            sendResponse({ success: true, ready: true });
+            return true;
+        }
+        
+        // For other messages, delegate to extractor instance
+        if (globalExtractorInstance) {
+            return globalExtractorInstance.handleMessage(message, sender, sendResponse);
+        }
+        
+        // Extractor not initialized yet
+        console.warn('Inbox Triage: Message received but extractor not initialized');
+        sendResponse({ success: false, error: 'Content script not initialized yet' });
+        return true;
+    });
+    
+    console.log('Inbox Triage: Message listener registered');
+} catch (error) {
+    console.error('Inbox Triage: Failed to set up message listener:', error);
+}
+
+// Load utility modules dynamically
+(async function loadUtilities() {
+    try {
+        const textCleaner = await import(chrome.runtime.getURL('utils/text-cleaner.js'));
+        cleanText = textCleaner.cleanText;
+        extractEmailFromText = textCleaner.extractEmailFromText;
+        
+        const timestampParser = await import(chrome.runtime.getURL('utils/timestamp-parser.js'));
+        parseTimestamp = timestampParser.parseTimestamp;
+        normalizeTimestamp = timestampParser.normalizeTimestamp;
+        parseRelativeTime = timestampParser.parseRelativeTime;
+        
+        const mutationObserver = await import(chrome.runtime.getURL('content/mutation-observer.js'));
+        createThreadObserver = mutationObserver.createThreadObserver;
+        
+        const urlMonitor = await import(chrome.runtime.getURL('content/url-monitor.js'));
+        setupUrlChangeMonitor = urlMonitor.setupUrlChangeMonitor;
+        
+        const uiThemeDetector = await import(chrome.runtime.getURL('utils/ui-theme-detector.js'));
+        detectUITheme = uiThemeDetector.detectUITheme;
+        
+        console.log('Inbox Triage: Utility modules loaded');
+    } catch (error) {
+        console.error('Inbox Triage: Failed to load utility modules:', error);
+    }
+})();
 
 class EmailThreadExtractor {
     constructor() {
+        // Check if getSelectorsForCurrentSite is available
+        if (typeof getSelectorsForCurrentSite !== 'function') {
+            console.error('Inbox Triage: getSelectorsForCurrentSite not available - selectors.js may not have loaded');
+            this.siteConfig = null;
+            this.isInitialized = false;
+            return;
+        }
+        
         this.siteConfig = getSelectorsForCurrentSite();
         this.isInitialized = false;
         this.mutationObserver = null;
         this.observerTimeout = null;
+        // Wait for utilities to load before initializing
         this.init();
     }
     
-    init() {
+    async init() {
         if (!this.siteConfig) {
             console.log('Inbox Triage: Unsupported email provider on', window.location.hostname);
             return;
         }
         
+        // Wait for utility modules to load
+        let retries = 0;
+        while ((!cleanText || !createThreadObserver || !setupUrlChangeMonitor || !detectUITheme) && retries < 50) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            retries++;
+        }
+        
+        if (!cleanText || !createThreadObserver || !setupUrlChangeMonitor || !detectUITheme) {
+            console.error('Inbox Triage: Utility modules not loaded, some features may not work');
+        }
+        
         console.log(`Inbox Triage: Content script initialized for ${this.siteConfig.provider} on ${window.location.href}`);
         this.isInitialized = true;
-        
-        // Listen for messages from side panel
-        chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-            this.handleMessage(message, sender, sendResponse);
-            return true; // Keep message channel open for async responses
-        });
         
         // Initialize MutationObserver for dynamic content handling
         this.setupMutationObserver();
@@ -49,6 +122,10 @@ class EmailThreadExtractor {
      */
     setupMutationObserver() {
         if (!this.siteConfig) return;
+        if (!createThreadObserver) {
+            console.warn('Inbox Triage: createThreadObserver not loaded yet');
+            return;
+        }
         
         const { selectors } = this.siteConfig;
         
@@ -94,6 +171,11 @@ class EmailThreadExtractor {
      * Gmail and Outlook use pushState/replaceState for navigation
      */
     setupUrlChangeListener() {
+        if (!setupUrlChangeMonitor) {
+            console.warn('Inbox Triage: setupUrlChangeMonitor not loaded yet');
+            return;
+        }
+        
         this.urlChangeCleanup = setupUrlChangeMonitor((newUrl) => {
             this.handleUrlChange();
         });
@@ -269,7 +351,7 @@ class EmailThreadExtractor {
                 if (!message.content) continue;
                 
                 // Create a normalized version for duplicate detection
-                const normalizedContent = cleanText(message.content).toLowerCase();
+                const normalizedContent = cleanText ? cleanText(message.content).toLowerCase() : message.content.toLowerCase();
                 
                 // Skip if we've seen this content before (duplicate removal)
                 if (seenContent.has(normalizedContent)) {
@@ -312,7 +394,7 @@ class EmailThreadExtractor {
             
             // Final cleanup and trimming
             combinedText = combinedText.replace(/\n\n---\n\n$/, ''); // Remove trailing separator
-            combinedText = cleanText(combinedText);
+            combinedText = cleanText ? cleanText(combinedText) : combinedText.trim();
             
             // Ensure we don't exceed the limit after cleanup
             if (combinedText.length > 50000) {
@@ -342,13 +424,14 @@ class EmailThreadExtractor {
                 return null;
             }
             
-            // Detect UI theme and view mode
-            const uiConfig = detectUITheme(this.siteConfig.provider);
+            // Detect UI theme and view mode  
+            const uiConfig = detectUITheme ? detectUITheme(this.siteConfig.provider) : { theme: 'light', viewMode: 'default', density: 'default' };
             
-            return {
+            const threadData = {
                 provider: this.siteConfig.provider,
                 subject: this.extractSubject(),
                 messages: this.extractMessages(),
+                attachments: this.extractAttachments(),
                 extractedAt: new Date().toISOString(),
                 url: window.location.href,
                 uiTheme: uiConfig.theme,
@@ -374,7 +457,7 @@ class EmailThreadExtractor {
         }
         
         if (subjectElement) {
-            return cleanText(subjectElement.textContent);
+            return cleanText ? cleanText(subjectElement.textContent) : subjectElement.textContent.trim();
         }
         
         return null;
@@ -423,9 +506,9 @@ class EmailThreadExtractor {
         // This ensures proper thread ordering even with nested structures
         messages.sort((a, b) => {
             // If we have timestamps, use them
-            if (a.timestamp && b.timestamp) {
-                const timeA = parseTimestamp(a.timestamp);
-                const timeB = parseTimestamp(b.timestamp);
+                if (a.timestamp && b.timestamp) {
+                    const timeA = parseTimestamp ? parseTimestamp(a.timestamp) : null;
+                    const timeB = parseTimestamp ? parseTimestamp(b.timestamp) : null;
                 if (timeA && timeB) {
                     return timeA - timeB;
                 }
@@ -542,7 +625,7 @@ class EmailThreadExtractor {
             bodyElement = messageElement.querySelector(selectors.messageBodyAlt);
         }
         
-        const content = bodyElement ? cleanText(bodyElement.textContent) : '';
+        const content = bodyElement ? (cleanText ? cleanText(bodyElement.textContent) : bodyElement.textContent.trim()) : '';
         
         if (!content) {
             return null;
@@ -577,7 +660,7 @@ class EmailThreadExtractor {
         for (const selector of contentSelectors) {
             const element = document.querySelector(selector);
             if (element) {
-                const content = cleanText(element.textContent);
+                const content = cleanText ? cleanText(element.textContent) : element.textContent.trim();
                 if (content && content.length > 20) { // Minimum content threshold
                     return {
                         index: 0,
@@ -635,7 +718,7 @@ class EmailThreadExtractor {
             let name = '';
             const nameEl = attachmentElement.querySelector(selectors.attachmentNames);
             if (nameEl) {
-                name = cleanText(nameEl.textContent);
+                name = cleanText ? cleanText(nameEl.textContent) : nameEl.textContent.trim();
             }
             
             // Extract attachment link
@@ -649,7 +732,7 @@ class EmailThreadExtractor {
             let size = '';
             const sizeEl = attachmentElement.querySelector(selectors.attachmentSizes);
             if (sizeEl) {
-                size = cleanText(sizeEl.textContent);
+                size = cleanText ? cleanText(sizeEl.textContent) : sizeEl.textContent.trim();
             }
             
             // Skip if no name or download URL
@@ -753,14 +836,14 @@ class EmailThreadExtractor {
         // Extract sender name
         const senderNameEl = messageElement.querySelector(selectors.senderName || selectors.sender);
         if (senderNameEl) {
-            senderName = cleanText(senderNameEl.textContent);
+            senderName = cleanText ? cleanText(senderNameEl.textContent) : senderNameEl.textContent.trim();
         }
         
         // Extract sender email if available
         const senderEmailEl = messageElement.querySelector(selectors.senderEmail || selectors.sender);
         if (senderEmailEl) {
             const emailAttr = senderEmailEl.getAttribute('email');
-            senderEmail = emailAttr || extractEmailFromText(senderEmailEl.textContent);
+            senderEmail = emailAttr || (extractEmailFromText ? extractEmailFromText(senderEmailEl.textContent) : '');
         }
         
         return {
@@ -784,7 +867,7 @@ class EmailThreadExtractor {
             // Strategy 1: Try title attribute first (often contains full datetime)
             const title = timestampEl.getAttribute('title');
             if (title && title.trim().length > 0) {
-                return normalizeTimestamp(title);
+                return normalizeTimestamp ? normalizeTimestamp(title) : title;
             }
             
             // Strategy 2: Check data attributes for timestamp
@@ -792,13 +875,13 @@ class EmailThreadExtractor {
                                  timestampEl.getAttribute('data-time') ||
                                  timestampEl.getAttribute('datetime');
             if (dataTimestamp && dataTimestamp.trim().length > 0) {
-                return normalizeTimestamp(dataTimestamp);
+                return normalizeTimestamp ? normalizeTimestamp(dataTimestamp) : dataTimestamp;
             }
             
             // Strategy 3: Extract from text content
             const textContent = timestampEl.textContent;
             if (textContent && textContent.trim().length > 0) {
-                return normalizeTimestamp(textContent);
+                return normalizeTimestamp ? normalizeTimestamp(textContent) : textContent.trim();
             }
             
             // Strategy 4: Check parent element for timestamp attributes
@@ -807,7 +890,7 @@ class EmailThreadExtractor {
                 const parentTimestamp = parent.getAttribute('title') || 
                                        parent.getAttribute('data-timestamp');
                 if (parentTimestamp && parentTimestamp.trim().length > 0) {
-                    return normalizeTimestamp(parentTimestamp);
+                    return normalizeTimestamp ? normalizeTimestamp(parentTimestamp) : parentTimestamp;
                 }
             }
         }
@@ -819,9 +902,9 @@ class EmailThreadExtractor {
             if (altTimestamp) {
                 const altTitle = altTimestamp.getAttribute('title');
                 if (altTitle) {
-                    return normalizeTimestamp(altTitle);
+                    return normalizeTimestamp ? normalizeTimestamp(altTitle) : altTitle;
                 }
-                return normalizeTimestamp(altTimestamp.textContent);
+                return normalizeTimestamp ? normalizeTimestamp(altTimestamp.textContent) : altTimestamp.textContent.trim();
             }
         } else if (this.siteConfig.provider === 'outlook') {
             // Outlook timestamp variations based on version
@@ -858,11 +941,11 @@ class EmailThreadExtractor {
                     const altTitle = altTimestamp.getAttribute('title') || 
                                    altTimestamp.getAttribute('aria-label');
                     if (altTitle) {
-                        return normalizeTimestamp(altTitle);
+                        return normalizeTimestamp ? normalizeTimestamp(altTitle) : altTitle;
                     }
                     const textContent = altTimestamp.textContent;
                     if (textContent && textContent.trim().length > 0) {
-                        return normalizeTimestamp(textContent);
+                        return normalizeTimestamp ? normalizeTimestamp(textContent) : textContent.trim();
                     }
                 }
             }
@@ -972,16 +1055,27 @@ class EmailThreadExtractor {
     }
 }
 
-// Global instance reference for the global function
-let globalExtractorInstance = null;
-
 // Initialize the extractor when the page loads
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        globalExtractorInstance = new EmailThreadExtractor();
-    });
-} else {
-    globalExtractorInstance = new EmailThreadExtractor();
+try {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Inbox Triage: DOMContentLoaded, creating extractor instance');
+            try {
+                globalExtractorInstance = new EmailThreadExtractor();
+            } catch (error) {
+                console.error('Inbox Triage: Failed to create extractor instance:', error);
+            }
+        });
+    } else {
+        console.log('Inbox Triage: Document already loaded, creating extractor instance');
+        try {
+            globalExtractorInstance = new EmailThreadExtractor();
+        } catch (error) {
+            console.error('Inbox Triage: Failed to create extractor instance:', error);
+        }
+    }
+} catch (error) {
+    console.error('Inbox Triage: Failed to initialize extractor:', error);
 }
 
 /**
