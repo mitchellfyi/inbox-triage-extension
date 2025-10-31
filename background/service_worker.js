@@ -6,6 +6,8 @@
 import { TranslationService } from './translation-service.js';
 import { MultimodalAnalysisService } from './multimodal-service.js';
 import { sanitizeErrorMessage } from '../utils/error-handler.js';
+import { createStatusBroadcaster } from '../utils/status-utils.js';
+import { createSuccessResponse, createErrorResponseForService } from '../utils/response-utils.js';
 import { validateDraftsSchema, validateAndFormatDrafts } from '../utils/validation.js';
 import { OpenAIAPI, AnthropicAPI, GoogleAIAPI, createSystemPrompt, createReplyPrompt } from './api-integrations.js';
 import { SummaryService } from './summary-service.js';
@@ -22,12 +24,18 @@ class InboxTriageServiceWorker {
             available: false
         };
         
-        // Initialize services
+        // Initialize services with standardized status broadcaster
+        // Reference: utils/status-utils.js - createStatusBroadcaster for status update patterns
+        const statusBroadcaster = createStatusBroadcaster(chrome.runtime.sendMessage.bind(chrome.runtime));
+        
+        // Store broadcaster for use in broadcastModelStatus method (backward compatibility)
+        this.statusBroadcaster = statusBroadcaster;
+        
         this.translationService = new TranslationService();
         this.multimodalService = new MultimodalAnalysisService();
         this.summaryService = new SummaryService({
             aiCapabilities: this.aiCapabilities,
-            broadcastModelStatus: (type, capabilities) => this.broadcastModelStatus(type, capabilities),
+            broadcastModelStatus: statusBroadcaster,
             shouldUseCloudFallback: (operation, processingMode, thread) => this.shouldUseCloudFallback(operation, processingMode, thread)
         });
         this.draftService = new DraftService({
@@ -103,7 +111,7 @@ class InboxTriageServiceWorker {
                     console.log('Summarizer API available:', summarizerAvailability);
                     
                     // Broadcast initial model status to side panel if it's open
-                    this.broadcastModelStatus('summarizer', this.aiCapabilities.summarizer);
+                    statusBroadcaster('summarizer', this.aiCapabilities.summarizer);
                 } catch (error) {
                     console.error('Error checking Summarizer availability:', error);
                 }
@@ -124,7 +132,7 @@ class InboxTriageServiceWorker {
                     console.log('Language Model API (Prompt API) available:', languageModelAvailability);
                     
                     // Broadcast initial model status to side panel if it's open
-                    this.broadcastModelStatus('promptApi', this.aiCapabilities.promptApi);
+                    statusBroadcaster('promptApi', this.aiCapabilities.promptApi);
                 } catch (error) {
                     console.error('Error checking LanguageModel availability:', error);
                 }
@@ -153,7 +161,7 @@ class InboxTriageServiceWorker {
                     }
                     
                     // Broadcast initial model status to side panel if it's open
-                    this.broadcastModelStatus('translator', this.aiCapabilities.translator);
+                    statusBroadcaster('translator', this.aiCapabilities.translator);
                 } catch (error) {
                     console.error('Error checking Translator availability:', error);
                 }
@@ -180,11 +188,11 @@ class InboxTriageServiceWorker {
                 console.log('  - chrome://flags/#prompt-api-for-gemini-nano');
                 console.log('  - chrome://flags/#summarization-api-for-gemini-nano');
                 console.log('  - chrome://flags/#translation-api');
-                this.broadcastModelStatus('none', null);
+                statusBroadcaster('none', null);
             }
         } catch (error) {
             console.error('Error initializing AI capabilities:', error);
-            this.broadcastModelStatus('error', { error: sanitizeErrorMessage(error.message) });
+            statusBroadcaster('error', { error: sanitizeErrorMessage(error.message) });
         }
         
         // Start periodic checks for model availability
@@ -245,7 +253,7 @@ class InboxTriageServiceWorker {
                         this.aiCapabilities.summarizer.available !== newAvailability) {
                         
                         this.aiCapabilities.summarizer = newCapabilities;
-                        this.broadcastModelStatus('summarizer', newCapabilities);
+                        this.statusBroadcaster('summarizer', newCapabilities);
                         hasUpdates = true;
                     }
                 } catch (error) {
@@ -264,7 +272,7 @@ class InboxTriageServiceWorker {
                         this.aiCapabilities.promptApi.available !== newAvailability) {
                         
                         this.aiCapabilities.promptApi = newCapabilities;
-                        this.broadcastModelStatus('promptApi', newCapabilities);
+                        this.statusBroadcaster('promptApi', newCapabilities);
                         hasUpdates = true;
                     }
                 } catch (error) {
@@ -478,20 +486,15 @@ class InboxTriageServiceWorker {
                 targetLanguage
             });
             
-            sendResponse({
-                success: true,
+            sendResponse(createSuccessResponse({
                 translatedText,
                 sourceLanguage,
                 targetLanguage
-            });
+            }));
             
         } catch (error) {
             console.error('Translation error:', error);
-            const sanitizedError = sanitizeErrorMessage(error.message);
-            sendResponse({
-                success: false,
-                error: sanitizedError
-            });
+            sendResponse(createErrorResponseForService(error, 'Translation'));
         }
     }
     
@@ -551,25 +554,13 @@ class InboxTriageServiceWorker {
                 analysisType
             });
             
-            sendResponse({
-                success: true,
+            sendResponse(createSuccessResponse({
                 analysis: result
-            });
+            }));
             
         } catch (error) {
             console.error('Image analysis error:', error);
-            const sanitizedError = sanitizeErrorMessage(error.message);
-            
-            // Broadcast error status
-            this.broadcastModelStatus('multimodal', { 
-                status: 'error',
-                error: sanitizedError
-            });
-            
-            sendResponse({
-                success: false,
-                error: sanitizedError
-            });
+            sendResponse(createErrorResponseForService(error, 'Image analysis'));
         }
     }
     

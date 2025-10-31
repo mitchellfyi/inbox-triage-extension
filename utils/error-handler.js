@@ -94,6 +94,9 @@ export function sanitizeErrorMessage(errorMessage) {
 /**
  * Create a user-friendly error object for API responses
  * 
+ * This is a convenience function that creates standardized error responses.
+ * For more control, use createErrorResponseForService from response-utils.js.
+ * 
  * @param {Error|string} error - Error object or error message string
  * @param {string} context - Additional context about where the error occurred
  * @returns {Object} Error response object with sanitized message
@@ -106,5 +109,36 @@ export function createErrorResponse(error, context = '') {
         success: false,
         error: context ? `${context}: ${sanitized}` : sanitized
     };
+}
+
+/**
+ * Handle error and create standardized response for service methods
+ * 
+ * This is a convenience wrapper that catches errors and creates standardized
+ * error responses. For more advanced error handling, use response-utils.js.
+ * 
+ * Reference: utils/response-utils.js - withErrorHandling for advanced patterns
+ * 
+ * @param {Error} error - Error object
+ * @param {string} context - Context about where the error occurred
+ * @param {Function} sendResponse - Optional response callback function
+ * @returns {Object} Standardized error response object
+ */
+export function handleServiceError(error, context = '', sendResponse = null) {
+    const message = error instanceof Error ? error.message : String(error);
+    const sanitized = sanitizeErrorMessage(message);
+    const errorMessage = context ? `${context}: ${sanitized}` : sanitized;
+    
+    const response = {
+        success: false,
+        error: errorMessage
+    };
+    
+    // If sendResponse callback provided, call it
+    if (sendResponse && typeof sendResponse === 'function') {
+        sendResponse(response);
+    }
+    
+    return response;
 }
 

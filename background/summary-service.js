@@ -7,6 +7,8 @@
  */
 
 import { sanitizeErrorMessage } from '../utils/error-handler.js';
+import { createSuccessResponse, createErrorResponseForService } from '../utils/response-utils.js';
+import { broadcastOperationStatus, StatusStages } from '../utils/status-utils.js';
 import { OpenAIAPI, AnthropicAPI, GoogleAIAPI } from './api-integrations.js';
 
 /**
@@ -98,7 +100,7 @@ export class SummaryService {
             }
             
             // Broadcast progress update
-            this.broadcastModelStatus('summarizing', { stage: 'generating_tldr' });
+            broadcastOperationStatus(this.broadcastModelStatus, 'summarizing', StatusStages.GENERATING_TLDR);
             
             // Create TL;DR summarizer session - matching docs exactly
             // Reference: https://developer.chrome.com/docs/ai/summarizer-api
@@ -119,7 +121,7 @@ export class SummaryService {
             tldrSummarizer.destroy();
             
             // Broadcast progress update
-            this.broadcastModelStatus('summarizing', { stage: 'generating_key_points' });
+            broadcastOperationStatus(this.broadcastModelStatus, 'summarizing', StatusStages.GENERATING_KEY_POINTS);
             
             let keyPoints = [];
             
@@ -149,30 +151,22 @@ export class SummaryService {
             }
             
             // Broadcast completion
-            this.broadcastModelStatus('summarizing', { stage: 'completed' });
+            broadcastOperationStatus(this.broadcastModelStatus, 'summarizing', StatusStages.COMPLETED);
             
-            sendResponse({
-                success: true,
-                summary: summary,
-                keyPoints: keyPoints,
-                usedFallback: usedFallback
-            });
+            sendResponse(createSuccessResponse(
+                { summary, keyPoints },
+                { usedFallback: usedFallback }
+            ));
             
         } catch (error) {
             console.error('Summary generation error:', error);
             
-            // Sanitize error message for user display
-            const sanitizedError = sanitizeErrorMessage(error.message);
-            
-            this.broadcastModelStatus('summarizing', { 
-                stage: 'error', 
-                error: sanitizedError
+            // Broadcast error status
+            broadcastOperationStatus(this.broadcastModelStatus, 'summarizing', StatusStages.ERROR, {
+                error: sanitizeErrorMessage(error.message)
             });
             
-            sendResponse({
-                success: false,
-                error: sanitizedError
-            });
+            sendResponse(createErrorResponseForService(error, 'Summary generation'));
         }
     }
 
@@ -220,20 +214,14 @@ export class SummaryService {
                     throw new Error(`Unsupported API provider: ${provider}`);
             }
             
-            sendResponse({
-                success: true,
-                summary: summary,
-                keyPoints: keyPoints,
-                usedFallback: true // Indicate external API was used
-            });
+            sendResponse(createSuccessResponse(
+                { summary, keyPoints },
+                { usedFallback: true } // Indicate external API was used
+            ));
             
         } catch (error) {
             console.error('External API summary generation error:', error);
-            const sanitizedError = sanitizeErrorMessage(error.message);
-            sendResponse({
-                success: false,
-                error: `External API error: ${sanitizedError}`
-            });
+            sendResponse(createErrorResponseForService(error, 'External API summary generation'));
         }
     }
 

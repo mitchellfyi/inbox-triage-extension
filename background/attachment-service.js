@@ -7,6 +7,7 @@
  */
 
 import { sanitizeErrorMessage } from '../utils/error-handler.js';
+import { createSuccessResponse, createErrorResponseForService } from '../utils/response-utils.js';
 
 /**
  * Attachment Processing Service
@@ -61,36 +62,35 @@ export class AttachmentService {
             }
             
             // Generate summary using Summarizer API
+            // Only generate AI summary if we extracted actual text content (not informative messages)
             let summary = '';
-            if (processedContent && this.aiCapabilities.summarizer?.available === 'readily') {
-                summary = await this.generateAttachmentSummary(processedContent, attachment);
+            const hasExtractedText = processedContent && 
+                                    processedContent.length > 100 && 
+                                    processedContent.startsWith('Extracted text from');
+            
+            if (hasExtractedText && this.aiCapabilities.summarizer?.available === 'readily') {
+                // Extract just the text portion (remove the "Extracted text from..." prefix)
+                const textMatch = processedContent.match(/Extracted text from .+:\n\n(.+)/s);
+                const textContent = textMatch ? textMatch[1] : processedContent;
+                summary = await this.generateAttachmentSummary(textContent, attachment);
             } else {
-                summary = `${attachment.name} (${attachment.type.toUpperCase()}) - Local processing capabilities coming soon.`;
+                // Use processed content as summary (includes informative messages for DOCX/XLSX)
+                summary = processedContent || `${attachment.name} (${attachment.type.toUpperCase()}) - Processing completed.`;
             }
             
-            sendResponse({
-                success: true,
+            sendResponse(createSuccessResponse({
                 attachment: {
                     ...attachment,
                     extractedContent: processedContent,
                     summary: summary,
                     processed: true
                 }
-            });
+            }));
             
         } catch (error) {
             console.error('Attachment processing error:', error);
             
-            const sanitizedError = sanitizeErrorMessage(error.message);
-            sendResponse({
-                success: false,
-                error: sanitizedError,
-                attachment: {
-                    ...attachment,
-                    summary: `Error processing ${attachment.name}: ${sanitizedError}`,
-                    processed: false
-                }
-            });
+            sendResponse(createErrorResponseForService(error, 'Attachment processing'));
         }
     }
 
@@ -147,49 +147,312 @@ export class AttachmentService {
     /**
      * Process document attachment (PDF, DOCX, XLSX)
      * 
-     * STATUS: Planned - Requires file parsing libraries (not yet implemented)
-     * 
-     * Document parsing requires integration of file parsing libraries:
-     * - PDF.js for PDF text extraction
-     * - mammoth.js for Word document (.docx) parsing
-     * - SheetJS for spreadsheet (.xlsx) data extraction
-     * 
-     * Current implementation: Returns informative message explaining current
-     * capabilities and planned features. Users can view attachment metadata
-     * and access files via the attachment card UI.
-     * 
-     * Privacy: All file processing must occur on-device per docs/spec.md requirements.
-     * No attachment content should be transmitted to external services.
-     * 
-     * Future implementation steps:
-     * 1. Integrate file parsing libraries (must be compatible with extension constraints)
-     * 2. Fetch document blob from attachment.downloadUrl
-     * 3. Extract text content using appropriate library
-     * 4. Return extracted text for AI summarization
-     * 5. Generate summaries using Summarizer API
-     * 
      * Reference: docs/spec.md - Attachment Content Processing requirements
-     * Reference: docs/todo.md - Implementation roadmap
+     * Reference: docs/chrome-ai-api-compliance.md - Chrome AI API patterns
      * 
-     * @param {Object} attachment - Document attachment metadata
-     * @returns {string} Informative message about current status and future plans
+     * This method fetches document files and attempts to extract text content
+     * for AI summarization. Implementation uses native browser APIs where possible.
+     * 
+     * Processing strategy:
+     * - PDF: Attempts basic text extraction using native APIs (limited success for complex PDFs)
+     * - DOCX: Requires parsing library (mammoth.js) - currently documents limitation
+     * - XLSX: Requires parsing library (SheetJS) - currently documents limitation
+     * 
+     * Privacy: All file processing occurs on-device per docs/spec.md requirements.
+     * No attachment content is transmitted to external services.
+     * 
+     * @param {Object} attachment - Document attachment metadata with downloadUrl
+     * @returns {Promise<string>} Extracted text content or informative message
+     * @throws {Error} If file fetching or processing fails
      */
     async processDocumentAttachment(attachment) {
         try {
-            const typeMap = {
-                'pdf': 'PDF text extraction',
-                'docx': 'Word document text extraction', 
-                'xlsx': 'Spreadsheet data extraction'
-            };
+            // Validate attachment has download URL
+            if (!attachment.downloadUrl) {
+                throw new Error(`No download URL available for ${attachment.name}`);
+            }
+
+            // Fetch file blob
+            const fileBlob = await this.fetchAttachmentFile(attachment.downloadUrl);
             
-            const description = typeMap[attachment.type] || 'Document processing';
-            // Document parsing is planned but not yet implemented
-            // Users will see this message when documents are detected
-            return `${description} for ${attachment.name}\n\nStatus: Document parsing is planned but not yet available.\n\nFor now, you can:\n• View attachment metadata (name, size, type)\n• Use the attachment card to access the file\n\nFuture updates will include:\n• PDF text extraction\n• Word document parsing\n• Spreadsheet data extraction\n• AI-powered document summaries\n\nSee docs/todo.md for implementation roadmap.`;
+            // Process based on file type
+            switch (attachment.type) {
+                case 'pdf':
+                    return await this.extractPDFText(fileBlob, attachment);
+                    
+                case 'docx':
+                    return await this.extractDOCXText(fileBlob, attachment);
+                    
+                case 'xlsx':
+                    return await this.extractXLSXText(fileBlob, attachment);
+                    
+                default:
+                    throw new Error(`Unsupported document type: ${attachment.type}`);
+            }
             
         } catch (error) {
             console.error('Document processing error:', error);
-            return `Error processing document: ${error.message}`;
+            throw new Error(`Failed to process ${attachment.name}: ${error.message}`);
+        }
+    }
+
+    /**
+     * Fetch attachment file from download URL
+     * 
+     * Reference: docs/spec.md - Attachment Content Processing requirements
+     * 
+     * Fetches file blob from attachment download URL. Handles CORS and authentication
+     * errors gracefully. Service worker context allows cross-origin requests.
+     * 
+     * @param {string} downloadUrl - URL to fetch attachment from
+     * @returns {Promise<Blob>} File blob
+     * @throws {Error} If fetch fails or returns non-OK status
+     */
+    async fetchAttachmentFile(downloadUrl) {
+        try {
+            // Validate URL
+            if (!downloadUrl || typeof downloadUrl !== 'string') {
+                throw new Error('Invalid download URL');
+            }
+
+            // Fetch file with proper headers
+            const response = await fetch(downloadUrl, {
+                method: 'GET',
+                credentials: 'include', // Include cookies for authenticated requests
+                redirect: 'follow'
+            });
+
+            // Check response status
+            if (!response.ok) {
+                throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+            }
+
+            // Get blob
+            const blob = await response.blob();
+            
+            if (!blob || blob.size === 0) {
+                throw new Error('Empty file received');
+            }
+
+            return blob;
+
+        } catch (error) {
+            console.error('File fetch error:', error);
+            throw new Error(`Unable to download file: ${error.message}`);
+        }
+    }
+
+    /**
+     * Extract text from PDF file
+     * 
+     * Reference: docs/spec.md - Attachment Content Processing requirements
+     * Reference: docs/chrome-ai-api-compliance.md - Chrome AI API patterns
+     * 
+     * ATTEMPT: Uses native browser APIs to extract text from PDF files.
+     * LIMITATION: Native text extraction has limited success with complex PDFs.
+     * For full PDF support, PDF.js library would be required but conflicts with
+     * project "no external dependencies" constraint.
+     * 
+     * Current implementation:
+     * - Attempts to read PDF as text (works for text-based PDFs)
+     * - Falls back to informative message for binary/complex PDFs
+     * 
+     * Future enhancement: Integrate PDF.js when dependency constraints allow
+     * 
+     * @param {Blob} fileBlob - PDF file blob
+     * @param {Object} attachment - Attachment metadata
+     * @returns {Promise<string>} Extracted text or informative message
+     */
+    async extractPDFText(fileBlob, attachment) {
+        try {
+            // Check file size (warn for very large files)
+            const maxSize = 10 * 1024 * 1024; // 10MB limit
+            if (fileBlob.size > maxSize) {
+                console.warn(`PDF file ${attachment.name} exceeds size limit (${fileBlob.size} bytes)`);
+                return `PDF file ${attachment.name} is too large for processing (${Math.round(fileBlob.size / 1024 / 1024)}MB). Maximum size: 10MB.`;
+            }
+
+            // Attempt to extract text using FileReader API
+            // Note: This works for text-based PDFs but not binary/encoded PDFs
+            const text = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    try {
+                        const result = reader.result;
+                        if (typeof result === 'string') {
+                            // Try to extract readable text from PDF structure
+                            // PDFs have text streams that may be partially readable
+                            const extractedText = this.extractReadableTextFromPDF(result);
+                            resolve(extractedText);
+                        } else {
+                            reject(new Error('Unable to read PDF as text'));
+                        }
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                reader.onerror = () => reject(new Error('FileReader error'));
+                reader.readAsText(fileBlob, 'utf-8');
+            });
+
+            // Validate extracted text
+            if (text && text.trim().length > 50) {
+                // Successfully extracted meaningful text
+                return `Extracted text from ${attachment.name}:\n\n${text}`;
+            } else {
+                // PDF is binary/encoded - requires PDF.js for proper parsing
+                return `PDF file ${attachment.name} requires advanced parsing library for text extraction.\n\n` +
+                       `Current status: Basic text extraction attempted but file appears to be binary/encoded.\n\n` +
+                       `To enable full PDF parsing:\n` +
+                       `• Integrate PDF.js library (currently blocked by "no external dependencies" constraint)\n` +
+                       `• See docs/todo.md for implementation roadmap\n\n` +
+                       `For now, you can:\n` +
+                       `• View attachment metadata (name, size, type)\n` +
+                       `• Open the file directly from the attachment card`;
+            }
+
+        } catch (error) {
+            console.error('PDF extraction error:', error);
+            return `Error extracting text from PDF ${attachment.name}: ${error.message}\n\n` +
+                   `PDF parsing requires PDF.js library (see docs/todo.md for implementation roadmap).`;
+        }
+    }
+
+    /**
+     * Extract readable text from PDF data string
+     * 
+     * Attempts to find readable text patterns in PDF content.
+     * PDFs store text in streams that may be partially readable as plain text.
+     * 
+     * @param {string} pdfData - PDF file content as string
+     * @returns {string} Extracted readable text
+     */
+    extractReadableTextFromPDF(pdfData) {
+        // PDF text streams are often between parentheses or marked with BT/ET
+        // Try to extract readable sequences
+        const textMatches = [];
+        
+        // Pattern 1: Text between parentheses (common PDF text encoding)
+        const parenthesesPattern = /\(([^)]+)\)/g;
+        let match;
+        while ((match = parenthesesPattern.exec(pdfData)) !== null) {
+            const text = match[1];
+            // Filter out non-readable content (control chars, very short strings)
+            if (text.length > 3 && /[a-zA-Z0-9]/.test(text)) {
+                textMatches.push(text);
+            }
+        }
+        
+        // Pattern 2: Look for readable text sequences (3+ consecutive letters/numbers)
+        const readablePattern = /[a-zA-Z0-9]{3,}/g;
+        const readableMatches = pdfData.match(readablePattern);
+        if (readableMatches) {
+            textMatches.push(...readableMatches);
+        }
+        
+        // Combine and deduplicate
+        const uniqueText = [...new Set(textMatches)].join(' ');
+        
+        // Return if we found meaningful content
+        if (uniqueText.length > 50) {
+            return uniqueText.substring(0, 32000); // Limit to 32KB for AI processing
+        }
+        
+        return '';
+    }
+
+    /**
+     * Extract text from DOCX file
+     * 
+     * Reference: docs/spec.md - Attachment Content Processing requirements
+     * 
+     * STATUS: Requires mammoth.js library (blocked by "no external dependencies" constraint)
+     * 
+     * DOCX files are ZIP archives containing XML files. Text extraction requires:
+     * 1. Unzipping the DOCX file
+     * 2. Parsing document.xml to extract text content
+     * 3. Handling formatting and structure
+     * 
+     * Current implementation: Documents limitation and provides clear guidance
+     * 
+     * Future enhancement: Integrate mammoth.js when dependency constraints allow
+     * 
+     * @param {Blob} fileBlob - DOCX file blob
+     * @param {Object} attachment - Attachment metadata
+     * @returns {Promise<string>} Informative message about limitation
+     */
+    async extractDOCXText(fileBlob, attachment) {
+        try {
+            // Check file size
+            const maxSize = 10 * 1024 * 1024; // 10MB limit
+            if (fileBlob.size > maxSize) {
+                return `Word document ${attachment.name} exceeds size limit (${Math.round(fileBlob.size / 1024 / 1024)}MB). Maximum size: 10MB.`;
+            }
+
+            // DOCX files are ZIP archives - would need unzip library to parse
+            // Current implementation documents the limitation clearly
+            return `Word document ${attachment.name} requires parsing library for text extraction.\n\n` +
+                   `DOCX files are ZIP archives containing XML files. To extract text:\n` +
+                   `• Integrate mammoth.js library (currently blocked by "no external dependencies" constraint)\n` +
+                   `• Library would unzip DOCX, parse document.xml, and extract formatted text\n` +
+                   `• See docs/todo.md for implementation roadmap\n\n` +
+                   `For now, you can:\n` +
+                   `• View attachment metadata (name, size, type)\n` +
+                   `• Open the file directly from the attachment card\n\n` +
+                   `File size: ${Math.round(fileBlob.size / 1024)}KB`;
+
+        } catch (error) {
+            console.error('DOCX extraction error:', error);
+            return `Error processing Word document ${attachment.name}: ${error.message}\n\n` +
+                   `DOCX parsing requires mammoth.js library (see docs/todo.md for implementation roadmap).`;
+        }
+    }
+
+    /**
+     * Extract data from XLSX file
+     * 
+     * Reference: docs/spec.md - Attachment Content Processing requirements
+     * 
+     * STATUS: Requires SheetJS library (blocked by "no external dependencies" constraint)
+     * 
+     * XLSX files are ZIP archives containing XML files. Data extraction requires:
+     * 1. Unzipping the XLSX file
+     * 2. Parsing sharedStrings.xml for cell values
+     * 3. Parsing sheet XML files for cell references
+     * 4. Handling formulas and formatting
+     * 
+     * Current implementation: Documents limitation and provides clear guidance
+     * 
+     * Future enhancement: Integrate SheetJS when dependency constraints allow
+     * 
+     * @param {Blob} fileBlob - XLSX file blob
+     * @param {Object} attachment - Attachment metadata
+     * @returns {Promise<string>} Informative message about limitation
+     */
+    async extractXLSXText(fileBlob, attachment) {
+        try {
+            // Check file size
+            const maxSize = 10 * 1024 * 1024; // 10MB limit
+            if (fileBlob.size > maxSize) {
+                return `Spreadsheet ${attachment.name} exceeds size limit (${Math.round(fileBlob.size / 1024 / 1024)}MB). Maximum size: 10MB.`;
+            }
+
+            // XLSX files are ZIP archives - would need unzip library to parse
+            // Current implementation documents the limitation clearly
+            return `Spreadsheet ${attachment.name} requires parsing library for data extraction.\n\n` +
+                   `XLSX files are ZIP archives containing XML files. To extract data:\n` +
+                   `• Integrate SheetJS library (currently blocked by "no external dependencies" constraint)\n` +
+                   `• Library would unzip XLSX, parse XML files, and extract cell values\n` +
+                   `• See docs/todo.md for implementation roadmap\n\n` +
+                   `For now, you can:\n` +
+                   `• View attachment metadata (name, size, type)\n` +
+                   `• Open the file directly from the attachment card\n\n` +
+                   `File size: ${Math.round(fileBlob.size / 1024)}KB`;
+
+        } catch (error) {
+            console.error('XLSX extraction error:', error);
+            return `Error processing spreadsheet ${attachment.name}: ${error.message}\n\n` +
+                   `XLSX parsing requires SheetJS library (see docs/todo.md for implementation roadmap).`;
         }
     }
 

@@ -7,6 +7,7 @@
  */
 
 import { sanitizeErrorMessage } from '../utils/error-handler.js';
+import { createSuccessResponse, createErrorResponseForService } from '../utils/response-utils.js';
 import { validateDraftsSchema, validateAndFormatDrafts } from '../utils/validation.js';
 import { OpenAIAPI, AnthropicAPI, GoogleAIAPI, createSystemPrompt, createReplyPrompt } from './api-integrations.js';
 
@@ -143,31 +144,24 @@ export class DraftService {
                 const fallback = this.createFallbackDrafts('', subject, tone);
                 const fallbackFormatted = validateAndFormatDrafts(fallback, subject);
                 
-                sendResponse({
-                    success: true,
-                    drafts: fallbackFormatted,
-                    warning: 'AI response was incomplete, using fallback drafts',
-                    usedFallback: usedFallback
-                });
+                sendResponse(createSuccessResponse(
+                    { drafts: fallbackFormatted },
+                    { 
+                        warning: 'AI response was incomplete, using fallback drafts',
+                        usedFallback: usedFallback
+                    }
+                ));
                 return;
             }
             
-            sendResponse({
-                success: true,
-                drafts: formattedDrafts,
-                usedFallback: usedFallback
-            });
+            sendResponse(createSuccessResponse(
+                { drafts: formattedDrafts },
+                { usedFallback: usedFallback }
+            ));
             
         } catch (error) {
             console.error('Draft generation error:', error);
-            
-            // Sanitize error message for user display
-            const sanitizedError = sanitizeErrorMessage(error.message);
-            
-            sendResponse({
-                success: false,
-                error: sanitizedError
-            });
+            sendResponse(createErrorResponseForService(error, 'Draft generation'));
         }
     }
 
@@ -219,28 +213,24 @@ export class DraftService {
                 const fallback = this.createFallbackDrafts('', subject, tone);
                 const fallbackFormatted = validateAndFormatDrafts(fallback, subject);
                 
-                sendResponse({
-                    success: true,
-                    drafts: fallbackFormatted,
-                    warning: 'External API response was incomplete, using fallback drafts',
-                    usedFallback: true
-                });
+                sendResponse(createSuccessResponse(
+                    { drafts: fallbackFormatted },
+                    { 
+                        warning: 'External API response was incomplete, using fallback drafts',
+                        usedFallback: true
+                    }
+                ));
                 return;
             }
             
-            sendResponse({
-                success: true,
-                drafts: formattedDrafts,
-                usedFallback: true // Indicate external API was used
-            });
+            sendResponse(createSuccessResponse(
+                { drafts: formattedDrafts },
+                { usedFallback: true } // Indicate external API was used
+            ));
             
         } catch (error) {
             console.error('External API draft generation error:', error);
-            const sanitizedError = sanitizeErrorMessage(error.message);
-            sendResponse({
-                success: false,
-                error: `External API error: ${sanitizedError}`
-            });
+            sendResponse(createErrorResponseForService(error, 'External API draft generation'));
         }
     }
 
