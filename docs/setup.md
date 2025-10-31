@@ -7,7 +7,7 @@ Get up and running with AI-powered email triage in just a few minutes!
 ### Step 1: Check System Requirements
 
 **Required:**
-- ✅ **Chrome 128+** (Check: `chrome://version`)
+- ✅ **Chrome 138+** (Check: `chrome://version`)
 - ✅ **22GB+ free storage** (for AI models)
 - ✅ **4GB+ GPU VRAM** (or decent integrated graphics)
 - ✅ **Operating System:**
@@ -28,6 +28,8 @@ Get up and running with AI-powered email triage in just a few minutes!
    - Search for: `#prompt-api-for-gemini-nano`
      - Set to: **"Enabled"**
    - Search for: `#summarization-api-for-gemini-nano`
+     - Set to: **"Enabled"**
+   - Search for: `#translation-api` (Optional but recommended)
      - Set to: **"Enabled"**
 
 3. **Restart Chrome:**
@@ -66,7 +68,7 @@ Get up and running with AI-powered email triage in just a few minutes!
 ### System Requirements (Detailed)
 
 #### Minimum Requirements:
-- **Chrome Version:** 128 or later (138+ recommended)
+- **Chrome Version:** 138 or later (Stable)
 - **Storage Space:** 22GB free on your Chrome profile volume
 - **GPU:** 4GB+ VRAM (integrated graphics may work but slower)
 - **RAM:** 8GB+ recommended
@@ -102,11 +104,15 @@ Get up and running with AI-powered email triage in just a few minutes!
    - **Purpose:** Enables the Summarizer API
    - **Required for:** Email thread summaries, key points extraction
 
+4. **Translation API** (Optional but recommended)
+   - **Flag:** `#translation-api`
+   - **Setting:** "Enabled"
+   - **Purpose:** Enables Translator API for multilingual support
+
 #### Optional Flags (Future Features):
 
 These flags aren't needed now but may be useful later:
 
-- `#translation-api` - For multilingual email support
 - `#language-detection-api` - For automatic language detection
 - `#writer-api-for-gemini-nano` - For enhanced writing assistance
 - `#rewriter-api-for-gemini-nano` - For text rewriting
@@ -143,15 +149,15 @@ After enabling flags and restarting Chrome:
 If you can't use Chrome AI (incompatible system, insufficient resources, etc.):
 
 1. **Get an API Key:**
-   - **Google AI Studio:** https://aistudio.google.com/app/apikey (Gemini - Recommended)
-   - **Anthropic:** https://console.anthropic.com/ (Claude)
-   - **OpenAI:** https://platform.openai.com/api-keys (GPT-4)
+   - **OpenAI:** https://platform.openai.com/api-keys (GPT-4 - Currently Supported)
+   - **Google AI Studio:** https://aistudio.google.com/app/apikey (Gemini - Planned)
+   - **Anthropic:** https://console.anthropic.com/ (Claude - Planned)
 
 2. **Configure in Extension:**
    - Open the extension
    - Scroll to **"API Settings (Optional)"**
    - Check **"Use custom API key"**
-   - Select your provider
+   - Select your provider (currently only OpenAI supported)
    - Enter your API key (securely stored)
    - Click **"Save API Key"**
 
@@ -160,6 +166,7 @@ If you can't use Chrome AI (incompatible system, insufficient resources, etc.):
    - You'll be charged based on API provider pricing
    - Chrome AI is free and private (all local processing)
    - Custom keys work across all platforms/browsers
+   - Currently only OpenAI is fully implemented; Anthropic and Google AI are planned
 
 ---
 
@@ -177,7 +184,7 @@ If you can't use Chrome AI (incompatible system, insufficient resources, etc.):
 1. Double-check flags are **enabled**, not just "Default"
 2. Wait 5-10 minutes for model download
 3. Free up space (need 22GB+ available)
-4. Update Chrome to version 128+
+4. Update Chrome to version 138+
 5. Check `chrome://components/` for model status
 
 ### Problem: "AI model is downloading"
@@ -249,7 +256,7 @@ If you can't use Chrome AI (incompatible system, insufficient resources, etc.):
 **Check these:**
 1. API key is valid and not expired
 2. You have API credits/billing enabled
-3. Correct provider selected (Google/Anthropic/OpenAI)
+3. Correct provider selected (currently only OpenAI supported)
 4. Internet connection is working
 5. Check browser console for specific error
 
@@ -270,7 +277,7 @@ If you can't use Chrome AI (incompatible system, insufficient resources, etc.):
 | **Offline** | ✅ Works offline | ❌ Requires internet |
 | **Setup** | 🔧 Requires Chrome flags | 🔑 Just need API key |
 | **Quality** | ✨ Good (Gemini Nano) | ✨ Excellent (GPT-4/Claude) |
-| **Platforms** | 🖥️ Chrome 128+ only | 🌍 Works anywhere |
+| **Platforms** | 🖥️ Chrome 138+ only | 🌍 Works anywhere |
 
 **Recommendation:** Use Chrome AI for best privacy and cost. Use custom API keys if you need:
 - Maximum quality (GPT-4)
@@ -304,6 +311,12 @@ If you can't use Chrome AI (incompatible system, insufficient resources, etc.):
    - Example: "Mention the Q4 deadline"
    - Example: "Ask about project budget"
    - Example: "Decline politely, suggest alternative"
+
+5. **Translation:**
+   - Select target language from Settings dropdown
+   - Supports 15+ languages
+   - All translations happen on-device for privacy
+   - Works offline after initial model download
 
 ### Keyboard Shortcuts:
 
@@ -344,6 +357,7 @@ Currently none, but you can:
 - **Chrome Built-in AI:** https://developer.chrome.com/docs/ai/built-in
 - **Prompt API Guide:** https://developer.chrome.com/docs/ai/prompt-api
 - **Summarizer API Guide:** https://developer.chrome.com/docs/ai/summarizer-api
+- **Translator API Guide:** https://developer.chrome.com/docs/ai/translator-api
 
 ### API Provider Documentation:
 - **Google AI (Gemini):** https://ai.google.dev/docs
@@ -351,10 +365,10 @@ Currently none, but you can:
 - **OpenAI API:** https://platform.openai.com/docs
 
 ### Extension Documentation:
-- **SPEC.md** - Complete feature specifications
-- **AGENTS.md** - Development guidelines
-- **IMPROVEMENTS.md** - Recent enhancements changelog
-- **README.md** - Project overview
+- **[spec.md](./spec.md)** - Complete feature specifications
+- **[AGENTS.md](../AGENTS.md)** - Development guidelines
+- **[implementation-summary.md](./implementation-summary.md)** - Implementation details
+- **[README.md](../README.md)** - Project overview
 
 ### Getting Help:
 - **GitHub Issues:** Report bugs or request features
@@ -421,6 +435,6 @@ You're all set! Here's what to do next:
 
 **Last Updated:** October 2025  
 **Extension Version:** 1.0.0  
-**Minimum Chrome Version:** 128  
-**Recommended Chrome Version:** 138+
+**Minimum Chrome Version:** 138  
+**Recommended Chrome Version:** 138+ (Stable)
 

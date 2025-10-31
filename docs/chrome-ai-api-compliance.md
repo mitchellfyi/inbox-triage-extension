@@ -94,6 +94,42 @@ session.destroy();
 
 ---
 
+### 3. Translator API
+**Status**: ✅ Correctly Implemented  
+**Availability**: Chrome 138+ Stable  
+**Documentation**: https://developer.chrome.com/docs/ai/translator-api
+
+#### Our Implementation:
+```javascript
+// Check availability for language pair
+const availability = await Translator.availability({
+    sourceLanguage: 'en',
+    targetLanguage: 'es'
+});
+
+// Create translation session
+const translator = await Translator.create({
+    sourceLanguage: 'en',
+    targetLanguage: 'es'
+});
+
+// Translate text
+const translated = await translator.translate(text);
+
+// Clean up
+translator.destroy();
+```
+
+**Compliance Notes**:
+- ✅ Uses global constructor: `Translator`
+- ✅ Checks `.availability()` with language pair before creating sessions
+- ✅ Properly configures session with `sourceLanguage` and `targetLanguage`
+- ✅ Uses `.translate()` method for text translation
+- ✅ Destroys sessions after use
+- ✅ Supports 15+ languages
+
+---
+
 ## 🔍 API Availability Checking
 
 According to the [official documentation](https://developer.chrome.com/docs/ai/summarizer-api), we must check API availability before use using global constructors. Our implementation correctly follows this pattern:
@@ -116,11 +152,20 @@ if ('LanguageModel' in self) {
     const availability = await LanguageModel.availability();
     // Returns: "readily", "after-download", or "no"
 }
+
+// Check Translator API - requires language pair
+if ('Translator' in self) {
+    const availability = await Translator.availability({
+        sourceLanguage: 'en',
+        targetLanguage: 'es'
+    });
+    // Returns: "readily", "available", "after-download", or "no"
+}
 ```
 
 **Compliance**: ✅ Correctly implements availability checking - matches official documentation exactly
 
-**Note**: We use `'Summarizer' in self` for the check (to verify the global exists), then call `Summarizer.availability()` directly (without `self.` prefix) to match the documentation pattern.
+**Note**: We use `'Summarizer' in self` for the check (to verify the global exists), then call `Summarizer.availability()` directly (without `self.` prefix) to match the documentation pattern. Translator API requires a language pair for availability checking.
 
 ---
 
@@ -140,7 +185,11 @@ Users must enable these flags in `chrome://flags`:
    - Set to: "Enabled"
    - Purpose: Enables Summarizer API
 
-**Documentation Status**: ✅ All flags documented in README.md
+4. **`#translation-api`** (Optional but recommended)
+   - Set to: "Enabled"
+   - Purpose: Enables Translator API for multilingual support
+
+**Documentation Status**: ✅ All flags documented in README.md and SETUP.md
 
 ---
 
@@ -196,9 +245,11 @@ According to the official documentation, Chrome's Built-in AI:
 **Source**: https://developer.chrome.com/docs/ai/built-in-apis
 
 **Our Usage**:
-- ✅ Summarizer API (Stable)
-- ✅ Prompt API (Stable, Extensions)
-- ❌ Not using Origin Trial APIs (future consideration)
+- ✅ Summarizer API (Stable) - Implemented
+- ✅ Prompt API (Stable, Extensions) - Implemented
+- ✅ Translator API (Stable) - Implemented
+- ✅ Prompt API Multimodal (Stable, Extensions) - Implemented for image analysis
+- ❌ Not using Origin Trial APIs (future consideration: Proofreader, Rewriter, Writer)
 
 ---
 
@@ -211,6 +262,7 @@ According to the official documentation, Chrome's Built-in AI:
 
 console.log('Summarizer available:', 'Summarizer' in self);
 console.log('LanguageModel available:', 'LanguageModel' in self);
+console.log('Translator available:', 'Translator' in self);
 
 // Check availability status (matching docs exactly)
 if ('Summarizer' in self) {
@@ -223,6 +275,15 @@ if ('LanguageModel' in self) {
     const availability = await LanguageModel.availability();
     console.log('LanguageModel availability:', availability);
     // Expected: "readily", "after-download", or "no"
+}
+
+if ('Translator' in self) {
+    const availability = await Translator.availability({
+        sourceLanguage: 'en',
+        targetLanguage: 'es'
+    });
+    console.log('Translator availability:', availability);
+    // Expected: "readily", "available", "after-download", or "no"
 }
 ```
 
@@ -278,11 +339,11 @@ if ('LanguageModel' in self) {
 
 ## ✅ Compliance Checklist
 
-- [x] Using correct API global constructors (`self.Summarizer`, `self.LanguageModel`)
+- [x] Using correct API global constructors (`Summarizer`, `LanguageModel`, `Translator`)
 - [x] Checking `.availability()` before creating sessions
 - [x] Properly configuring sessions with required options
 - [x] Destroying sessions after use with `.destroy()`
-- [x] Handling all availability states ("readily", "after-download", "no")
+- [x] Handling all availability states ("readily", "after-download", "no", "available")
 - [x] Providing fallback for unavailable models
 - [x] Documenting Chrome version requirements (138+)
 - [x] Documenting hardware requirements (22GB storage, 4GB+ VRAM)
@@ -291,21 +352,23 @@ if ('LanguageModel' in self) {
 - [x] Supporting offline usage after initial download
 - [x] Proper error handling and user feedback
 - [x] Using correct type names ('tldr' not 'tl;dr')
+- [x] Translator API properly implemented with language pair configuration
 
 ---
 
 ## 🚀 Future API Considerations
 
 ### APIs to Consider Adding:
-1. **Translator API** - For multi-language email support
-2. **Language Detector API** - To auto-detect email language
-3. **Rewriter API** - For improving existing draft text
-4. **Writer API** - For generating specific content types
+1. **Language Detector API** - To auto-detect email language
+2. **Rewriter API** - For improving existing draft text (Origin Trial)
+3. **Writer API** - For generating specific content types (Origin Trial)
+4. **Proofreader API** - For grammar checking (Origin Trial)
 
 ### Implementation Notes:
-- Writer and Rewriter APIs are in Origin Trial
+- Writer, Rewriter, and Proofreader APIs are in Origin Trial
 - Would need to register for origin trials
 - Consider adding when APIs reach Stable status
+- Translator API is already implemented ✅
 
 ---
 
@@ -324,7 +387,8 @@ The Inbox Triage Extension correctly implements Chrome's Built-in AI APIs accord
 
 **Recommendations**:
 - Continue monitoring Chrome AI documentation for updates
-- Consider adding Translator and Language Detector APIs
-- Update to new APIs when they reach Stable status
+- Consider adding Language Detector API for automatic language detection
+- Monitor Origin Trial APIs (Proofreader, Rewriter, Writer) for Stable release
 - Keep hardware requirements documentation current
+- Consider adding multimodal Prompt API for additional attachment types
 

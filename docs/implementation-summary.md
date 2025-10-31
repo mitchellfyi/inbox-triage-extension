@@ -4,11 +4,13 @@
 
 This document summarizes all work completed to fix and enhance the Inbox Triage Extension with proper Chrome Built-in AI integration and comprehensive setup instructions.
 
+**Reference**: See [README.md](../README.md) for project overview
+
 ---
 
 ## 📚 Documentation Created
 
-### 1. **SETUP.md** - Comprehensive Setup Guide (New)
+### 1. **[setup.md](./setup.md)** - Comprehensive Setup Guide (New)
 Complete step-by-step guide with:
 - ✅ Quick Start (3 steps, 5 minutes)
 - ✅ Detailed system requirements
@@ -23,7 +25,7 @@ Complete step-by-step guide with:
 
 **Based on official:** [Chrome Built-in AI Documentation](https://developer.chrome.com/docs/ai/built-in)
 
-### 2. **QUICK-REFERENCE.md** - Quick Reference Card (New)
+### 2. **[quick-reference.md](./quick-reference.md)** - Quick Reference Card (New)
 Printable quick reference with:
 - ✅ Installation checklist
 - ✅ Usage workflow
@@ -34,23 +36,19 @@ Printable quick reference with:
 - ✅ Common questions and answers
 - ✅ System requirements summary
 
-### 3. **IMPROVEMENTS.md** - Changes Log (Updated)
-Documented all improvements:
-- ✅ Context detection implementation
-- ✅ Placeholder messaging system
-- ✅ API key override feature
-- ✅ External API integration
-- ✅ UX enhancements
-- ✅ Files changed summary
-
-### 4. **README.md** - Updated
+### 3. **README.md** - Updated
 Enhanced with:
 - ✅ Quick Start section (5 minutes)
 - ✅ 3-step installation process
-- ✅ Links to SETUP.md for details
+- ✅ Links to [setup.md](./setup.md) for details
 - ✅ Alternative API key setup
-- ✅ Prerequisites clarified (Chrome 128+, 22GB storage, 4GB GPU)
+- ✅ Prerequisites clarified (Chrome 138+, 22GB storage, 4GB GPU)
 - ✅ Testing instructions
+
+### 4. **Documentation Reorganization** - Completed
+- ✅ All documentation moved to `/docs` directory
+- ✅ Consistent kebab-case naming (`setup.md`, `quick-reference.md`, etc.)
+- ✅ All cross-references updated throughout codebase
 
 ---
 
@@ -99,6 +97,8 @@ Enhanced with:
 ✅ Fallback to Chrome AI when possible
 ```
 
+**Reference**: See [docs/todo.md](./todo.md) for implementation roadmap
+
 ### 5. Manifest Updates (manifest.json)
 ```javascript
 ✅ Added host permissions for external APIs:
@@ -137,6 +137,13 @@ Based on [developer.chrome.com/docs/ai/built-in](https://developer.chrome.com/do
 ✅ Cleanup: session.destroy() - CORRECT
 ```
 
+#### Translator API
+```javascript
+✅ Availability check: await Translator.availability() - CORRECT
+✅ Translate: await Translator.translate(text, options) - CORRECT
+✅ Supports 15+ languages on-device
+```
+
 #### Availability States
 ```javascript
 ✅ "readily" - Model ready to use - HANDLED
@@ -144,20 +151,25 @@ Based on [developer.chrome.com/docs/ai/built-in](https://developer.chrome.com/do
 ✅ "no" - Model unavailable - HANDLED
 ```
 
+**Reference**: See [chrome-ai-api-compliance.md](./chrome-ai-api-compliance.md) for detailed API verification
+
 ### Required Chrome Flags (Documented)
 ```
 ✅ #optimization-guide-on-device-model → Enabled BypassPerfRequirement
 ✅ #prompt-api-for-gemini-nano → Enabled
 ✅ #summarization-api-for-gemini-nano → Enabled
+✅ #translation-api → Enabled (optional but recommended)
 ```
 
 ### System Requirements (Documented)
 ```
-✅ Chrome 128+ (138+ recommended)
+✅ Chrome 138+ (Stable)
 ✅ 22GB free storage
 ✅ 4GB+ GPU VRAM
 ✅ Windows 10+ / macOS 13+ / Linux
 ```
+
+**Reference**: See [setup.md](./setup.md) for detailed requirements
 
 ---
 
@@ -173,7 +185,7 @@ Based on [developer.chrome.com/docs/ai/built-in](https://developer.chrome.com/do
 ### After
 - ✅ Context detection (knows Gmail/Outlook vs other pages)
 - ✅ Contextual messages guide users
-- ✅ Comprehensive setup guides (SETUP.md, QUICK-REFERENCE.md)
+- ✅ Comprehensive setup guides ([setup.md](./setup.md), [quick-reference.md](./quick-reference.md))
 - ✅ Custom API keys option (OpenAI, Anthropic, Google)
 - ✅ Clear status messages for AI availability
 - ✅ Extract button disabled when not applicable
@@ -189,26 +201,31 @@ Based on [developer.chrome.com/docs/ai/built-in](https://developer.chrome.com/do
 | Context Detection | ✅ Complete | Gmail, Outlook, other pages |
 | Smart Placeholders | ✅ Complete | Context-aware messaging |
 | Chrome AI Integration | ✅ Complete | Summarizer + Prompt APIs |
+| Translator API | ✅ Complete | On-device multilingual support |
 | API Key Settings UI | ✅ Complete | Full settings section |
 | API Key Storage | ✅ Complete | Secure Chrome sync storage |
 | OpenAI Integration | ✅ Complete | GPT-4 summarization + drafts |
 | Anthropic Integration | 🔄 Prepared | Placeholder methods ready - not yet implemented |
 | Google AI Integration | 🔄 Prepared | Placeholder methods ready - not yet implemented |
 | Image Analysis | ✅ Partial | Multimodal Prompt API via UI button (not bulk processing) |
-| PDF/DOCX/XLSX Processing | 🔄 Planned | Not yet implemented - see TODO.md |
-| Attachment Detail Modal | 🔄 Planned | Uses alert() placeholder - see TODO.md |
-| Translation Support | ✅ Complete | Translator API integration complete |
-| Setup Documentation | ✅ Complete | SETUP.md comprehensive |
-| Quick Reference | ✅ Complete | QUICK-REFERENCE.md |
+| PDF/DOCX/XLSX Processing | 🔄 Planned | Not yet implemented - see [todo.md](./todo.md) |
+| Attachment Detail Modal | 🔄 Planned | Uses alert() placeholder - see [todo.md](./todo.md) |
+| Setup Documentation | ✅ Complete | [setup.md](./setup.md) comprehensive |
+| Quick Reference | ✅ Complete | [quick-reference.md](./quick-reference.md) |
 | Troubleshooting Guide | ✅ Complete | 10+ common issues |
 | Privacy Documentation | ✅ Complete | Clear explanations |
 | Error Handling | ✅ Complete | User-friendly messages (centralized in utils/) |
 | Model Download Status | ✅ Complete | Progress tracking |
 | Draft Validation | ✅ Complete | Centralized validation utilities |
+| Documentation Structure | ✅ Complete | All docs in `/docs` with consistent naming |
+
+**Reference**: See [todo.md](./todo.md) for remaining tasks
 
 ---
 
 ## 🧪 Testing Recommendations
+
+**Reference**: See [testing.md](./testing.md) for comprehensive testing guidelines
 
 ### Manual Testing Checklist
 
@@ -222,6 +239,7 @@ Based on [developer.chrome.com/docs/ai/built-in](https://developer.chrome.com/do
 #### Chrome AI
 - [ ] Summarization works with Chrome AI
 - [ ] Draft generation works with Chrome AI
+- [ ] Translation works with Translator API
 - [ ] Status shows "AI models downloading" when appropriate
 - [ ] Status shows "AI models ready" when ready
 - [ ] Error messages are user-friendly
@@ -254,20 +272,22 @@ npm run test:e2e
 ```
 inbox-triage-extension/
 ├── README.md                 # Project overview + Quick Start (updated)
-├── SETUP.md                  # Comprehensive setup guide (NEW)
-├── QUICK-REFERENCE.md        # Printable quick reference (NEW)
-├── IMPROVEMENTS.md           # Changes log (updated)
-├── IMPLEMENTATION-SUMMARY.md # This file (NEW)
-├── SPEC.md                   # Technical specifications
 ├── AGENTS.md                 # Development guidelines
-└── TODO.md                   # Project tasks
+├── docs/
+│   ├── setup.md              # Comprehensive setup guide
+│   ├── quick-reference.md    # Printable quick reference
+│   ├── spec.md               # Technical specifications
+│   ├── todo.md               # Project tasks
+│   ├── implementation-summary.md  # This file
+│   ├── chrome-ai-api-compliance.md  # API verification
+│   ├── testing.md            # Testing guide
+└── LICENSE                   # MIT License
 ```
 
 ### User Journey
-1. **README.md** - First stop, quick overview
-2. **SETUP.md** - Detailed setup if needed
-3. **QUICK-REFERENCE.md** - Keep handy for daily use
-4. **IMPROVEMENTS.md** - See what's new
+1. **[README.md](../README.md)** - First stop, quick overview
+2. **[setup.md](./setup.md)** - Detailed setup if needed
+3. **[quick-reference.md](./quick-reference.md)** - Keep handy for daily use
 
 ---
 
@@ -286,6 +306,8 @@ inbox-triage-extension/
 - ⚠️ **Provider privacy policy applies** - Check with provider
 - ✅ **Clear warnings** - Users informed of external processing
 
+**Reference**: See [README.md](../README.md) for privacy guarantees and [setup.md](./setup.md) for privacy information
+
 ---
 
 ## 🚀 Deployment Checklist
@@ -296,11 +318,11 @@ inbox-triage-extension/
 - [ ] Documentation reviewed
 - [ ] API keys tested (OpenAI)
 - [ ] Privacy notices reviewed
-- [ ] Chrome versions tested (128, 138+)
+- [ ] Chrome versions tested (138+)
 - [ ] Gmail tested
 - [ ] Outlook tested
 - [ ] README.md updated
-- [ ] SETUP.md reviewed
+- [ ] setup.md reviewed
 - [ ] Version number bumped
 
 ### Release Notes
@@ -327,6 +349,8 @@ inbox-triage-extension/
    - Show costs (for custom APIs)
    - Track request counts
    - Set usage limits
+
+**Reference**: See [todo.md](./todo.md) for detailed task list
 
 ### Medium Term
 1. **Enhanced Context Detection**
@@ -363,10 +387,11 @@ inbox-triage-extension/
 4. ✅ **Flexible AI provider options** (Chrome AI + 3 external providers)
 5. ✅ **Production-ready** with complete error handling
 6. ✅ **Privacy-focused** with clear notices and local-first approach
-7. ✅ **Well-documented** with 3 user-facing guides
+7. ✅ **Well-documented** with comprehensive guides
 8. ✅ **Accessible** with keyboard navigation and ARIA labels
 9. ✅ **Tested** with manual and automated test plans
 10. ✅ **Future-proof** with prepared integrations for other providers
+11. ✅ **Organized documentation** - All docs in `/docs` with consistent naming and cross-links
 
 ---
 
@@ -375,8 +400,9 @@ inbox-triage-extension/
 1. **Chrome Built-in AI:** https://developer.chrome.com/docs/ai/built-in
 2. **Prompt API Guide:** https://developer.chrome.com/docs/ai/prompt-api
 3. **Summarizer API Guide:** https://developer.chrome.com/docs/ai/summarizer-api
-4. **OpenAI API Docs:** https://platform.openai.com/docs
-5. **Chrome Extensions:** https://developer.chrome.com/docs/extensions
+4. **Translator API Guide:** https://developer.chrome.com/docs/ai/translator-api
+5. **OpenAI API Docs:** https://platform.openai.com/docs
+6. **Chrome Extensions:** https://developer.chrome.com/docs/extensions
 
 ---
 
@@ -389,12 +415,14 @@ The Inbox Triage Extension is now:
 - ✅ **Flexible** with Chrome AI and custom API key options
 - ✅ **Privacy-focused** with local processing by default
 - ✅ **Production-ready** for deployment
+- ✅ **Well-organized** with all documentation in `/docs` directory
 
 **Time to install:** 5 minutes  
 **User experience:** Excellent  
 **Documentation quality:** Comprehensive  
 **Privacy compliance:** ✅ Full  
 **API implementation:** ✅ Correct  
+**Documentation organization:** ✅ Complete
 
 **Status:** ✅ READY FOR USE
 

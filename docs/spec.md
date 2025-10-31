@@ -12,6 +12,7 @@ This project builds a Chrome extension for inbox triage that summarises email th
 - Extract and analyse email attachments (PDF, DOCX, XLSX, images) locally using on-device AI capabilities.
 - Provide attachment summaries and content analysis without transmitting files externally.
 - Offer a simple UI within Chrome's side panel for capturing thread text, displaying summaries, attachment analysis, and copying drafts.
+- Support multilingual translation of summaries and drafts using on-device Translator API.
 
 ## Non-Goals and Constraints
 
@@ -24,8 +25,8 @@ This project builds a Chrome extension for inbox triage that summarises email th
 
 ### Hard Constraints
 - **Manifest V3** - Must use modern Chrome extension architecture
-- **On-device AI only** - No external API calls or server dependencies  
-- **Chrome's built-in AI APIs** - Summarizer API and Prompt API exclusively
+- **On-device AI only** - No external API calls or server dependencies (default mode)
+- **Chrome's built-in AI APIs** - Summarizer API, Prompt API, and Translator API exclusively
 - **Privacy-first** - No data collection, transmission, or storage
 - **No external dependencies** - No third-party frameworks or libraries
 - **Side Panel API** - UI must run in Chrome's side panel interface
@@ -33,8 +34,8 @@ This project builds a Chrome extension for inbox triage that summarises email th
 ## Supported Platforms
 
 ### Primary Support
-- **Chrome 114+** - Required for Side Panel API support
-- **Chrome 120+** - Recommended for stable AI API access
+- **Chrome 138+** (Stable) - Required for Chrome Built-in AI APIs
+- **Chrome 114+** - Minimum for Side Panel API support
 - **Gmail** - Standard web interface (mail.google.com)
 - **Outlook** - Web interface (outlook.office.com, outlook.live.com)
 
@@ -51,11 +52,15 @@ This project builds a Chrome extension for inbox triage that summarises email th
 - **Communication**: Message passing to service worker via chrome.runtime
 - **Constraints**: No direct AI API access, minimal DOM manipulation
 
+**Reference**: See [AGENTS.md](../AGENTS.md) for development guidelines
+
 ### Service Worker Layer  
 - **Purpose**: AI processing coordination and API orchestration
 - **Scope**: AI API calls, message routing, data transformation
 - **Communication**: Bidirectional messaging with content scripts and side panel
 - **Constraints**: No DOM access, limited storage to extension APIs only
+
+**Reference**: See [chrome-ai-api-compliance.md](./chrome-ai-api-compliance.md) for API usage details
 
 ### Side Panel Layer
 - **Purpose**: User interface and interaction handling
@@ -71,12 +76,16 @@ This project builds a Chrome extension for inbox triage that summarises email th
 **Then** the extension should extract all thread content without sending data to external servers  
 **And** display the extracted content count or status to the user  
 
+**Reference**: See [testing.md](./testing.md) for testing requirements
+
 ### AI-Powered Summarization  
 **Given** an email thread has been successfully extracted  
 **When** the user requests a summary  
 **Then** the Summarizer API should produce a concise TL;DR (under 100 words)  
 **And** generate up to five key points highlighting important information  
 **And** display both summary and key points in the side panel  
+
+**Reference**: See [chrome-ai-api-compliance.md](./chrome-ai-api-compliance.md) for API implementation details
 
 ### Reply Draft Generation
 **Given** an email thread has been summarized  
@@ -86,6 +95,8 @@ This project builds a Chrome extension for inbox triage that summarises email th
 **And** drafts should follow the pattern: short answer, medium with clarifications, detailed with next steps  
 **And** all drafts should reflect the selected tone (neutral, friendly, assertive, formal)  
 **And** the output should conform to a predefined JSON schema  
+
+**Reference**: See [AGENTS.md](../AGENTS.md) for validation utilities
 
 ### Tone Selection and Regeneration  
 **Given** reply drafts have been generated  
@@ -111,7 +122,7 @@ This project builds a Chrome extension for inbox triage that summarises email th
 **Given** processable attachments have been detected  
 **When** the system begins attachment analysis  
 **Then** image attachments should be analyzed using the Prompt API's multimodal capabilities (via user-triggered UI button)  
-**And** PDF, DOCX, XLSX files should be processed entirely on-device using local parsing libraries (planned - see TODO.md)  
+**And** PDF, DOCX, XLSX files should be processed entirely on-device using local parsing libraries (planned - see [todo.md](./todo.md))  
 **And** extracted content should be summarised using the built-in Summarizer API  
 **And** no attachment content should be transmitted to external servers  
 
@@ -153,6 +164,8 @@ This project builds a Chrome extension for inbox triage that summarises email th
 **And** translations should happen entirely on-device for privacy  
 **And** translation should work offline once AI models are downloaded
 
+**Reference**: See [chrome-ai-api-compliance.md](./chrome-ai-api-compliance.md) for Translator API implementation
+
 ### Hybrid Fallback Decision Rules
 **Given** hybrid mode is enabled and on-device models are unavailable  
 **When** AI processing is requested  
@@ -167,15 +180,19 @@ This project builds a Chrome extension for inbox triage that summarises email th
 **And** users should see clear indicators when cloud processing is used
 **And** processing should gracefully fall back to local extraction if cloud services fail
 
+**Reference**: See [AGENTS.md](../AGENTS.md) for hybrid fallback implementation patterns
+
 ## Technical Requirements
 
 - Manifest V3 Chrome extension using the Side Panel API.
 - Content scripts to extract thread text and attachment metadata from Gmail and Outlook.
-- Use built-in on-device AI tasks (Summarizer, Prompt API) exclusively for summarisation, drafting, and attachment analysis; avoid external calls.
-- Local file processing libraries (PDF.js, mammoth.js, SheetJS) for attachment content extraction (planned - see TODO.md).
+- Use built-in on-device AI tasks (Summarizer, Prompt API, Translator API) exclusively for summarisation, drafting, and translation; avoid external calls.
+- Local file processing libraries (PDF.js, mammoth.js, SheetJS) for attachment content extraction (planned - see [todo.md](./todo.md)).
 - JSON schema enforcement to ensure predictable and parseable reply drafts.
 - Basic styling and accessible UI; do not rely on third-party UI frameworks; keep file size minimal.
 - Code must be well-structured with separate modules for extraction, summarisation, drafting, attachment processing, and UI logic.
+
+**Reference**: See [AGENTS.md](../AGENTS.md) for coding standards and architecture
 
 ## Evaluation Criteria
 
@@ -197,3 +214,6 @@ A submission must include a public repository with install instructions, a short
 - **Maintainability**: Organise code for readability and future enhancements.
 - **Accessibility**: Ensure UI controls are keyboard accessible and labelled.
 - **Performance**: Attachment processing should not block the UI and should handle large files gracefully with appropriate size limits.
+
+**Reference**: See [README.md](../README.md) for privacy guarantees and [setup.md](./setup.md) for user-facing privacy information
+

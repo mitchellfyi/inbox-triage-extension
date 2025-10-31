@@ -9,7 +9,7 @@ This Chrome extension transforms email overwhelm into actionable insights by ins
 - **Save Time**: Get instant TL;DR summaries and key points from lengthy email threads
 - **Understand Attachments**: 
   - ✅ **Image Analysis**: AI-powered image understanding and OCR text extraction (via UI button)
-  - 🔜 **Document Processing**: PDF, DOCX, XLSX parsing planned (see TODO.md)
+  - 🔜 **Document Processing**: PDF, DOCX, XLSX parsing planned (see [docs/todo.md](docs/todo.md))
 - **Stay Responsive**: Generate professional reply drafts in multiple tones and lengths with custom guidance
 - **Voice Input**: Use voice dictation to quickly add guidance for your reply drafts
 - **🆕 Multilingual Support**: Translate summaries and drafts to 15+ languages on-device
@@ -26,7 +26,7 @@ This extension showcases multiple Chrome AI APIs working together:
 - **✅ Translator API** - On-device multilingual translation (15+ languages)
 - **🔜 More Coming Soon** - Proofreader, Rewriter, Writer APIs for enhanced content refinement
 
-**Custom API Keys**: OpenAI integration is fully implemented. Anthropic and Google AI integrations are planned but not yet available (see TODO.md).
+**Custom API Keys**: OpenAI integration is fully implemented. Anthropic and Google AI integrations are planned but not yet available (see [docs/todo.md](docs/todo.md)).
 
 All processing happens locally on your device for complete privacy.
 
@@ -34,9 +34,9 @@ All processing happens locally on your device for complete privacy.
 
 Start here to understand the project and contribute effectively:
 
-- **[SPEC.md](SPEC.md)** - Complete functional and technical requirements
+- **[docs/spec.md](docs/spec.md)** - Complete functional and technical requirements
 - **[AGENTS.md](AGENTS.md)** - Development guidelines for AI coding agents and contributors  
-- **[TODO.md](TODO.md)** - Project tasks and progress tracking
+- **[docs/todo.md](docs/todo.md)** - Project tasks and progress tracking
 - **[.github/copilot-instructions.md](.github/copilot-instructions.md)** - GitHub Copilot configuration and rules
 
 ## 🚀 Quick Start (5 Minutes)
@@ -85,7 +85,7 @@ Start here to understand the project and contribute effectively:
 
 ### 📖 Need Help?
 
-**Detailed Setup Guide:** See **[SETUP.md](SETUP.md)** for:
+**Detailed Setup Guide:** See **[docs/setup.md](docs/setup.md)** for:
 - Complete system requirements
 - Troubleshooting common issues  
 - Custom API key setup (Google Gemini, Anthropic, OpenAI)
@@ -93,9 +93,9 @@ Start here to understand the project and contribute effectively:
 - Feature comparison table
 
 **Quick Links:**
-- **Can't enable flags?** → [SETUP.md - Troubleshooting](SETUP.md#-troubleshooting)
-- **Models won't download?** → [SETUP.md - Model Download Issues](SETUP.md#problem-ai-model-is-downloading)
-- **Want to use external AI services?** → [SETUP.md - Custom API Keys](SETUP.md#alternative-use-custom-api-keys)
+- **Can't enable flags?** → [docs/setup.md - Troubleshooting](docs/setup.md#-troubleshooting)
+- **Models won't download?** → [docs/setup.md - Model Download Issues](docs/setup.md#problem-ai-model-is-downloading)
+- **Want to use external AI services?** → [docs/setup.md - Custom API Keys](docs/setup.md#alternative-use-custom-api-keys)
 
 ### Alternative: Use Custom API Keys
 
@@ -148,7 +148,7 @@ npm run test:e2e
 
 **Message Flow:** Content Script → Service Worker → AI APIs → Side Panel UI
 
-*For detailed architecture, see [SPEC.md](SPEC.md).*
+*For detailed architecture, see [docs/spec.md](docs/spec.md).*
 
 ## Privacy Guarantees
 
@@ -168,7 +168,7 @@ npm run test:e2e
 
 **Attachment Privacy:** 
 - ✅ Image files are analyzed locally using multimodal Prompt API (user-triggered)
-- 🔜 PDF, DOCX, XLSX parsing is planned but not yet implemented (see TODO.md)
+- 🔜 PDF, DOCX, XLSX parsing is planned but not yet implemented (see [docs/todo.md](docs/todo.md))
 - All attachment processing happens on-device when implemented. No attachment content is ever uploaded or transmitted, even in hybrid mode.
 
 **No Data Collection:** The extension does not collect, store, or transmit any user data, email content, attachment content, voice recordings, or usage analytics.
@@ -181,12 +181,12 @@ npm run test:e2e
 
 **For AI Agents and Human Contributors:**
 
-1. **Read SPEC.md first** - Understand complete requirements and constraints
-2. **Review AGENTS.md** - Follow development principles and workflow
-3. **Check TODO.md** - Pick or create tasks, track progress  
+1. **Read [docs/spec.md](docs/spec.md) first** - Understand complete requirements and constraints
+2. **Review [AGENTS.md](AGENTS.md)** - Follow development principles and workflow
+3. **Check [docs/todo.md](docs/todo.md)** - Pick or create tasks, track progress  
 4. **Open/assign tasks** - Create issues or assign yourself to existing ones
 5. **Submit focused PRs** - Small, incremental changes with tests
-6. **Update docs** - Keep TODO.md and relevant docs current
+6. **Update docs** - Keep [docs/todo.md](docs/todo.md) and relevant docs current
 
 **Key Principles:**
 - Privacy-first: On-device AI only, no external network calls
@@ -211,9 +211,12 @@ inbox-triage-extension/
 ├── sidepanel/
 │   ├── sidepanel.html        # Side panel UI with attachment display
 │   └── sidepanel.js          # Side panel JavaScript with attachment processing
-├── SPEC.md                   # Detailed project specifications
 ├── AGENTS.md                 # Development guidelines for contributors
-├── TODO.md                   # Task tracking and progress
+├── docs/
+│   ├── spec.md               # Detailed project specifications
+│   ├── todo.md               # Task tracking and progress
+│   ├── setup.md              # Comprehensive setup guide
+│   ├── quick-reference.md    # Quick reference card
 └── README.md                 # This file
 ```
 

@@ -2,6 +2,8 @@
 
 This file tracks project-wide tasks and their status. Keep this updated as work progresses.
 
+**Reference**: See [AGENTS.md](../AGENTS.md) for development guidelines
+
 ## How to Use
 
 1. **Pick a task** - Choose from the sections below, focusing on [todo] items
@@ -10,7 +12,7 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 4. **Work incrementally** - Make small, frequent commits with clear messages
 5. **Update status inline** - Move tasks through [todo] → [doing] → [blocked] → [done] as appropriate
 6. **Test thoroughly** - Ensure all tests pass cleanly without workarounds
-7. **Update docs after features** - Revise README.md, AGENTS.md, and this file once features are complete
+7. **Update docs after features** - Revise [README.md](../README.md), [AGENTS.md](../AGENTS.md), and this file once features are complete
 8. **Link issues/PRs** - Add GitHub links when available
 9. **Open PR** - Submit for review when ready with comprehensive testing and documentation
 
@@ -24,8 +26,8 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 ## Documentation
 
 ### Post-Feature Documentation Updates
-- `[todo]` SPEC.md improvements - Acceptance criteria format, explicit API boundaries, browser support notes
-- `[todo]` README.md feature integration - Update overview and quickstart sections after each major feature completion
+- `[todo]` [spec.md](./spec.md) improvements - Acceptance criteria format, explicit API boundaries, browser support notes
+- `[todo]` [README.md](../README.md) feature integration - Update overview and quickstart sections after each major feature completion
 - `[todo]` Link validation sweep - Verify all internal documentation links work correctly
 - `[todo]` Code example updates - Ensure all documentation code snippets reflect current implementation
 
@@ -80,6 +82,8 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 - `[todo]` Performance testing - Memory usage, response times
 - `[todo]` Privacy audit - Verify no external network calls (except when using custom API keys)
 
+**Reference**: See [testing.md](./testing.md) for testing guidelines
+
 ### Documentation Testing
 - `[todo]` Installation instructions verification - Test setup process works from scratch
 - `[todo]` Link validation - All internal documentation links work
@@ -89,28 +93,28 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 
 ## Hackathon Submission Tasks (Chrome Built-in AI Challenge 2025)
 
-**📁 Detailed task files**: See [`/todo`](/todo) directory for comprehensive implementation guides
+**📁 Detailed task files**: See [`/todo`](../todo) directory for comprehensive implementation guides
 
 ### Priority Tasks for Submission
 
 #### 🔴 CRITICAL (Must Complete for Competitive Submission)
-- `[todo]` [Task 000: Hackathon Submission Checklist](/todo/000_hackathon_submission_checklist.md) - Master checklist (1-2h)
-- `[todo]` [Task 006: Demo Video Creation](/todo/006_demo_video_creation.md) - Required deliverable (4-6h)
-- `[todo]` [Task 007: README API Showcase](/todo/007_readme_api_showcase.md) - Documentation enhancement (2-3h)
+- `[todo]` [Task 000: Hackathon Submission Checklist](../todo/000_hackathon_submission_checklist.md) - Master checklist (1-2h)
+- `[todo]` [Task 006: Demo Video Creation](../todo/006_demo_video_creation.md) - Required deliverable (4-6h)
+- `[todo]` [Task 007: README API Showcase](../todo/007_readme_api_showcase.md) - Documentation enhancement (2-3h)
 
 #### 🟡 HIGH PRIORITY (Strong Differentiators)
-- `[todo]` [Task 002: Proofreader API Integration](/todo/002_proofreader_api_integration.md) - Grammar checking (2-3h)
-- `[todo]` [Task 003: Rewriter API Integration](/todo/003_rewriter_api_integration.md) - Alternative phrasings (3-4h)
-- `[todo]` [Task 009: Accessibility Excellence](/todo/009_accessibility_excellence.md) - WCAG 2.1 AA compliance (3-4h)
+- `[todo]` [Task 002: Proofreader API Integration](../todo/002_proofreader_api_integration.md) - Grammar checking (2-3h)
+- `[todo]` [Task 003: Rewriter API Integration](../todo/003_rewriter_api_integration.md) - Alternative phrasings (3-4h)
+- `[todo]` [Task 009: Accessibility Excellence](../todo/009_accessibility_excellence.md) - WCAG 2.1 AA compliance (3-4h)
 
 #### 🟢 MEDIUM PRIORITY (Nice to Have)
-- `[todo]` [Task 004: Writer API Integration](/todo/004_writer_api_integration.md) - Content generation (3-4h)
-- `[todo]` [Task 008: Performance Metrics Display](/todo/008_performance_metrics_display.md) - Monitoring dashboard (2-3h)
-- `[todo]` [Task 010: System Status Dashboard](/todo/010_system_status_dashboard.md) - Health indicators (2-3h)
+- `[todo]` [Task 004: Writer API Integration](../todo/004_writer_api_integration.md) - Content generation (3-4h)
+- `[todo]` [Task 008: Performance Metrics Display](../todo/008_performance_metrics_display.md) - Monitoring dashboard (2-3h)
+- `[todo]` [Task 010: System Status Dashboard](../todo/010_system_status_dashboard.md) - Health indicators (2-3h)
 
 **Total Effort**: 30-43 hours for complete implementation  
 **Minimum Viable**: Tasks 000, 006, 007 = 7-11 hours (Tasks 001 ✅ and 005 ✅ completed)  
-**See**: [`/todo/README.md`](/todo/README.md) for detailed timeline and prioritization
+**See**: [`/todo/README.md`](../todo/README.md) for detailed timeline and prioritization
 
 ---
 
@@ -141,6 +145,7 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 - ✅ Playwright test infrastructure
 - ✅ Processing mode settings with privacy notices
 - ✅ Deep-link URL generation with proper encoding
+- ✅ **Documentation reorganization** - All docs moved to `/docs` with consistent naming and cross-links
 
 ### Next Focus Areas
 1. **Hackathon Preparation** - Create demo video and enhance documentation
@@ -148,3 +153,4 @@ This file tracks project-wide tasks and their status. Keep this updated as work 
 3. **Testing Coverage** - Add content script tests and cross-component integration tests
 4. **Documentation** - Polish README with API showcase and feature highlights
 5. **Release Preparation** - Prepare for Chrome Web Store submission after hackathon
+

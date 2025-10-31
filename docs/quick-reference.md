@@ -14,6 +14,7 @@ Enable these 3 flags:
 ✓ #optimization-guide-on-device-model → Enabled BypassPerfRequirement  
 ✓ #prompt-api-for-gemini-nano → Enabled
 ✓ #summarization-api-for-gemini-nano → Enabled
+✓ #translation-api → Enabled (optional but recommended)
 
 Click "Relaunch"
 ```
@@ -57,6 +58,15 @@ Status: "AI models downloading..." → "AI models ready" ✨
 6. Click "Copy Draft" to copy to clipboard
 ```
 
+### Translate Content
+```
+1. After extracting thread:
+2. Open Settings (⚙️ button)
+3. Select target language from dropdown
+4. Summary, key points, and drafts translate automatically
+5. Select "No Translation (Original)" to return to original
+```
+
 ---
 
 ## 🔧 Troubleshooting Quick Fixes
@@ -79,7 +89,7 @@ Status: "AI models downloading..." → "AI models ready" ✨
 ✅ **Free** - No API costs  
 ✅ **Fast** - Local processing  
 ✅ **Offline** - Works without internet  
-⚠️ **Requires** - Chrome 128+, 22GB storage, 4GB+ GPU  
+⚠️ **Requires** - Chrome 138+, 22GB storage, 4GB+ GPU  
 
 ### Custom API Key (Optional)
 ✅ **High quality** - GPT-4 / Claude  
@@ -101,9 +111,9 @@ Status: "AI models downloading..." → "AI models ready" ✨
 ```
 
 **Get API Keys:**
-- OpenAI: https://platform.openai.com/api-keys
-- Anthropic: https://console.anthropic.com/ (Coming Soon)
-- Google AI: https://ai.google.dev/ (Coming Soon)
+- OpenAI: https://platform.openai.com/api-keys (Currently Supported)
+- Anthropic: https://console.anthropic.com/ (Planned)
+- Google AI: https://ai.google.dev/ (Planned)
 
 ---
 
@@ -116,7 +126,7 @@ Status: "AI models downloading..." → "AI models ready" ✨
 | Cost | Free | $0.01-0.30/request |
 | Quality | Good | Excellent |
 | Offline | ✅ Yes | ❌ No |
-| Platforms | Chrome 128+ | Any browser |
+| Platforms | Chrome 138+ | Any browser |
 
 ---
 
@@ -137,7 +147,7 @@ Status: "AI models downloading..." → "AI models ready" ✨
 ### Check Chrome Version
 ```
 chrome://version
-Should show: 128 or higher
+Should show: 138 or higher
 ```
 
 ### Check AI Models
@@ -159,8 +169,8 @@ Result: Should show "readily"
 
 ## 📞 Getting Help
 
-**Detailed Guide:** `SETUP.md` (in extension folder)  
-**Troubleshooting:** `SETUP.md` → "Troubleshooting" section  
+**Detailed Guide:** [setup.md](./setup.md)  
+**Troubleshooting:** [setup.md](./setup.md#-troubleshooting)  
 **Report Bug:** GitHub Issues  
 **Questions:** GitHub Discussions  
 
@@ -172,7 +182,8 @@ Result: Should show "readily"
 - **Guidance:** Add specific requests like "Mention deadline"
 - **Voice Input:** Use 🎤 button for hands-free guidance
 - **Tone:** Choose appropriate tone for recipient
-- **Copy:** All drafts include subject line + body
+- **Copy:** Draft body text is copied (subject follows standard format)
+- **Translation:** Supports 15+ languages, all on-device
 
 ---
 
@@ -189,14 +200,14 @@ Result: Should show "readily"
 ## 📱 System Requirements
 
 ### Minimum
-- Chrome 128+
+- Chrome 138+
 - 22GB free storage
 - 4GB+ GPU VRAM  
 - 8GB+ RAM
 - Windows 10+ / macOS 13+ / Linux
 
 ### Recommended
-- Chrome 138+
+- Chrome 138+ (Stable)
 - 50GB free storage
 - Dedicated GPU
 - 16GB+ RAM
@@ -211,6 +222,7 @@ Result: Should show "readily"
 | Extract thread | < 1 sec | < 1 sec |
 | Generate summary | 2-5 sec | 1-3 sec |
 | Generate drafts | 5-10 sec | 2-5 sec |
+| Translate content | 1-3 sec | N/A |
 | Initial model download | 2-10 min | N/A |
 
 ---
@@ -255,21 +267,24 @@ A: Chrome AI is free. Custom API keys have provider pricing.
 **Q: Can I use with company email?**  
 A: Yes, but check your company's policies on AI tools.
 
+**Q: What languages are supported for translation?**  
+A: 15+ languages including Spanish, French, German, Japanese, Chinese, and more. See Settings dropdown for full list.
+
 ---
 
 ## 📈 Version Information
 
 **Current Version:** 1.0.0  
 **Last Updated:** October 2025  
-**Chrome Minimum:** 128  
-**Chrome Recommended:** 138+  
+**Chrome Minimum:** 138  
+**Chrome Recommended:** 138+ (Stable)
 
 ---
 
 ## 🎓 Learn More
 
 - Chrome AI Docs: https://developer.chrome.com/docs/ai/built-in
-- Extension Docs: See README.md and SPEC.md in folder
+- Extension Docs: See [README.md](../README.md) and [spec.md](./spec.md)
 - Official Blog: https://developer.chrome.com/blog
 
 ---

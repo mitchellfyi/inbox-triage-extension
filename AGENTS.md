@@ -2,12 +2,14 @@
 
 This document serves as a guide for AI coding agents working on the Inbox Triage Extension. Its purpose is to ensure that agents understand where to find requirements and how to approach development in a consistent, maintainable way.
 
+**Reference**: See [README.md](./README.md) for project overview
+
 ## Where to start
 
 **Required Reading Order:**
-1. **Read SPEC.md first** - Complete functional and technical requirements, constraints, and acceptance criteria
-2. **Review README.md** - High-level overview, quickstart, architecture, and contributing flow
-3. **Check TODO.md** - Current tasks, priorities, and project progress tracking
+1. **Read [docs/spec.md](./docs/spec.md) first** - Complete functional and technical requirements, constraints, and acceptance criteria
+2. **Review [README.md](./README.md)** - High-level overview, quickstart, architecture, and contributing flow
+3. **Check [docs/todo.md](./docs/todo.md)** - Current tasks, priorities, and project progress tracking
 
 **Never begin coding until you understand the complete requirement scope and constraints.**
 
@@ -15,15 +17,15 @@ This document serves as a guide for AI coding agents working on the Inbox Triage
 
 **The disciplined agent follows this cycle:**
 
-1. **READ** - Study SPEC.md requirements and existing code before making changes
+1. **READ** - Study [docs/spec.md](./docs/spec.md) requirements and existing code before making changes
 2. **PLAN** - Create focused, minimal-change plan addressing specific requirements
 3. **IMPLEMENT** - Make surgical code changes, following coding rules below
 4. **TEST** - Validate changes work as expected and don't break existing functionality  
-5. **DOCUMENT** - Update TODO.md status, commit with proper messages, update related docs
+5. **DOCUMENT** - Update [docs/todo.md](./docs/todo.md) status, commit with proper messages, update related docs
 
 **Key Success Factors:**
 - Small, incremental PRs (not monolithic changes)
-- Always validate against acceptance criteria in SPEC.md
+- Always validate against acceptance criteria in [docs/spec.md](./docs/spec.md)
 - Maintain working state after every change
 - Update documentation inline with code changes
 
@@ -40,7 +42,7 @@ This document serves as a guide for AI coding agents working on the Inbox Triage
 ### Commit Message Quality
 - **Use descriptive, specific messages** - "Fix button styling" not "Fix bug"
 - **Explain the why, not just the what** - Include context for future maintainers
-- **Reference issues and requirements** - Link to SPEC.md acceptance criteria when relevant
+- **Reference issues and requirements** - Link to [docs/spec.md](./docs/spec.md) acceptance criteria when relevant
 - **Follow the established patterns** - Use type(scope): format consistently
 
 ### Atomic Commits
@@ -52,6 +54,8 @@ This document serves as a guide for AI coding agents working on the Inbox Triage
 ## Testing Requirements
 
 **All new features and changes must include comprehensive testing:**
+
+**Reference**: See [docs/testing.md](./docs/testing.md) for detailed testing guidelines
 
 ### End-to-End Testing with Playwright
 - **Run tests locally before pushing** - Execute `npm run test:e2e` before committing changes
@@ -80,7 +84,7 @@ This document serves as a guide for AI coding agents working on the Inbox Triage
 - **Commit early, run tests locally before pushing** - Validate changes in development environment
 
 ### Manual Testing Requirements
-- **Test across target browsers** - Chrome versions and variants as specified in SPEC.md
+- **Test across target browsers** - Chrome versions and variants as specified in [docs/spec.md](./docs/spec.md)
 - **Test AI model states** - Available, downloading, and unavailable scenarios
 - **Test accessibility** - Keyboard navigation and screen reader compatibility
 - **Test privacy compliance** - Verify no external network calls or data leakage
@@ -90,16 +94,16 @@ This document serves as a guide for AI coding agents working on the Inbox Triage
 **Keep documentation current and accurate throughout development:**
 
 ### During Development
-- **Update TODO.md inline** - Mark progress as [doing] → [done] while working
+- **Update [docs/todo.md](./docs/todo.md) inline** - Mark progress as [doing] → [done] while working
 - **Document new APIs** - Add JSDoc comments for new functions and classes
 - **Update technical decisions** - Record architectural choices and rationale
 - **Note known limitations** - Document temporary constraints or future improvements needed
 
 ### After Feature Completion
-- **Update README.md** - Reflect new capabilities in the overview and quickstart sections
-- **Review AGENTS.md** - Add new patterns, update coding rules, revise workflows if needed
-- **Update SPEC.md** - Ensure acceptance criteria match implemented behavior
-- **Revise TODO.md** - Archive completed tasks, add follow-up work, reorganize sections
+- **Update [README.md](./README.md)** - Reflect new capabilities in the overview and quickstart sections
+- **Review [AGENTS.md](./AGENTS.md)** - Add new patterns, update coding rules, revise workflows if needed
+- **Update [docs/spec.md](./docs/spec.md)** - Ensure acceptance criteria match implemented behavior
+- **Revise [docs/todo.md](./docs/todo.md)** - Archive completed tasks, add follow-up work, reorganize sections
 
 ### Documentation Quality Standards
 - **Accuracy first** - Ensure all code examples work and all links are valid
@@ -117,7 +121,12 @@ This document serves as a guide for AI coding agents working on the Inbox Triage
 ├── sidepanel/          # UI layer - display and interaction only
 ├── assets/             # Static resources - icons, etc.
 ├── manifest.json       # Extension config - minimal permissions
-└── docs...            # SPEC.md, AGENTS.md, TODO.md, README.md
+├── AGENTS.md           # This file - development guidelines
+└── docs/               # All other documentation
+    ├── spec.md         # Technical specifications
+    ├── todo.md         # Task tracking
+    ├── setup.md        # User setup guide
+    └── README.md       # Documentation index
 ```
 
 ### Naming Conventions
@@ -133,6 +142,8 @@ This document serves as a guide for AI coding agents working on the Inbox Triage
 - **Implement graceful fallbacks** when AI features are unavailable
 - **Log technical details** to console for debugging
 - **Never crash silently** - always inform the user of issues
+
+**Reference**: See `utils/error-handler.js` for centralized error sanitization
 
 ### Accessibility Requirements
 - **Keyboard navigation**: All interactive elements must be keyboard accessible
@@ -184,7 +195,7 @@ Closes #issue-number
 ## Development principles
 
 - **Follow MV3 best practices**: Use Manifest V3 for extension architecture. Keep content scripts, background scripts, and UI code separate.
-- **On‑device AI only**: All AI processing must happen locally via Chrome’s built‑in APIs (Summarizer, Prompt, etc.). Do not introduce external API calls or server dependencies.
+- **On‑device AI only**: All AI processing must happen locally via Chrome's built‑in APIs (Summarizer, Prompt, Translator, etc.). Do not introduce external API calls or server dependencies.
 - **Maintainability**: Write clean, modular code. Use descriptive function and variable names. Keep side effects contained and avoid global state.
 - **Performance**: Optimise DOM queries and avoid expensive operations in loops. Keep response times quick for a smooth user experience.
 - **Error handling**: Always check availability of built‑in APIs. Provide user‑friendly error messages and fallback behaviour if models are unavailable or still downloading.
@@ -194,7 +205,7 @@ Closes #issue-number
 
 ## Hybrid Fallback Decision Rules
 
-**When implementing cloud fallback logic, follow these documented rules from SPEC.md:**
+**When implementing cloud fallback logic, follow these documented rules from [docs/spec.md](./docs/spec.md):**
 
 ### Model Availability Checks
 - Use `Summarizer.availability()` and `LanguageModel.availability()` to determine local model status
@@ -230,31 +241,31 @@ if (fallbackDecision.shouldFallback && processingMode === 'hybrid') {
 **Never do these things - they violate core project constraints:**
 
 - ❌ **Add external dependencies** - No npm packages, CDN imports, or third-party libraries
-- ❌ **Make network calls** - No fetch(), XMLHttpRequest, or external API calls of any kind
+- ❌ **Make network calls** - No fetch(), XMLHttpRequest, or external API calls of any kind (except when using custom API keys)
 - ❌ **Store user data** - No localStorage, IndexedDB, or chrome.storage of personal information
 - ❌ **Add new permissions** - Only request minimal permissions needed for current functionality
 - ❌ **Create inaccessible UI** - All controls must be keyboard accessible with proper ARIA labels
 - ❌ **Use global state** - Avoid shared mutable state between extension components
 - ❌ **Ignore error states** - Always handle AI model unavailability and provide user feedback
-- ❌ **Break privacy guarantees** - Email content must never leave the user's device
-- ❌ **Skip documentation** - Update TODO.md and relevant docs with every change
+- ❌ **Break privacy guarantees** - Email content must never leave the user's device (default mode)
+- ❌ **Skip documentation** - Update [docs/todo.md](./docs/todo.md) and relevant docs with every change
 - ❌ **Submit untested code** - All features must have passing tests without workarounds
 - ❌ **Make monolithic commits** - Keep commits small, focused, and logically separated
 - ❌ **Leave broken builds** - Every commit should maintain a working, testable state
 
 ## Workflow
 
-1. **Pick a task** from `TODO.md` or the issue tracker, update status to `[doing]`
-2. **Review requirements** in `SPEC.md` and study existing code patterns
+1. **Pick a task** from [docs/todo.md](./docs/todo.md) or the issue tracker, update status to `[doing]`
+2. **Review requirements** in [docs/spec.md](./docs/spec.md) and study existing code patterns
 3. **Create feature branch** with descriptive name following `type/brief-description` format
 4. **Write tests first** for new functionality, ensuring they initially fail
 5. **Implement incrementally** making small commits as you progress
 6. **Run tests frequently** ensuring they pass without workarounds or hacks  
 7. **Update docs inline** as you add new functionality or change behavior
 8. **Test manually** across browsers, AI states, and accessibility requirements
-9. **Final doc review** - Update README.md, AGENTS.md, and TODO.md to reflect completed work
+9. **Final doc review** - Update [README.md](./README.md), [AGENTS.md](./AGENTS.md), and [docs/todo.md](./docs/todo.md) to reflect completed work
 10. **Open pull request** with comprehensive description following PR template
-11. **Mark task complete** in TODO.md and link to the merged PR
+11. **Mark task complete** in [docs/todo.md](./docs/todo.md) and link to the merged PR
 
 **Quality Gates Before PR:**
 - ✅ All tests pass cleanly without skipped or failing tests
@@ -264,4 +275,7 @@ if (fallbackDecision.shouldFallback && processingMode === 'hybrid') {
 - ✅ Accessibility requirements met (keyboard navigation, ARIA labels)
 - ✅ Privacy compliance verified (no external network calls)
 
-By adhering to this guide, agents will produce consistent, high‑quality contributions that align with the project’s goals and constraints.
+**Reference**: See [docs/chrome-ai-api-compliance.md](./docs/chrome-ai-api-compliance.md) for API implementation details
+
+By adhering to this guide, agents will produce consistent, high‑quality contributions that align with the project's goals and constraints.
+

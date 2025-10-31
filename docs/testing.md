@@ -5,8 +5,10 @@ This guide covers both manual development testing and automated test execution f
 ## Manual Development Testing
 
 ### Prerequisites
-- **Chrome/Chromium 114+** (Chrome 120+ recommended for AI features)
+- **Chrome/Chromium 138+** (Required for Chrome Built-in AI APIs)
+- **Chrome flags enabled** (see SETUP.md for details)
 - **Developer mode enabled** in Chrome extensions
+- **22GB+ free storage** (for AI model download)
 
 ### Loading the Extension for Manual Testing
 
@@ -101,9 +103,27 @@ npx playwright test && npx playwright show-report
 ### Test Structure
 
 - **`tests/fixtures/extension.ts`** - Extension loading fixtures and helpers
+  - Provides `context`, `extensionId`, `backgroundPage`, `sidePanelPage` fixtures
+  - Handles extension loading in persistent browser context
+  
 - **`tests/panel.spec.ts`** - Side panel UI testing
+  - Tests baseline UI elements and structure
+  - Verifies accessibility and form controls
+  - Checks initial state and visibility
+  
 - **`tests/service-worker.spec.ts`** - Background service worker tests
+  - Tests service worker initialization
+  - Verifies message passing
+  - Tests AI capability checks
+  
+- **`tests/content-script.spec.ts`** - Content script and message passing tests
+  - Tests content script loading on pages
+  - Verifies message passing between components
+  - Tests error handling for unknown actions
+  
 - **`tests/deeplink.spec.ts`** - Deep-link URL generation tests
+  - Tests URL generation with thread metadata
+  - Verifies URL encoding and parameter handling
 
 ### Playwright Configuration
 
@@ -135,10 +155,13 @@ Check the "Actions" tab in GitHub for CI results and artifacts.
 
 ### For Manual Testing
 - Test across different email formats and thread lengths
-- Test AI model states: available, downloading, unavailable
+- Test AI model states: available ("readily"), downloading ("after-download"), unavailable ("no")
+- Test Translator API with different language pairs
 - Verify keyboard accessibility (Tab navigation, Enter/Space activation)
 - Check screen reader compatibility
-- Validate privacy compliance (no external network calls)
+- Validate privacy compliance (no external network calls when using Chrome AI)
+- Test multimodal image analysis functionality
+- Verify attachment processing (images, PDFs, DOCX, XLSX where applicable)
 
 ### For Automated Testing
 - Write tests that match user workflows
