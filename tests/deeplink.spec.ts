@@ -2,6 +2,9 @@ import { test, expect } from './fixtures/extension.js';
 
 test.describe('Deep Link Generation', () => {
   test('generates deep-link URLs with thread metadata', async ({ sidePanelPage, backgroundPage }) => {
+    // Wait for page to load
+    await sidePanelPage.waitForLoadState('domcontentloaded');
+    
     // Mock thread data that would come from content scripts
     const mockThreadData = {
       subject: 'Test Email Subject',
@@ -37,6 +40,9 @@ test.describe('Deep Link Generation', () => {
   });
 
   test('handles chrome.tabs.create for deep-link navigation', async ({ sidePanelPage, context }) => {
+    // Wait for page to load
+    await sidePanelPage.waitForLoadState('domcontentloaded');
+    
     // Mock the chrome.tabs API since we can't actually test the real implementation
     // without more complex setup
     
@@ -65,6 +71,9 @@ test.describe('Deep Link Generation', () => {
       chrome.tabs.create({ url: url });
     }, deepLinkUrl);
     
+    // Wait a moment for the async operation
+    await sidePanelPage.waitForTimeout(100);
+    
     // Verify that chrome.tabs.create was called with the correct URL
     const tabCreateResult = await sidePanelPage.evaluate(() => ({
       called: window.mockTabCreateCalled,
@@ -76,6 +85,9 @@ test.describe('Deep Link Generation', () => {
   });
 
   test('validates required metadata before generating deep-link', async ({ sidePanelPage }) => {
+    // Wait for page to load
+    await sidePanelPage.waitForLoadState('domcontentloaded');
+    
     // Test that deep-link generation handles missing metadata gracefully
     
     const result = await sidePanelPage.evaluate(() => {
@@ -102,6 +114,9 @@ test.describe('Deep Link Generation', () => {
   });
 
   test('encodes URL parameters correctly', async ({ sidePanelPage }) => {
+    // Wait for page to load
+    await sidePanelPage.waitForLoadState('domcontentloaded');
+    
     // Test that special characters in email subjects are properly encoded
     
     const mockThreadData = {

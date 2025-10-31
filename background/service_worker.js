@@ -62,7 +62,7 @@ class InboxTriageServiceWorker {
     /**
      * Initialize AI capabilities and check model availability
      * 
-     * Reference: SPEC.md - AI Model Availability Handling requirements
+     * Reference: docs/spec.md - AI Model Availability Handling requirements
      * Reference: https://developer.chrome.com/docs/ai/built-in
      * 
      * Checks availability of Summarizer, Prompt API, and Translator APIs.
@@ -559,7 +559,7 @@ class InboxTriageServiceWorker {
     /**
      * Generate summary of email thread using Summarizer API
      * 
-     * Reference: SPEC.md - AI-Powered Summarization requirements
+     * Reference: docs/spec.md - AI-Powered Summarization requirements
      * Reference: https://developer.chrome.com/docs/ai/summarizer-api
      * 
      * Generates TL;DR summary (under 100 words) and up to 5 key points.
@@ -580,7 +580,7 @@ class InboxTriageServiceWorker {
                 return await this.generateSummaryWithExternalAPI(thread, sendResponse, userSettings);
             }
             
-            // Apply hybrid fallback decision rules as documented in SPEC.md
+            // Apply hybrid fallback decision rules as documented in docs/spec.md
             const fallbackDecision = this.shouldUseCloudFallback('summarization', processingMode, thread);
             
             if (fallbackDecision.shouldFallback && processingMode === 'hybrid') {
@@ -617,7 +617,7 @@ class InboxTriageServiceWorker {
             // Combine all message content and apply content size limits
             let fullText = this.combineThreadMessages(thread);
             
-            // Apply content size limits as per SPEC.md (32,000 characters max)
+            // Apply content size limits as per docs/spec.md (32,000 characters max)
             if (fullText && fullText.length > 32000) {
                 console.warn('Content exceeds 32,000 character limit, truncating for on-device processing');
                 fullText = this.truncateContentForProcessing(fullText, 32000);
@@ -709,7 +709,7 @@ class InboxTriageServiceWorker {
     /**
      * Generate reply drafts using Prompt API with JSON schema
      * 
-     * Reference: SPEC.md - Reply Draft Generation requirements
+     * Reference: docs/spec.md - Reply Draft Generation requirements
      * Reference: https://developer.chrome.com/docs/ai/prompt-api
      * 
      * Generates exactly 3 reply drafts in selected tone:
@@ -734,7 +734,7 @@ class InboxTriageServiceWorker {
                 return await this.generateDraftsWithExternalAPI(thread, tone, guidance, sendResponse, userSettings);
             }
             
-            // Apply hybrid fallback decision rules as documented in SPEC.md  
+            // Apply hybrid fallback decision rules as documented in docs/spec.md  
             const fallbackDecision = this.shouldUseCloudFallback('drafting', processingMode, thread);
             
             if (fallbackDecision.shouldFallback && processingMode === 'hybrid') {
@@ -853,7 +853,7 @@ class InboxTriageServiceWorker {
     /**
      * Process a single attachment for AI analysis
      * 
-     * Reference: SPEC.md - Attachment Content Processing requirements
+     * Reference: docs/spec.md - Attachment Content Processing requirements
      * 
      * Processes attachments (images, PDFs, DOCX, XLSX) entirely on-device.
      * For images: uses multimodal Prompt API (triggered via UI)
@@ -967,8 +967,8 @@ class InboxTriageServiceWorker {
      * Process document attachment (PDF, DOCX, XLSX)
      * 
      * STATUS: Not yet implemented - placeholder functionality
-     * See TODO.md Section "Attachment Processing" for implementation roadmap
-     * Reference: SPEC.md - Attachment Content Processing requirements
+     * See docs/todo.md Section "Attachment Processing" for implementation roadmap
+     * Reference: docs/spec.md - Attachment Content Processing requirements
      * 
      * This method is called during attachment processing but currently returns
      * a placeholder message. File parsing libraries (PDF.js, mammoth.js, SheetJS)
@@ -981,7 +981,7 @@ class InboxTriageServiceWorker {
      * 3. Extract text content for AI summarization
      * 4. Return extracted text (respecting privacy: all processing on-device)
      * 
-     * Privacy Note: All file processing must occur on-device per SPEC.md requirements.
+     * Privacy Note: All file processing must occur on-device per docs/spec.md requirements.
      * No attachment content should be transmitted to external services.
      * 
      * @param {Object} attachment - Document attachment  
@@ -996,7 +996,7 @@ class InboxTriageServiceWorker {
             };
             
             const description = typeMap[attachment.type] || 'Document processing';
-            return `${description} for ${attachment.name}. Document parsing capabilities are planned but not yet implemented. See TODO.md for roadmap.`;
+            return `${description} for ${attachment.name}. Document parsing capabilities are planned but not yet implemented. See docs/todo.md for roadmap.`;
             
         } catch (error) {
             console.error('Document processing error:', error);
@@ -1121,7 +1121,7 @@ class InboxTriageServiceWorker {
     /**
      * Create system prompt with JSON schema constraints
      * 
-     * Reference: SPEC.md - Reply Draft Generation requirements (JSON schema enforcement)
+     * Reference: docs/spec.md - Reply Draft Generation requirements (JSON schema enforcement)
      * 
      * Creates a system prompt that instructs the AI to generate exactly 3 drafts
      * in the specified tone, conforming to the JSON schema structure.
@@ -1152,7 +1152,7 @@ Each draft must have exactly these three fields: type, subject, body. Generate e
     /**
      * Create a structured prompt for reply generation with JSON schema specification
      * 
-     * Reference: SPEC.md - Reply Draft Generation requirements
+     * Reference: docs/spec.md - Reply Draft Generation requirements
      * 
      * @param {string} threadText - The email thread content
      * @param {string} originalSubject - The original email subject
@@ -1253,7 +1253,7 @@ Respond with ONLY the following JSON format (no other text):
     
     /**
      * Determine if cloud fallback should be used based on documented decision rules
-     * Reference: SPEC.md - Hybrid Fallback Decision Rules
+     * Reference: docs/spec.md - Hybrid Fallback Decision Rules
      * @param {string} operation - 'summarization' or 'drafting'
      * @param {string} processingMode - 'device-only' or 'hybrid'
      * @param {Object} thread - Email thread data
@@ -1265,7 +1265,7 @@ Respond with ONLY the following JSON format (no other text):
             return { shouldFallback: false, reason: 'Device-only mode selected' };
         }
         
-        // Check model availability - as per SPEC.md requirements
+        // Check model availability - as per docs/spec.md requirements
         const capabilities = operation === 'summarization' ? 
             this.aiCapabilities.summarizer : this.aiCapabilities.promptApi;
         
@@ -1285,7 +1285,7 @@ Respond with ONLY the following JSON format (no other text):
             };
         }
         
-        // Don't fallback during download - wait for completion as per SPEC.md
+        // Don't fallback during download - wait for completion as per docs/spec.md
         if (capabilities.available === 'after-download') {
             return { 
                 shouldFallback: false, 
@@ -1298,7 +1298,7 @@ Respond with ONLY the following JSON format (no other text):
         if (thread) {
             const fullText = this.combineThreadMessages(thread);
             
-            // Content size limit check (32,000 characters as per SPEC.md)
+            // Content size limit check (32,000 characters as per docs/spec.md)
             if (fullText && fullText.length > 32000) {
                 return { 
                     shouldFallback: true, 
@@ -1611,7 +1611,7 @@ Respond with ONLY the following JSON format (no other text):
      * Placeholder for Anthropic API calls (Claude)
      * 
      * STATUS: Not yet implemented - placeholder functionality
-     * See TODO.md for implementation roadmap
+     * See docs/todo.md for implementation roadmap
      * 
      * This method is called when users select Anthropic as their API provider,
      * but the integration is not yet complete. Users are directed to use 
@@ -1628,14 +1628,14 @@ Respond with ONLY the following JSON format (no other text):
      * @throws {Error} Always throws error indicating feature not available
      */
     async callAnthropicSummarize(text, apiKey) {
-        throw new Error('Anthropic (Claude) API integration is not yet implemented. Please use OpenAI or Google AI providers, or Chrome\'s built-in AI. See TODO.md for implementation roadmap.');
+        throw new Error('Anthropic (Claude) API integration is not yet implemented. Please use OpenAI or Google AI providers, or Chrome\'s built-in AI. See docs/todo.md for implementation roadmap.');
     }
     
     /**
      * Placeholder for Anthropic API draft generation
      * 
      * STATUS: Not yet implemented - placeholder functionality
-     * See TODO.md for implementation roadmap
+     * See docs/todo.md for implementation roadmap
      * 
      * @param {string} text - Thread text
      * @param {string} subject - Email subject
@@ -1646,14 +1646,14 @@ Respond with ONLY the following JSON format (no other text):
      * @throws {Error} Always throws error indicating feature not available
      */
     async callAnthropicDrafts(text, subject, tone, guidance, apiKey) {
-        throw new Error('Anthropic (Claude) API integration is not yet implemented. Please use OpenAI or Google AI providers, or Chrome\'s built-in AI. See TODO.md for implementation roadmap.');
+        throw new Error('Anthropic (Claude) API integration is not yet implemented. Please use OpenAI or Google AI providers, or Chrome\'s built-in AI. See docs/todo.md for implementation roadmap.');
     }
     
     /**
      * Placeholder for Google AI API calls (Gemini)
      * 
      * STATUS: Not yet implemented - placeholder functionality
-     * See TODO.md for implementation roadmap
+     * See docs/todo.md for implementation roadmap
      * 
      * This method is called when users select Google AI as their API provider,
      * but the integration is not yet complete. Users are directed to use 
@@ -1670,14 +1670,14 @@ Respond with ONLY the following JSON format (no other text):
      * @throws {Error} Always throws error indicating feature not available
      */
     async callGoogleAISummarize(text, apiKey) {
-        throw new Error('Google AI (Gemini) API integration is not yet implemented. Please use OpenAI provider, or Chrome\'s built-in AI. See TODO.md for implementation roadmap.');
+        throw new Error('Google AI (Gemini) API integration is not yet implemented. Please use OpenAI provider, or Chrome\'s built-in AI. See docs/todo.md for implementation roadmap.');
     }
     
     /**
      * Placeholder for Google AI API draft generation
      * 
      * STATUS: Not yet implemented - placeholder functionality
-     * See TODO.md for implementation roadmap
+     * See docs/todo.md for implementation roadmap
      * 
      * @param {string} text - Thread text
      * @param {string} subject - Email subject
@@ -1688,7 +1688,7 @@ Respond with ONLY the following JSON format (no other text):
      * @throws {Error} Always throws error indicating feature not available
      */
     async callGoogleAIDrafts(text, subject, tone, guidance, apiKey) {
-        throw new Error('Google AI (Gemini) API integration is not yet implemented. Please use OpenAI provider, or Chrome\'s built-in AI. See TODO.md for implementation roadmap.');
+        throw new Error('Google AI (Gemini) API integration is not yet implemented. Please use OpenAI provider, or Chrome\'s built-in AI. See docs/todo.md for implementation roadmap.');
     }
     
     async openSidePanel(tab) {

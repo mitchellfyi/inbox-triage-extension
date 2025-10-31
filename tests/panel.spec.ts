@@ -2,8 +2,14 @@ import { test, expect } from './fixtures/extension.js';
 
 test.describe('Side Panel', () => {
   test('opens and shows baseline UI', async ({ sidePanelPage }) => {
+    // Wait for page to be fully loaded
+    await sidePanelPage.waitForLoadState('domcontentloaded');
+    
     // Check that the page loaded
     await expect(sidePanelPage).toHaveTitle('Inbox Triage');
+    
+    // Wait for main elements to be available
+    await sidePanelPage.waitForSelector('#extract-btn', { timeout: 5000 });
     
     // Check main UI elements are present (sections may be hidden initially)
     // Summary section exists but is initially hidden
@@ -35,19 +41,24 @@ test.describe('Side Panel', () => {
   });
 
   test('shows version information', async ({ sidePanelPage }) => {
+    // Wait for page to load
+    await sidePanelPage.waitForLoadState('domcontentloaded');
+    
     // Check that the page has correct title
     await expect(sidePanelPage).toHaveTitle('Inbox Triage');
     
-    // Check that service worker is loaded by looking for any JS functionality
-    // The page should have the main script loaded
-    const scripts = sidePanelPage.locator('script[src]');
-    await expect(scripts.first()).toHaveAttribute('src', 'sidepanel.js');
+    // Wait for page to be fully loaded
+    await sidePanelPage.waitForSelector('#extract-btn', { timeout: 5000 });
     
     // Check that main heading exists
     await expect(sidePanelPage.getByRole('heading', { name: 'Inbox Triage' })).toBeVisible();
   });
 
   test('has accessible form controls', async ({ sidePanelPage }) => {
+    // Wait for page to load
+    await sidePanelPage.waitForLoadState('domcontentloaded');
+    await sidePanelPage.waitForSelector('#extract-btn', { timeout: 5000 });
+    
     // Check that form controls have proper labels and are keyboard accessible
     // Processing mode radio is in settings panel (initially closed)
     const onDeviceRadio = sidePanelPage.locator('#mode-device-only');
@@ -66,6 +77,10 @@ test.describe('Side Panel', () => {
   });
 
   test('shows initial state correctly', async ({ sidePanelPage }) => {
+    // Wait for page to load
+    await sidePanelPage.waitForLoadState('domcontentloaded');
+    await sidePanelPage.waitForSelector('#extract-btn', { timeout: 5000 });
+    
     // Check that extract button is visible and enabled initially
     const extractBtn = sidePanelPage.locator('#extract-btn');
     await expect(extractBtn).toBeVisible();

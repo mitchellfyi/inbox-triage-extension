@@ -64,7 +64,7 @@ export function sanitizeErrorMessage(errorMessage) {
         },
         {
             patterns: [/not.*implemented/i, /coming soon/i, /placeholder/i],
-            message: 'This feature is not yet available. See TODO.md for implementation roadmap.'
+            message: 'This feature is not yet available. See docs/todo.md for implementation roadmap.'
         }
     ];
     

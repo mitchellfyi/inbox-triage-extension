@@ -2,7 +2,7 @@
  * Side Panel JavaScript for Inbox Triage Extension
  * Handles UI interactions and communication with content scripts
  * 
- * Reference: SPEC.md - Side Panel Layer requirements
+ * Reference: docs/spec.md - Side Panel Layer requirements
  * Reference: AGENTS.md - Side Panel Layer architecture
  */
 
@@ -543,7 +543,7 @@ class InboxTriageSidePanel {
     /**
      * Extract current email thread from active tab
      * 
-     * Reference: SPEC.md - Email Thread Extraction requirements
+     * Reference: docs/spec.md - Email Thread Extraction requirements
      * 
      * Coordinates with content script to extract thread content,
      * validates the data, and triggers summary generation.
@@ -1015,7 +1015,7 @@ class InboxTriageSidePanel {
      * Show detailed view of attachment (placeholder implementation)
      * 
      * STATUS: Not yet implemented - uses alert() as temporary placeholder
-     * See TODO.md Section "Attachment Processing" - "Detailed view modal"
+     * See docs/todo.md Section "Attachment Processing" - "Detailed view modal"
      * 
      * This method is called when users click on an attachment card to view
      * full extracted content and detailed analysis. Currently shows an alert
@@ -1028,18 +1028,18 @@ class InboxTriageSidePanel {
      * - Include download/view options
      * - Support keyboard navigation and accessibility
      * 
-     * Reference: SPEC.md - Attachment Summary Display requirements
+     * Reference: docs/spec.md - Attachment Summary Display requirements
      * 
      * @param {Object} attachment - Attachment to show details for
      */
     showAttachmentDetails(attachment) {
-        // TODO: Implement modal or expanded view per TODO.md
+        // TODO: Implement modal or expanded view per docs/todo.md
         // This is a placeholder implementation that will be replaced with
         // a proper modal dialog showing full attachment content and analysis
         console.log('Showing details for attachment:', attachment);
         
         // Temporary placeholder - will be replaced with modal implementation
-        alert(`Detailed view for ${attachment.name}\n\nThis feature will show full extracted content and detailed analysis.\n\nSee TODO.md for implementation roadmap.`);
+        alert(`Detailed view for ${attachment.name}\n\nThis feature will show full extracted content and detailed analysis.\n\nSee docs/todo.md for implementation roadmap.`);
     }
     
     /**

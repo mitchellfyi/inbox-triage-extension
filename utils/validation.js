@@ -5,14 +5,14 @@
  * This module provides consistent validation for AI-generated reply drafts,
  * ensuring they conform to the expected schema and are safe for display.
  * 
- * Reference: SPEC.md - Reply Draft Generation requirements
+ * Reference: docs/spec.md - Reply Draft Generation requirements
  */
 
 /**
  * JSON Schema definition for reply drafts
  * Ensures AI responses match expected structure
  * 
- * Reference: SPEC.md - Reply Draft Generation requirements
+ * Reference: docs/spec.md - Reply Draft Generation requirements
  * 
  * @returns {Object} JSON schema object for validation
  */
@@ -159,7 +159,7 @@ export function sanitizeString(value, maxLength) {
  * Ensures drafts are properly formatted and sanitized, with fallback
  * values for missing or invalid fields.
  * 
- * Reference: SPEC.md - Reply Draft Generation requirements
+ * Reference: docs/spec.md - Reply Draft Generation requirements
  * 
  * @param {Object} drafts - The drafts object to validate and format
  * @param {string} originalSubject - The original email subject for fallback

@@ -3,7 +3,12 @@ import { test, expect, evaluateInServiceWorker } from './fixtures/extension.js';
 test.describe('Service Worker', () => {
   test('loads and initializes properly', async ({ backgroundPage }) => {
     // Check that the service worker loaded
-    await expect(backgroundPage).toBeTruthy();
+    expect(backgroundPage).toBeTruthy();
+    
+    // Wait for service worker to be fully initialized
+    await backgroundPage.waitForFunction(() => {
+      return typeof chrome !== 'undefined' && chrome.runtime !== undefined;
+    }, { timeout: 5000 });
     
     // Check that the main service worker class is instantiated
     const hasServiceWorker = await evaluateInServiceWorker(backgroundPage, () => {
@@ -14,6 +19,12 @@ test.describe('Service Worker', () => {
   });
 
   test('handles basic messaging', async ({ backgroundPage, sidePanelPage }) => {
+    // Wait for pages to be ready
+    await sidePanelPage.waitForLoadState('domcontentloaded');
+    await backgroundPage.waitForFunction(() => {
+      return typeof chrome !== 'undefined' && chrome.runtime !== undefined;
+    }, { timeout: 5000 });
+    
     // Test message passing from side panel to service worker
     let messageReceived = false;
     
@@ -40,6 +51,12 @@ test.describe('Service Worker', () => {
   });
 
   test('responds to AI capability checks', async ({ backgroundPage, sidePanelPage }) => {
+    // Wait for pages to be ready
+    await sidePanelPage.waitForLoadState('domcontentloaded');
+    await backgroundPage.waitForFunction(() => {
+      return typeof chrome !== 'undefined' && chrome.runtime !== undefined;
+    }, { timeout: 5000 });
+    
     // Test AI capability detection functionality
     // This tests the service worker's ability to check AI model availability
     
@@ -71,6 +88,9 @@ test.describe('Service Worker', () => {
     const sidePanelUrl = `chrome-extension://${extensionId}/sidepanel/sidepanel.html`;
     const sidePanelPage = await context.newPage();
     await sidePanelPage.goto(sidePanelUrl);
+    
+    // Wait for page to load
+    await sidePanelPage.waitForLoadState('domcontentloaded');
     
     await expect(sidePanelPage).toHaveTitle('Inbox Triage');
     

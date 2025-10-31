@@ -2,7 +2,7 @@
  * Content Script for Inbox Triage Extension
  * Extracts email thread content from Gmail and Outlook
  * 
- * Reference: SPEC.md - Email Thread Extraction requirements
+ * Reference: docs/spec.md - Email Thread Extraction requirements
  * Reference: AGENTS.md - Content Script Layer architecture
  */
 
@@ -73,7 +73,7 @@ class EmailThreadExtractor {
     /**
      * Extract current email thread from DOM
      * 
-     * Reference: SPEC.md - Email Thread Extraction requirements
+     * Reference: docs/spec.md - Email Thread Extraction requirements
      * 
      * Extracts all thread content including subject, messages, attachments,
      * and metadata without sending data to external servers.
