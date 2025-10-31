@@ -13,6 +13,7 @@ export class TranslationUI {
             originalKeyPoints: null,
             originalDrafts: new Map()
         };
+        this.isTranslatingDrafts = false; // Track if translation is in progress to prevent loops
     }
 
     /**
@@ -126,6 +127,12 @@ export class TranslationUI {
             // Save settings first to persist the selection
             await this.saveSettings();
             
+            // Prevent recursive translation calls
+            if (this.isTranslatingDrafts) {
+                console.log('Translation already in progress, skipping onLanguageChange translation');
+                return;
+            }
+            
             try {
                 // Check availability first (non-blocking check)
                 const availabilityCheck = await chrome.runtime.sendMessage({
@@ -137,8 +144,10 @@ export class TranslationUI {
                 if (availabilityCheck && availabilityCheck.available) {
                     // Translation is available, proceed with translation
                     try {
-                        // Try to translate existing content
-                        await this.translateExistingContent();
+                        // Try to translate existing content (only if not already translating)
+                        if (!this.isTranslatingDrafts) {
+                            await this.translateExistingContent();
+                        }
                     } catch (translateError) {
                         console.error('Error translating content:', translateError);
                         const langName = this.getLanguageName(newLanguage);
@@ -150,7 +159,9 @@ export class TranslationUI {
                     this.updateStatus(`Downloading translation model for ${langName}... This may take a moment.`, 'loading');
                     // Try to translate anyway - it will trigger download
                     try {
-                        await this.translateExistingContent();
+                        if (!this.isTranslatingDrafts) {
+                            await this.translateExistingContent();
+                        }
                     } catch (translateError) {
                         // Download in progress - selection is kept, will translate when ready
                         console.log('Translation model downloading, will translate when ready');
@@ -168,7 +179,9 @@ export class TranslationUI {
                 // Don't reset selection on error - might be temporary
                 // Try to translate anyway in case it works
                 try {
-                    await this.translateExistingContent();
+                    if (!this.isTranslatingDrafts) {
+                        await this.translateExistingContent();
+                    }
                 } catch (translateError) {
                     // Silent fail - selection is kept
                     console.log('Translation not immediately available, but selection kept');
@@ -239,6 +252,12 @@ export class TranslationUI {
             try {
                 await this.translateAllDrafts();
                 translatedCount += this.currentDrafts.length;
+                
+                // Update display after translating drafts - but check if we're already in a display cycle
+                // Only call callback if we're not already displaying (prevents infinite loops)
+                if (this.displayReplyDraftsCallback && !this.isTranslatingDrafts) {
+                    this.displayReplyDraftsCallback(this.currentDrafts, true);
+                }
             } catch (error) {
                 console.error('Error translating drafts:', error);
             }
@@ -327,6 +346,7 @@ export class TranslationUI {
 
     /**
      * Translate all drafts
+     * Note: Does not trigger re-render - caller should handle display update
      */
     async translateAllDrafts() {
         if (!this.currentDrafts || this.currentDrafts.length === 0) return;
@@ -334,17 +354,25 @@ export class TranslationUI {
         const targetLanguage = this.translationSettings.targetLanguage;
         if (targetLanguage === 'none') return;
         
+        // Prevent recursive translation calls
+        if (this.isTranslatingDrafts) {
+            console.log('Translation already in progress, skipping');
+            return;
+        }
+        
+        this.isTranslatingDrafts = true;
+        
         try {
             for (let i = 0; i < this.currentDrafts.length; i++) {
                 await this.translateDraft(i);
             }
             
-            // Refresh draft display (skip translation since we just translated)
-            if (this.displayReplyDraftsCallback) {
-                this.displayReplyDraftsCallback(this.currentDrafts, true);
-            }
+            // Don't trigger re-render here - caller will handle it
+            // This prevents infinite loops when called from displayReplyDrafts
         } catch (error) {
             console.error('Error translating drafts:', error);
+        } finally {
+            this.isTranslatingDrafts = false;
         }
     }
 
@@ -356,20 +384,30 @@ export class TranslationUI {
         if (!this.currentDrafts || index < 0 || index >= this.currentDrafts.length) return;
         
         const draft = this.currentDrafts[index];
-        const originalBody = this.translationSettings.originalDrafts.get(index) || draft.body;
-        
-        // Store original if not stored yet
-        if (!this.translationSettings.originalDrafts.has(index)) {
-            this.translationSettings.originalDrafts.set(index, draft.body);
-        }
-        
         const targetLanguage = this.translationSettings.targetLanguage;
         if (targetLanguage === 'none') return;
+        
+        // Check if this draft is already translated (compare with original)
+        const originalBody = this.translationSettings.originalDrafts.get(index);
+        if (originalBody && draft.body === originalBody) {
+            // Draft hasn't been translated yet, proceed
+        } else if (!originalBody) {
+            // Store original if not stored yet
+            this.translationSettings.originalDrafts.set(index, draft.body);
+        } else {
+            // Draft appears to already be translated (body != originalBody)
+            // Don't translate again to avoid loops
+            console.log(`Draft ${index} already appears translated, skipping`);
+            return;
+        }
+        
+        // Use stored original for translation
+        const textToTranslate = this.translationSettings.originalDrafts.get(index);
         
         try {
             const response = await chrome.runtime.sendMessage({
                 action: 'translateText',
-                text: originalBody,
+                text: textToTranslate,
                 sourceLanguage: 'en',
                 targetLanguage: targetLanguage
             });

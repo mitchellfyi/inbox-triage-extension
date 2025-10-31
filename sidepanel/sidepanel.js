@@ -26,6 +26,7 @@ class InboxTriageSidePanel {
         this.isVisible = document.visibilityState === 'visible';
         this.isExtracting = false; // Track if extraction is in progress
         this.isGenerating = false; // Track if draft generation is in progress
+        this.isTranslatingDrafts = false; // Track if draft translation is in progress
         
         this.initializeElements();
         
@@ -1415,6 +1416,12 @@ class InboxTriageSidePanel {
     }
     
     displayReplyDrafts(drafts, skipTranslation = false) {
+        // Prevent recursive calls during translation
+        if (this.isTranslatingDrafts) {
+            console.log('Translation in progress, skipping displayReplyDrafts call');
+            return;
+        }
+        
         // Update translation module with current drafts
         this.translationUI.setCurrentDrafts(drafts);
         
@@ -1435,16 +1442,23 @@ class InboxTriageSidePanel {
             
             // Auto-translate if a language is selected (but only on initial render)
             if (!skipTranslation && this.translationUI.translationSettings.targetLanguage !== 'none') {
+                // Mark translation as in progress to prevent recursive calls
+                this.isTranslatingDrafts = true;
+                
                 setTimeout(async () => {
                     try {
                         await this.translationUI.translateAllDrafts();
                         // Re-render with translated content, but skip further translation
-                        this.displayReplyDrafts(drafts, true);
-                        // Save state after translation completes
+                        // Pass the already-translated drafts directly to avoid re-translation
+                        this.isTranslatingDrafts = false; // Clear flag before re-render
+                        this.displayReplyDrafts(this.currentDrafts, true);
+                        // Save state after translation completes (only once)
                         this.saveState();
                     } catch (error) {
                         console.error('Auto-translation of drafts failed:', error);
-                        // Don't show error to user - just log it
+                        this.isTranslatingDrafts = false; // Clear flag on error
+                        // Still save state even if translation failed
+                        this.saveState();
                     }
                 }, 100);
             } else {

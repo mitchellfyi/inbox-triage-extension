@@ -498,6 +498,12 @@ class InboxTriageServiceWorker {
             
             console.log(`Translation availability for ${sourceLanguage} → ${targetLanguage}:`, availability);
             
+            // If availability is 'no' or 'unavailable', provide helpful error message
+            if (availability === 'no' || availability === 'unavailable') {
+                const errorMsg = `Translation from ${sourceLanguage} to ${targetLanguage} is not available. This language pair may not be supported in your Chrome version. Try a different language pair or check Chrome AI settings.`;
+                throw new Error(errorMsg);
+            }
+            
             // If downloadable, inform user and proceed (download will start automatically)
             if (availability === 'downloadable' || availability === 'after-download') {
                 this.broadcastModelStatus('translator', { 

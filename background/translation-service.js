@@ -42,7 +42,8 @@ export class TranslationService {
             return {
                 available: false,
                 state: 'no',
-                reason: 'Translator API not available in this browser'
+                reason: 'Translator API not available in this browser',
+                needsDownload: false
             };
         }
         
@@ -54,17 +55,37 @@ export class TranslationService {
             
             console.log(`Translation availability for ${sourceLanguage}→${targetLanguage}: ${availability}`);
             
+            // Handle different availability states
+            const isAvailable = availability === 'readily' || 
+                               availability === 'available' || 
+                               availability === 'after-download' ||
+                               availability === 'downloadable';
+            
+            const needsDownload = availability === 'after-download' || 
+                                 availability === 'downloadable';
+            
+            let reason = null;
+            if (!isAvailable) {
+                if (availability === 'no' || availability === 'unavailable') {
+                    reason = `Translation not supported for ${sourceLanguage}→${targetLanguage}. This language pair may not be available in your Chrome version.`;
+                } else {
+                    reason = `Translation availability unknown: ${availability}`;
+                }
+            }
+            
             return {
-                available: availability === 'readily' || availability === 'after-download',
+                available: isAvailable,
                 state: availability,
-                needsDownload: availability === 'after-download'
+                needsDownload: needsDownload,
+                reason: reason
             };
         } catch (error) {
             console.error('Error checking translation availability:', error);
             return {
                 available: false,
                 state: 'error',
-                reason: error.message
+                reason: error.message,
+                needsDownload: false
             };
         }
     }
@@ -73,8 +94,9 @@ export class TranslationService {
         // Check availability first
         const availabilityCheck = await this.checkAvailability(sourceLanguage, targetLanguage);
         
-        if (!availabilityCheck.available) {
-            const reason = availabilityCheck.reason || `Translation not supported for ${sourceLanguage}→${targetLanguage}`;
+        // If not available and not downloadable, throw error
+        if (!availabilityCheck.available && !availabilityCheck.needsDownload) {
+            const reason = availabilityCheck.reason || `Translation not supported for ${sourceLanguage}→${targetLanguage}. This language pair may not be available in your Chrome version.`;
             throw new Error(reason);
         }
         
@@ -82,6 +104,9 @@ export class TranslationService {
         if (availabilityCheck.needsDownload) {
             console.log(`Translation model for ${sourceLanguage}→${targetLanguage} needs download. This may take a moment...`);
         }
+        
+        // If availability is 'downloadable', try to create translator anyway (it will trigger download)
+        // The Translator API will handle the download automatically when we create the session
 
         const sessionKey = `${sourceLanguage}-${targetLanguage}`;
         
